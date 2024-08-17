@@ -8,3 +8,7 @@ dependencies:
   - lit
   - zlib
   - gxx_linux-64
+  - pytest
+  - pytest-xdist
+  - greenlet
+  - pybind11
