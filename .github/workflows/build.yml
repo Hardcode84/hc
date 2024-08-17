@@ -94,16 +94,17 @@ jobs:
           cd _build
           $env:CXX="cl.exe"
           $env:CC="cl.exe"
-          cmake ../llvm                                                    `
-            -GNinja                                                        `
-            -DCMAKE_BUILD_TYPE=Release                                     `
-            -DLLVM_ENABLE_PROJECTS=mlir                                    `
-            -DLLVM_ENABLE_ASSERTIONS=ON                                    `
-            -DLLVM_ENABLE_RTTI=ON                                          `
-            -DLLVM_INSTALL_UTILS=ON                                        `
-            -DLLVM_TARGETS_TO_BUILD=X86                                    `
-            -DLLVM_ENABLE_BINDINGS=OFF                                     `
-            -DLLVM_ENABLE_ZSTD=OFF                                         `
+          cmake ../llvm                                                        `
+            -GNinja                                                            `
+            -DCMAKE_BUILD_TYPE=Release                                         `
+            -DLLVM_ENABLE_PROJECTS=mlir                                        `
+            -DLLVM_ENABLE_ASSERTIONS=ON                                        `
+            -DLLVM_ENABLE_RTTI=ON                                              `
+            -DLLVM_INSTALL_UTILS=ON                                            `
+            -DLLVM_TARGETS_TO_BUILD=X86                                        `
+            -DLLVM_ENABLE_BINDINGS=OFF                                         `
+            -DLLVM_ENABLE_ZSTD=OFF                                             `
+            -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   `
             -DLLVM_DISTRIBUTION_COMPONENTS="llvm-headers;llvm-libraries;cmake-exports;FileCheck;count;not;mlir-headers;mlir-libraries;mlir-cmake-exports;mlir-tblgen;mlir-cpu-runner" `
             -DCMAKE_INSTALL_PREFIX="$env:WORKSPACE/llvm-mlir/_mlir_install"
           ninja install-distribution-stripped
@@ -324,26 +325,27 @@ jobs:
           echo "INFO: Need to rebuild LLVM-MLIR. Previous installation for MLIR not found"
           np=`nproc`
           echo "INFO: nproc $np"
-          git clone https://github.com/llvm/llvm-project || exit 1
-          cd llvm-project || exit 1
-          git checkout $LLVM_SHA || exit 1
-          mkdir _build || exit 1
-          cd _build || exit 1
+          git clone https://github.com/llvm/llvm-project
+          cd llvm-project
+          git checkout $LLVM_SHA
+          mkdir _build
+          cd _build
           export CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
           export CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
-          cmake ../llvm                                                    \
-            -GNinja                                                        \
-            -DCMAKE_BUILD_TYPE=Release                                     \
-            -DLLVM_ENABLE_PROJECTS=mlir                                    \
-            -DLLVM_ENABLE_ASSERTIONS=ON                                    \
-            -DLLVM_ENABLE_RTTI=ON                                          \
-            -DLLVM_INSTALL_UTILS=ON                                        \
-            -DLLVM_TARGETS_TO_BUILD=X86                                    \
-            -DLLVM_ENABLE_BINDINGS=OFF                                     \
-            -DLLVM_ENABLE_ZSTD=OFF                                         \
+          cmake ../llvm                                                        \
+            -GNinja                                                            \
+            -DCMAKE_BUILD_TYPE=Release                                         \
+            -DLLVM_ENABLE_PROJECTS=mlir                                        \
+            -DLLVM_ENABLE_ASSERTIONS=ON                                        \
+            -DLLVM_ENABLE_RTTI=ON                                              \
+            -DLLVM_INSTALL_UTILS=ON                                            \
+            -DLLVM_TARGETS_TO_BUILD=X86                                        \
+            -DLLVM_ENABLE_BINDINGS=OFF                                         \
+            -DLLVM_ENABLE_ZSTD=OFF                                             \
+            -DMLIR_ENABLE_BINDINGS_PYTHON=OFF                                  \
             -DLLVM_DISTRIBUTION_COMPONENTS="llvm-headers;llvm-libraries;cmake-exports;FileCheck;count;not;mlir-headers;mlir-libraries;mlir-cmake-exports;mlir-tblgen;mlir-cpu-runner" \
-            -DCMAKE_INSTALL_PREFIX=/home/runner/work/llvm-mlir/_mlir_install || exit 1
-          ninja install-distribution-stripped || exit 1
+            -DCMAKE_INSTALL_PREFIX=/home/runner/work/llvm-mlir/_mlir_install
+          ninja install-distribution-stripped
           cp bin/FileCheck /home/runner/work/llvm-mlir/_mlir_install/bin/
           cp bin/count /home/runner/work/llvm-mlir/_mlir_install/bin/
           cp bin/not /home/runner/work/llvm-mlir/_mlir_install/bin/
@@ -405,11 +407,11 @@ jobs:
           cmake ${GITHUB_WORKSPACE}                                            \
             -GNinja                                                            \
             -DCMAKE_BUILD_TYPE=Release                                         \
-            -DLLVM_DIR="$env:LLVM_DIR/lib/cmake/llvm"                          \
-            -DMLIR_DIR="$env:LLVM_DIR/lib/cmake/mlir"                          \
+            -DLLVM_DIR=${LLVM_DIR}/lib/cmake/llvm                              \
+            -DMLIR_DIR=${LLVM_DIR}/lib/cmake/mlir                              \
             -DHC_ENABLE_TESTS=ON                                               \
             -DHC_ENABLE_TOOLS=ON                                               \
-            -DLLVM_EXTERNAL_LIT="$external_lit"                                \
+            -DLLVM_EXTERNAL_LIT=${EXTERNAL_LIT}
           ninja all
 
       - name: Test HC
