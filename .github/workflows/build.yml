@@ -107,7 +107,7 @@ jobs:
             -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   `
             -DLLVM_DISTRIBUTION_COMPONENTS="llvm-headers;llvm-libraries;cmake-exports;FileCheck;count;not;mlir-headers;mlir-libraries;mlir-cmake-exports;mlir-tblgen;mlir-cpu-runner;mlir-python-sources" `
             -DCMAKE_INSTALL_PREFIX="$env:WORKSPACE/llvm-mlir/_mlir_install"
-          ninja install-distribution-stripped
+          ninja install-distribution
           cp bin/FileCheck.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
           cp bin/count.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
           cp bin/not.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
@@ -345,7 +345,7 @@ jobs:
             -DMLIR_ENABLE_BINDINGS_PYTHON=OFF                                  \
             -DLLVM_DISTRIBUTION_COMPONENTS="llvm-headers;llvm-libraries;cmake-exports;FileCheck;count;not;mlir-headers;mlir-libraries;mlir-cmake-exports;mlir-tblgen;mlir-cpu-runner;mlir-python-sources" \
             -DCMAKE_INSTALL_PREFIX=/home/runner/work/llvm-mlir/_mlir_install
-          ninja install-distribution-stripped
+          ninja install-distribution
           cp bin/FileCheck /home/runner/work/llvm-mlir/_mlir_install/bin/
           cp bin/count /home/runner/work/llvm-mlir/_mlir_install/bin/
           cp bin/not /home/runner/work/llvm-mlir/_mlir_install/bin/
