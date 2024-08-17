@@ -12,3 +12,4 @@ dependencies:
   - pytest-xdist
   - greenlet
   - pybind11
+  - numpy
