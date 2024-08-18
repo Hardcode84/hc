@@ -550,6 +550,25 @@ hc::typing::TypeConstantOp::interpret(InterpreterState &state) {
 
 mlir::FailureOr<bool>
 hc::typing::TypeResolverReturnOp::interpret(InterpreterState &state) {
+  assert(state.result);
+  auto &result = *state.result;
+  mlir::ValueRange args = getArgs();
+
+  auto isSeq = [&]() -> typing::SequenceType {
+    if (args.size() != 1)
+      return {};
+
+    return mlir::dyn_cast_if_present<typing::SequenceType>(
+        getType(state, args.front()));
+  };
+
+  if (auto seq = isSeq()) {
+    for (auto type : seq.getParams())
+      result.emplace_back(type);
+  } else {
+    getTypes(state, args, result);
+  }
+
   state.setCompleted();
   return true;
 }

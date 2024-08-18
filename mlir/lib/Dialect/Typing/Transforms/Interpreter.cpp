@@ -17,7 +17,7 @@ hc::typing::Interpreter::run(mlir::Operation *rootOp, TypeResolverOp resolver,
                              mlir::TypeRange types,
                              llvm::SmallVectorImpl<mlir::Type> &result) {
   assert(!resolver.getBodyRegion().empty());
-  state.init(rootOp, resolver.getBodyRegion().front(), types);
+  state.init(rootOp, resolver.getBodyRegion().front(), types, result);
 
   while (true) {
     mlir::Operation &op = state.getNextOp();
@@ -28,10 +28,8 @@ hc::typing::Interpreter::run(mlir::Operation *rootOp, TypeResolverOp resolver,
     if (!*res)
       return false;
 
-    if (state.isCompleted()) {
-      getTypes(state, op.getOperands(), result);
+    if (state.isCompleted())
       return true;
-    }
   }
   llvm_unreachable("Unreachable");
 }
