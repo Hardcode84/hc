@@ -62,6 +62,7 @@ target_link_libraries(${python_module_name} PRIVATE
     MLIRCAPIDebug
     MLIRCAPIIR
     MLIRCAPIInterfaces
+    MLIRCAPITransforms
     MLIRPass
   )
 
