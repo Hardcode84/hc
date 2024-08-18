@@ -26,6 +26,7 @@ CurrentGroup2 = typing.IdentType.get("hckernel.kernel_api.CurrentGroup2")
 CurrentGroup3 = typing.IdentType.get("hckernel.kernel_api.CurrentGroup3")
 
 GroupLoad = typing.IdentType.get("hckernel.kernel_api.CurrentGroup.load")
+GroupStore = typing.IdentType.get("hckernel.kernel_api.CurrentGroup.store")
 
 
 @func
@@ -129,6 +130,12 @@ def resolver(a: ValueType):
         i += 1
 
     return make_type("Tuple", elements=seq)
+
+
+@type_resolver(_registry, ["py_ir.tuple_unpack"])
+def resolver(a: ValueType):
+    check_is_tuple(a)
+    return get_type_param(a, "elements")
 
 
 @type_resolver(_registry, ["py_ir.getitem"])
@@ -282,8 +289,36 @@ def resolver(target: ValueType):
 @type_resolver(_registry, ["py_ir.call"])
 def resolver(func: ValueType):
     check_type(func, GroupLoad)
-    buffer = get_arg(1)
-    shape = get_arg(2)
+    buffer = get_named_arg("array")
+    if is_same(buffer, NoneTyp):
+        buffer = get_arg(1)
+
+    shape = get_named_arg("shape")
+    if is_same(shape, NoneTyp):
+        shape = get_arg(2)
     check_is_tuple(shape)
     elements = get_type_param(shape, "elements")
     return make_type("Tensor", dims=elements, dtype=get_type_param(buffer, "dtype"))
+
+
+@type_resolver(_registry, ["py_ir.getattr", "store"])
+def resolver(target: ValueType):
+    check_is_current_group(target)
+    return GroupStore
+
+
+@type_resolver(_registry, ["py_ir.call"])
+def resolver(func: ValueType):
+    check_type(func, GroupStore)
+    dst = get_named_arg("dst")
+    if is_same(dst, NoneTyp):
+        dst = get_arg(1)
+
+    check_is_shaped(dst)
+
+    src = get_named_arg("src")
+    if is_same(src, NoneTyp):
+        src = get_arg(2)
+
+    check_is_shaped(src)
+    return NoneTyp
