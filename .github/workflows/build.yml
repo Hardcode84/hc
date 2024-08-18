@@ -1,0 +1,481 @@
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Run tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  LLVM_SHA_FILE: llvm-sha.txt
+
+jobs:
+  build_llvm_win:
+    env:
+      CORE_ENV_FILE: scripts/core-env-win.yml
+    name: Builds Windows LLVM/MLIR
+    runs-on: windows-2019
+    timeout-minutes: 420
+
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          vsversion : "2019"
+
+      - name: Disable Defender
+        shell: powershell
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache conda packages
+        uses: actions/cache@v3
+        env:
+          CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: ~/conda_pkgs_dir
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
+
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          run-post: false
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
+          activate-environment: test-env
+          environment-file: ${{ env.CORE_ENV_FILE }}
+          python-version: "3.10"
+          channels: conda-forge
+
+      - name: Setup Cache Vars
+        run: |
+          $sha = (cat "$env:GITHUB_WORKSPACE\$env:LLVM_SHA_FILE")
+          echo "LLVM_SHA=$sha" >> $env:GITHUB_ENV
+          $wspath = (Resolve-Path "$env:GITHUB_WORKSPACE\..\")
+          echo "WORKSPACE=$wspath" >> $env:GITHUB_ENV
+          cat $env:GITHUB_ENV
+
+      - name: Cache LLVM-MLIR
+        id: cache-llvm-mlir
+        uses: actions/cache@v3
+        env:
+          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: |
+            D:\a\hc\llvm-mlir\_mlir_install\**
+          key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
+
+      - name: Build LLVM-MLIR
+        if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
+        timeout-minutes: 420
+        run: |
+          conda list
+          cd $env:WORKSPACE
+          mkdir -ea 0 -p llvm-mlir
+          pushd llvm-mlir
+          echo "INFO: Need to rebuild LLVM-MLIR. Previous installation for MLIR not found"
+          git clone https://github.com/llvm/llvm-project
+          cd llvm-project
+          git checkout $env:LLVM_SHA
+          mkdir _build
+          cd _build
+          $env:CXX="cl.exe"
+          $env:CC="cl.exe"
+          cmake ../llvm                                                        `
+            -GNinja                                                            `
+            -DCMAKE_BUILD_TYPE=Release                                         `
+            -DLLVM_ENABLE_PROJECTS=mlir                                        `
+            -DLLVM_ENABLE_ASSERTIONS=ON                                        `
+            -DLLVM_ENABLE_RTTI=ON                                              `
+            -DLLVM_INSTALL_UTILS=ON                                            `
+            -DLLVM_TARGETS_TO_BUILD=X86                                        `
+            -DLLVM_ENABLE_BINDINGS=OFF                                         `
+            -DLLVM_ENABLE_ZSTD=OFF                                             `
+            -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   `
+            -DCMAKE_INSTALL_PREFIX="$env:WORKSPACE/llvm-mlir/_mlir_install"
+          ninja install
+          cp bin/FileCheck.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
+          cp bin/count.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
+          cp bin/not.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
+          popd
+
+  test_win:
+    env:
+      CORE_ENV_FILE: scripts/core-env-win.yml
+    name: "Windows: Run HC tests"
+    runs-on: windows-2019
+    timeout-minutes: 420
+    needs: build_llvm_win
+
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          vsversion : "2019"
+
+      - name: Disable Defender
+        shell: powershell
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          run-post: false
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
+          activate-environment: test-env
+          environment-file: ${{ env.CORE_ENV_FILE }}
+          python-version: "3.10"
+          channels: conda-forge
+
+      - name: Setup Cache Vars
+        run: |
+          $sha = (cat "$env:GITHUB_WORKSPACE\$env:LLVM_SHA_FILE")
+          echo "LLVM_SHA=$sha" >> $env:GITHUB_ENV
+          $wspath = (Resolve-Path "$env:GITHUB_WORKSPACE\..\")
+          echo "WORKSPACE=$wspath" >> $env:GITHUB_ENV
+          cat $env:GITHUB_ENV
+
+      - name: Cache LLLVM-MLIR
+        id: cache-llvm-mlir
+        uses: actions/cache@v3
+        env:
+          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: |
+            D:\a\hc\llvm-mlir\_mlir_install\**
+          key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
+
+
+      - name: Build HC
+        run: |
+          $external_lit="$env:GITHUB_WORKSPACE\scripts\runlit.py"
+          $env:LLVM_DIR=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
+          mkdir -p cmake_build
+          cd cmake_build
+          cmake "$env:GITHUB_WORKSPACE"                                        `
+            -GNinja                                                            `
+            -DCMAKE_BUILD_TYPE=Release                                         `
+            -DLLVM_DIR="$env:LLVM_DIR/lib/cmake/llvm"                          `
+            -DMLIR_DIR="$env:LLVM_DIR/lib/cmake/mlir"                          `
+            -DHC_ENABLE_TESTS=ON                                               `
+            -DHC_ENABLE_TOOLS=ON                                               `
+            -DLLVM_EXTERNAL_LIT="$external_lit"
+          ninja all
+
+      - name: Test HC
+        run: |
+          cd cmake_build
+          ninja check-hc
+
+
+  test_python_win:
+    env:
+      CORE_ENV_FILE: scripts/core-env-win.yml
+    name: "Windows: Run HC python tests"
+    runs-on: windows-2019
+    timeout-minutes: 420
+    needs: build_llvm_win
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          vsversion : "2019"
+
+      - name: Disable Defender
+        shell: powershell
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          run-post: false
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
+          activate-environment: test-env
+          environment-file: ${{ env.CORE_ENV_FILE }}
+          python-version: ${{ matrix.python }}
+          channels: conda-forge
+
+      - name: Setup Cache Vars
+        run: |
+          $sha = (cat "$env:GITHUB_WORKSPACE\$env:LLVM_SHA_FILE")
+          echo "LLVM_SHA=$sha" >> $env:GITHUB_ENV
+          $wspath = (Resolve-Path "$env:GITHUB_WORKSPACE\..\")
+          echo "WORKSPACE=$wspath" >> $env:GITHUB_ENV
+          cat $env:GITHUB_ENV
+
+      - name: Cache LLLVM-MLIR
+        id: cache-llvm-mlir
+        uses: actions/cache@v3
+        env:
+          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: |
+            D:\a\hc\llvm-mlir\_mlir_install\**
+          key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
+
+
+      - name: Build python package
+        run: |
+          cd python
+          $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
+          python setup.py develop
+
+      - name: Test HC
+        run: |
+          cd python
+          pytest hckernel -vv --capture=tee-sys -rXF
+
+
+  build_llvm_linux:
+    env:
+      CORE_ENV_FILE: scripts/core-env-linux.yml
+    name: Builds Linux LLVM/MLIR
+    runs-on: ubuntu-20.04
+    defaults:
+      run:
+        shell: bash -el {0}
+    timeout-minutes: 420
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache conda packages
+        uses: actions/cache@v3
+        env:
+          CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: ~/.conda/pkgs
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
+
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          run-post: false
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
+          activate-environment: test-env
+          environment-file: ${{ env.CORE_ENV_FILE }}
+          python-version: "3.10"
+          channels: conda-forge
+
+      - name: Setup Cache Vars
+        run: |
+          echo 'LLVM_SHA<<EOF' >> $GITHUB_ENV
+          cat $GITHUB_WORKSPACE/$LLVM_SHA_FILE >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+
+      - name: Cache LLLVM-MLIR
+        id: cache-llvm-mlir
+        uses: actions/cache@v3
+        env:
+          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: |
+            /home/runner/work/llvm-mlir/_mlir_install/**
+          key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
+
+      - name: Build LLVM-MLIR
+        if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        timeout-minutes: 420
+        run: |
+          mkdir -p /home/runner/work/llvm-mlir
+          pushd /home/runner/work/llvm-mlir
+          echo "INFO: Need to rebuild LLVM-MLIR. Previous installation for MLIR not found"
+          np=`nproc`
+          echo "INFO: nproc $np"
+          git clone https://github.com/llvm/llvm-project
+          cd llvm-project
+          git checkout $LLVM_SHA
+          mkdir _build
+          cd _build
+          export CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
+          export CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
+          cmake ../llvm                                                        \
+            -GNinja                                                            \
+            -DCMAKE_BUILD_TYPE=Release                                         \
+            -DLLVM_ENABLE_PROJECTS=mlir                                        \
+            -DLLVM_ENABLE_ASSERTIONS=ON                                        \
+            -DLLVM_ENABLE_RTTI=ON                                              \
+            -DLLVM_INSTALL_UTILS=ON                                            \
+            -DLLVM_TARGETS_TO_BUILD=X86                                        \
+            -DLLVM_ENABLE_BINDINGS=OFF                                         \
+            -DLLVM_ENABLE_ZSTD=OFF                                             \
+            -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   \
+            -DCMAKE_INSTALL_PREFIX=/home/runner/work/llvm-mlir/_mlir_install
+          ninja install
+          cp bin/FileCheck /home/runner/work/llvm-mlir/_mlir_install/bin/
+          cp bin/count /home/runner/work/llvm-mlir/_mlir_install/bin/
+          cp bin/not /home/runner/work/llvm-mlir/_mlir_install/bin/
+          popd
+
+  test_linux:
+    env:
+      CORE_ENV_FILE: scripts/core-env-linux.yml
+    name: "Linux: Run HC tests"
+    runs-on: ubuntu-20.04
+    defaults:
+      run:
+        shell: bash -el {0}
+    timeout-minutes: 420
+    needs: build_llvm_linux
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          run-post: false
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
+          activate-environment: test-env
+          environment-file: ${{ env.CORE_ENV_FILE }}
+          python-version: "3.10"
+          channels: conda-forge
+
+      - name: Setup Cache Vars
+        run: |
+          echo 'LLVM_SHA<<EOF' >> $GITHUB_ENV
+          cat $GITHUB_WORKSPACE/$LLVM_SHA_FILE >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+
+      - name: Cache LLLVM-MLIR
+        id: cache-llvm-mlir
+        uses: actions/cache@v3
+        env:
+          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: |
+            /home/runner/work/llvm-mlir/_mlir_install/**
+          key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
+
+
+      - name: Build HC
+        run: |
+          export EXTERNAL_LIT=${GITHUB_WORKSPACE}/scripts/runlit.py
+          export LLVM_DIR=/home/runner/work/llvm-mlir/_mlir_install
+          mkdir -p cmake_build
+          cd cmake_build
+          cmake ${GITHUB_WORKSPACE}                                            \
+            -GNinja                                                            \
+            -DCMAKE_BUILD_TYPE=Release                                         \
+            -DLLVM_DIR=${LLVM_DIR}/lib/cmake/llvm                              \
+            -DMLIR_DIR=${LLVM_DIR}/lib/cmake/mlir                              \
+            -DHC_ENABLE_TESTS=ON                                               \
+            -DHC_ENABLE_TOOLS=ON                                               \
+            -DLLVM_EXTERNAL_LIT=${EXTERNAL_LIT}
+          ninja all
+
+      - name: Test HC
+        run: |
+          cd cmake_build
+          ninja check-hc
+
+
+  test_python_linux:
+    env:
+      CORE_ENV_FILE: scripts/core-env-linux.yml
+    name: "Linux: Run HC python tests"
+    runs-on: ubuntu-20.04
+    defaults:
+      run:
+        shell: bash -el {0}
+    timeout-minutes: 420
+    needs: build_llvm_linux
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          run-post: false
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
+          activate-environment: test-env
+          environment-file: ${{ env.CORE_ENV_FILE }}
+          python-version: ${{ matrix.python }}
+          channels: conda-forge
+
+      - name: Setup Cache Vars
+        run: |
+          echo 'LLVM_SHA<<EOF' >> $GITHUB_ENV
+          cat $GITHUB_WORKSPACE/$LLVM_SHA_FILE >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+
+      - name: Cache LLLVM-MLIR
+        id: cache-llvm-mlir
+        uses: actions/cache@v3
+        env:
+          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: |
+            /home/runner/work/llvm-mlir/_mlir_install/**
+          key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
+
+
+      - name: Build python package
+        run: |
+          cd python
+          export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
+          python setup.py develop
+
+      - name: Test HC
+        run: |
+          cd python
+          pytest hckernel -vv --capture=tee-sys -rXF

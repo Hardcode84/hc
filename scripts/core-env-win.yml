@@ -1,0 +1,16 @@
+name: dev
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - cmake
+  - ninja
+  - lit
+  - zlib
+  - vs2019_win-64
+  - pytest
+  - pytest-xdist
+  - greenlet
+  - pybind11
+  - numpy
+  - sympy
