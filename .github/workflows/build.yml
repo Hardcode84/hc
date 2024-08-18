@@ -344,8 +344,6 @@ jobs:
             -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   \
             -DCMAKE_INSTALL_PREFIX=/home/runner/work/llvm-mlir/_mlir_install
           ninja install
-          strip /home/runner/work/llvm-mlir/_mlir_install/bin/* || true
-          strip /home/runner/work/llvm-mlir/_mlir_install/lib/* || true
           cp bin/FileCheck /home/runner/work/llvm-mlir/_mlir_install/bin/
           cp bin/count /home/runner/work/llvm-mlir/_mlir_install/bin/
           cp bin/not /home/runner/work/llvm-mlir/_mlir_install/bin/
