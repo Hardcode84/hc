@@ -341,7 +341,7 @@ jobs:
             -DLLVM_TARGETS_TO_BUILD=X86                                        \
             -DLLVM_ENABLE_BINDINGS=OFF                                         \
             -DLLVM_ENABLE_ZSTD=OFF                                             \
-            -DMLIR_ENABLE_BINDINGS_PYTHON=OFF                                  \
+            -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   \
             -DCMAKE_INSTALL_PREFIX=/home/runner/work/llvm-mlir/_mlir_install
           ninja install
           cp bin/FileCheck /home/runner/work/llvm-mlir/_mlir_install/bin/
