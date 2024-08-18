@@ -13,3 +13,4 @@ dependencies:
   - greenlet
   - pybind11
   - numpy
+  - sympy
