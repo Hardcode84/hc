@@ -19,7 +19,7 @@ set(HEADERS_LIST
 
 add_library(${PROJECT_NAME} STATIC ${SOURCES_LIST} ${HEADERS_LIST})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE
+target_link_libraries(${PROJECT_NAME} PUBLIC
     hc_core
     pybind11::module
     )
