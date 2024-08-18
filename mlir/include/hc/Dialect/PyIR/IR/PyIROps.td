@@ -445,7 +445,9 @@ def PyIR_TuplePackOp : PyIR_OpBase<"tuple_pack", [
   let assemblyFormat = "attr-dict $args `:` type($args) `->` type($result)";
 }
 
-def PyIR_TupleUnpackOp : PyIR_OpBase<"tuple_unpack"> {
+def PyIR_TupleUnpackOp : PyIR_OpBase<"tuple_unpack", [
+  Pure, DeclareOpInterfaceMethods<TypingKeyInterface>
+]> {
   let arguments = (ins AnyType:$arg);
 
   let results = (outs Variadic<AnyType>:$results);
