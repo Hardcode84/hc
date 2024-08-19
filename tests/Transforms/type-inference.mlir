@@ -72,6 +72,232 @@ py_ir.module {
 
 // -----
 
+typing.type_resolver ["py_ir.loadvar", "a"] {
+  %0 = typing.type_constant #typing.type_attr<!typing<literal "A">> : !typing.value
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver ["py_ir.loadvar", "func"] {
+  %0 = typing.type_constant #typing.type_attr<!typing<ident "func">> : !typing.value
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver ["py_ir.call"] {
+  %c0 = arith.constant 0: index
+  %c1 = arith.constant 1: index
+  %0 = typing.make_ident "func" []
+  %1 = typing.get_arg %c0
+  %2 = typing.is_same %0 %1
+  typing.check %2
+
+  %3 = typing.get_arg %c1
+  %4 = typing.get_metatype_name %3
+
+  typing.type_resolver_return %4
+}
+
+//       CHECK: ![[LIT:.*]] = !typing<literal "Literal">
+// CHECK-LABEL: py_ir.module {
+//       CHECK:  py_ir.call %1 : !{{.*}}  (%0) : !{{.*}} -> ![[LIT]]
+//       CHECK: }
+
+py_ir.module {
+  %0 = py_ir.loadvar "a" : !py_ir.undefined
+  %1 = py_ir.loadvar "func" : !py_ir.undefined
+  %2 = py_ir.call %1 : !py_ir.undefined  (%0) : !py_ir.undefined -> !py_ir.undefined
+}
+
+// -----
+
+typing.type_resolver ["py_ir.loadvar", "a"] {
+  %0 = typing.type_constant #typing.type_attr<!typing<ident "A">> : !typing.value
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver ["py_ir.loadvar", "func"] {
+  %0 = typing.type_constant #typing.type_attr<!typing<ident "func">> : !typing.value
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver ["py_ir.call"] {
+  %c0 = arith.constant 0: index
+  %c1 = arith.constant 1: index
+  %0 = typing.make_ident "func" []
+  %1 = typing.get_arg %c0
+  %2 = typing.is_same %0 %1
+  typing.check %2
+
+  %3 = typing.get_arg %c1
+  %4 = typing.get_metatype_name %3
+
+  typing.type_resolver_return %4
+}
+
+//       CHECK: ![[LIT:.*]] = !typing<literal "Ident">
+// CHECK-LABEL: py_ir.module {
+//       CHECK:  py_ir.call %1 : !{{.*}}  (%0) : !{{.*}} -> ![[LIT]]
+//       CHECK: }
+
+py_ir.module {
+  %0 = py_ir.loadvar "a" : !py_ir.undefined
+  %1 = py_ir.loadvar "func" : !py_ir.undefined
+  %2 = py_ir.call %1 : !py_ir.undefined  (%0) : !py_ir.undefined -> !py_ir.undefined
+}
+
+// -----
+
+typing.type_resolver ["py_ir.loadvar", "a"] {
+  %0 = typing.type_constant #typing.type_attr<!typing<symbol "A">> : !typing.value
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver ["py_ir.loadvar", "func"] {
+  %0 = typing.type_constant #typing.type_attr<!typing<ident "func">> : !typing.value
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver ["py_ir.call"] {
+  %c0 = arith.constant 0: index
+  %c1 = arith.constant 1: index
+  %0 = typing.make_ident "func" []
+  %1 = typing.get_arg %c0
+  %2 = typing.is_same %0 %1
+  typing.check %2
+
+  %3 = typing.get_arg %c1
+  %4 = typing.get_metatype_name %3
+
+  typing.type_resolver_return %4
+}
+
+//       CHECK: ![[LIT:.*]] = !typing<literal "Symbol">
+// CHECK-LABEL: py_ir.module {
+//       CHECK:  py_ir.call %1 : !{{.*}}  (%0) : !{{.*}} -> ![[LIT]]
+//       CHECK: }
+
+py_ir.module {
+  %0 = py_ir.loadvar "a" : !py_ir.undefined
+  %1 = py_ir.loadvar "func" : !py_ir.undefined
+  %2 = py_ir.call %1 : !py_ir.undefined  (%0) : !py_ir.undefined -> !py_ir.undefined
+}
+
+// -----
+
+typing.type_resolver ["py_ir.loadvar", "a"] {
+  %0 = typing.type_constant #typing.type_attr<!typing<sequence i32, i64>> : !typing.value
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver ["py_ir.loadvar", "func"] {
+  %0 = typing.type_constant #typing.type_attr<!typing<ident "func">> : !typing.value
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver ["py_ir.call"] {
+  %c0 = arith.constant 0: index
+  %c1 = arith.constant 1: index
+  %0 = typing.make_ident "func" []
+  %1 = typing.get_arg %c0
+  %2 = typing.is_same %0 %1
+  typing.check %2
+
+  %3 = typing.get_arg %c1
+  %4 = typing.get_metatype_name %3
+
+  typing.type_resolver_return %4
+}
+
+//       CHECK: ![[LIT:.*]] = !typing<literal "Sequence">
+// CHECK-LABEL: py_ir.module {
+//       CHECK:  py_ir.call %1 : !{{.*}}  (%0) : !{{.*}} -> ![[LIT]]
+//       CHECK: }
+
+py_ir.module {
+  %0 = py_ir.loadvar "a" : !py_ir.undefined
+  %1 = py_ir.loadvar "func" : !py_ir.undefined
+  %2 = py_ir.call %1 : !py_ir.undefined  (%0) : !py_ir.undefined -> !py_ir.undefined
+}
+
+// -----
+
+!identA = !typing<ident "A">
+!identB = !typing<ident "B">
+typing.type_resolver ["py_ir.loadvar", "a"] {
+  %0 = typing.type_constant #typing.type_attr<!typing<union !identA, !identB>> : !typing.value
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver ["py_ir.loadvar", "func"] {
+  %0 = typing.type_constant #typing.type_attr<!typing<ident "func">> : !typing.value
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver ["py_ir.call"] {
+  %c0 = arith.constant 0: index
+  %c1 = arith.constant 1: index
+  %0 = typing.make_ident "func" []
+  %1 = typing.get_arg %c0
+  %2 = typing.is_same %0 %1
+  typing.check %2
+
+  %3 = typing.get_arg %c1
+  %4 = typing.get_metatype_name %3
+
+  typing.type_resolver_return %4
+}
+
+//       CHECK: ![[LIT:.*]] = !typing<literal "Union">
+// CHECK-LABEL: py_ir.module {
+//       CHECK:  py_ir.call %1 : !{{.*}}  (%0) : !{{.*}} -> ![[LIT]]
+//       CHECK: }
+
+py_ir.module {
+  %0 = py_ir.loadvar "a" : !py_ir.undefined
+  %1 = py_ir.loadvar "func" : !py_ir.undefined
+  %2 = py_ir.call %1 : !py_ir.undefined  (%0) : !py_ir.undefined -> !py_ir.undefined
+}
+
+// -----
+
+!symA = !typing<symbol "A">
+!symB = !typing<symbol "B">
+typing.type_resolver ["py_ir.loadvar", "a"] {
+  %0 = typing.type_constant #typing.type_attr<!typing<expr (!symA, !symB) -> s0 + s1>> : !typing.value
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver ["py_ir.loadvar", "func"] {
+  %0 = typing.type_constant #typing.type_attr<!typing<ident "func">> : !typing.value
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver ["py_ir.call"] {
+  %c0 = arith.constant 0: index
+  %c1 = arith.constant 1: index
+  %0 = typing.make_ident "func" []
+  %1 = typing.get_arg %c0
+  %2 = typing.is_same %0 %1
+  typing.check %2
+
+  %3 = typing.get_arg %c1
+  %4 = typing.get_metatype_name %3
+
+  typing.type_resolver_return %4
+}
+
+//       CHECK: ![[LIT:.*]] = !typing<literal "Expr">
+// CHECK-LABEL: py_ir.module {
+//       CHECK:  py_ir.call %1 : !{{.*}}  (%0) : !{{.*}} -> ![[LIT]]
+//       CHECK: }
+
+py_ir.module {
+  %0 = py_ir.loadvar "a" : !py_ir.undefined
+  %1 = py_ir.loadvar "func" : !py_ir.undefined
+  %2 = py_ir.call %1 : !py_ir.undefined  (%0) : !py_ir.undefined -> !py_ir.undefined
+}
+
+// -----
+
 func.func @test_func(%0: !typing.value) -> (!typing.value) {
   return %0 : !typing.value
 }

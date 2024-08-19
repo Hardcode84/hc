@@ -349,6 +349,16 @@ def Typing_GetIdentParamOp : Typing_OpBase<"get_ident_param", [
   let assemblyFormat = "attr-dict $ident $name";
 }
 
+def Typing_GetMetatypeNameOp : Typing_OpBase<"get_metatype_name", [
+  Pure, DeclareOpInterfaceMethods<TypingInterpreterInterface>,
+  DeclareOpInterfaceMethods<TypingKeyInterface>
+]> {
+  let arguments = (ins Typing_ValueType:$value);
+  let results = (outs Typing_ValueType:$result);
+
+  let assemblyFormat = "attr-dict $value";
+}
+
 def Typing_CreateSeqOp : Typing_OpBase<"create_seq", [
   Pure,
   DeclareOpInterfaceMethods<TypingInterpreterInterface>,

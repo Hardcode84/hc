@@ -164,5 +164,10 @@ def get_type_param(type, name):
 
 
 @_register_func
+def get_metatype_name(type):
+    _stub_error()
+
+
+@_register_func
 def get_global_attr(name):
     _stub_error()
