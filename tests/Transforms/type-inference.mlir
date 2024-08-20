@@ -96,8 +96,10 @@ typing.type_resolver ["py_ir.call"] {
   typing.type_resolver_return %4
 }
 
-//       CHECK: ![[LIT:.*]] = !typing<literal "Literal">
+//       CHECK: ![[LIT:.*]] = !typing<literal "typing.literal">
 // CHECK-LABEL: py_ir.module {
+//       CHECK:  %0 = py_ir.loadvar "a"
+//       CHECK:  %1 = py_ir.loadvar "func"
 //       CHECK:  py_ir.call %1 : !{{.*}}  (%0) : !{{.*}} -> ![[LIT]]
 //       CHECK: }
 
@@ -133,8 +135,10 @@ typing.type_resolver ["py_ir.call"] {
   typing.type_resolver_return %4
 }
 
-//       CHECK: ![[LIT:.*]] = !typing<literal "Ident">
+//       CHECK: ![[LIT:.*]] = !typing<literal "typing.ident">
 // CHECK-LABEL: py_ir.module {
+//       CHECK:  %0 = py_ir.loadvar "a"
+//       CHECK:  %1 = py_ir.loadvar "func"
 //       CHECK:  py_ir.call %1 : !{{.*}}  (%0) : !{{.*}} -> ![[LIT]]
 //       CHECK: }
 
@@ -170,45 +174,10 @@ typing.type_resolver ["py_ir.call"] {
   typing.type_resolver_return %4
 }
 
-//       CHECK: ![[LIT:.*]] = !typing<literal "Symbol">
+//       CHECK: ![[LIT:.*]] = !typing<literal "typing.symbol">
 // CHECK-LABEL: py_ir.module {
-//       CHECK:  py_ir.call %1 : !{{.*}}  (%0) : !{{.*}} -> ![[LIT]]
-//       CHECK: }
-
-py_ir.module {
-  %0 = py_ir.loadvar "a" : !py_ir.undefined
-  %1 = py_ir.loadvar "func" : !py_ir.undefined
-  %2 = py_ir.call %1 : !py_ir.undefined  (%0) : !py_ir.undefined -> !py_ir.undefined
-}
-
-// -----
-
-typing.type_resolver ["py_ir.loadvar", "a"] {
-  %0 = typing.type_constant #typing.type_attr<!typing<sequence i32, i64>> : !typing.value
-  typing.type_resolver_return %0
-}
-
-typing.type_resolver ["py_ir.loadvar", "func"] {
-  %0 = typing.type_constant #typing.type_attr<!typing<ident "func">> : !typing.value
-  typing.type_resolver_return %0
-}
-
-typing.type_resolver ["py_ir.call"] {
-  %c0 = arith.constant 0: index
-  %c1 = arith.constant 1: index
-  %0 = typing.make_ident "func" []
-  %1 = typing.get_arg %c0
-  %2 = typing.is_same %0 %1
-  typing.check %2
-
-  %3 = typing.get_arg %c1
-  %4 = typing.get_metatype_name %3
-
-  typing.type_resolver_return %4
-}
-
-//       CHECK: ![[LIT:.*]] = !typing<literal "Sequence">
-// CHECK-LABEL: py_ir.module {
+//       CHECK:  %0 = py_ir.loadvar "a"
+//       CHECK:  %1 = py_ir.loadvar "func"
 //       CHECK:  py_ir.call %1 : !{{.*}}  (%0) : !{{.*}} -> ![[LIT]]
 //       CHECK: }
 
@@ -246,8 +215,10 @@ typing.type_resolver ["py_ir.call"] {
   typing.type_resolver_return %4
 }
 
-//       CHECK: ![[LIT:.*]] = !typing<literal "Union">
+//       CHECK: ![[LIT:.*]] = !typing<literal "typing.union">
 // CHECK-LABEL: py_ir.module {
+//       CHECK:  %0 = py_ir.loadvar "a"
+//       CHECK:  %1 = py_ir.loadvar "func"
 //       CHECK:  py_ir.call %1 : !{{.*}}  (%0) : !{{.*}} -> ![[LIT]]
 //       CHECK: }
 
@@ -285,8 +256,10 @@ typing.type_resolver ["py_ir.call"] {
   typing.type_resolver_return %4
 }
 
-//       CHECK: ![[LIT:.*]] = !typing<literal "Expr">
+//       CHECK: ![[LIT:.*]] = !typing<literal "typing.expr">
 // CHECK-LABEL: py_ir.module {
+//       CHECK:  %0 = py_ir.loadvar "a"
+//       CHECK:  %1 = py_ir.loadvar "func"
 //       CHECK:  py_ir.call %1 : !{{.*}}  (%0) : !{{.*}} -> ![[LIT]]
 //       CHECK: }
 

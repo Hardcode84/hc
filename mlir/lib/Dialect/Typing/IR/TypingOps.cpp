@@ -709,22 +709,7 @@ mlir::FailureOr<bool>
 hc::typing::GetMetatypeNameOp::interpret(InterpreterState &state) {
   auto *ctx = getContext();
   auto type = hc::typing::getType(state, getValue());
-  std::string name = "Unknown metatype";
-  if (mlir::isa<hc::typing::IdentType>(type)) {
-    name = "Ident";
-  } else if (mlir::isa<hc::typing::SequenceType>(type)) {
-    name = "Sequence";
-  } else if (mlir::isa<hc::typing::SymbolType>(type)) {
-    name = "Symbol";
-  } else if (mlir::isa<hc::typing::LiteralType>(type)) {
-    name = "Literal";
-  } else if (mlir::isa<hc::typing::UnionType>(type)) {
-    name = "Union";
-  } else if (mlir::isa<hc::typing::ExprType>(type)) {
-    name = "Expr";
-  } else {
-    return emitError("Unknown metatype of type ") << type;
-  }
+  mlir::StringRef name = type.getAbstractType().getName();
 
   state.state[getResult()] =
       hc::typing::LiteralType::get(mlir::StringAttr::get(ctx, name));

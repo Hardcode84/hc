@@ -427,6 +427,7 @@ typing.type_resolver ["py_ir.getattr", "get_metatype_name"] {
   typing.check %2
 
   %3 = typing.make_ident "hckernel.typing.get_metatype_name" []
+  typing.type_resolver_return %3
 }
 
 typing.type_resolver ["py_ir.call"] {
