@@ -706,6 +706,17 @@ hc::typing::GetIdentParamOp::interpret(InterpreterState &state) {
 }
 
 mlir::FailureOr<bool>
+hc::typing::GetMetatypeNameOp::interpret(InterpreterState &state) {
+  auto *ctx = getContext();
+  auto type = hc::typing::getType(state, getValue());
+  mlir::StringRef name = type.getAbstractType().getName();
+
+  state.state[getResult()] =
+      hc::typing::LiteralType::get(mlir::StringAttr::get(ctx, name));
+  return true;
+}
+
+mlir::FailureOr<bool>
 hc::typing::CreateSeqOp::interpret(InterpreterState &state) {
   state.state[getResult()] = SequenceType::get(getContext(), std::nullopt);
   return true;

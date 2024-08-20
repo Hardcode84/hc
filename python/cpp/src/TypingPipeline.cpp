@@ -117,6 +117,10 @@ static mlir::LogicalResult convertCall(mlir::PatternRewriter &builder,
            vt,
            {vt},
            &convertCall<hc::typing::GetIdentNameOp, 1>},
+          {"get_metatype_name",
+           vt,
+           {vt},
+           &convertCall<hc::typing::GetMetatypeNameOp, 1>},
       };
 
   for (auto &&[funcName, resType, argTypes, handler] : handlers) {
