@@ -4,8 +4,8 @@
 
 #include "hc/Dialect/Typing/IR/TypingOpsInterfaces.hpp"
 
-static mlir::FailureOr<bool> handleOp(hc::typing::InterpreterState &state,
-                                      mlir::Operation &op) {
+static mlir::FailureOr<hc::typing::InterpreterResult>
+handleOp(hc::typing::InterpreterState &state, mlir::Operation &op) {
   if (auto iface = mlir::dyn_cast<hc::typing::TypingInterpreterInterface>(op))
     return iface.interpret(state);
 
@@ -25,11 +25,16 @@ hc::typing::Interpreter::run(mlir::Operation *rootOp, TypeResolverOp resolver,
     if (mlir::failed(res))
       return mlir::failure();
 
-    if (!*res)
+    switch (*res) {
+    case InterpreterResult::MatchFail:
       return false;
-
-    if (state.isCompleted())
+    case InterpreterResult::MatchSuccess:
       return true;
+    case InterpreterResult::Advance:
+      continue;
+    default:
+      llvm_unreachable("Invalid type interpreter state");
+    }
   }
   llvm_unreachable("Unreachable");
 }

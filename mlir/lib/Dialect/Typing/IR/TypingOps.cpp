@@ -141,9 +141,10 @@ hc::typing::CastOp::inferTypes(mlir::TypeRange types,
   return true;
 }
 
-mlir::FailureOr<bool> hc::typing::CastOp::interpret(InterpreterState &state) {
+mlir::FailureOr<hc::typing::InterpreterResult>
+hc::typing::CastOp::interpret(InterpreterState &state) {
   state.state[getResult()] = getVal(state, getValue());
-  return true;
+  return InterpreterResult::Advance;
 }
 
 bool hc::typing::ValueCastOp::areCastCompatible(mlir::TypeRange inputs,
@@ -182,7 +183,7 @@ mlir::FailureOr<bool> hc::typing::ValueCastOp::inferTypes(
   return true;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::ValueCastOp::interpret(InterpreterState &state) {
   mlir::Type dstType = getType();
   if (dstType.isIntOrIndex()) {
@@ -191,7 +192,7 @@ hc::typing::ValueCastOp::interpret(InterpreterState &state) {
       return emitOpError("Invalid src val");
 
     state.state[getResult()] = setInt(getContext(), *val);
-    return true;
+    return InterpreterResult::Advance;
   }
 
   return emitOpError("Unsupported cast");
@@ -224,22 +225,22 @@ static mlir::LogicalResult jumpToBlock(mlir::Operation *op,
 struct BranchOpInterpreterInterface final
     : public hc::typing::TypingInterpreterInterface::ExternalModel<
           BranchOpInterpreterInterface, mlir::cf::BranchOp> {
-  mlir::FailureOr<bool> interpret(mlir::Operation *o,
-                                  InterpreterState &state) const {
+  mlir::FailureOr<hc::typing::InterpreterResult>
+  interpret(mlir::Operation *o, InterpreterState &state) const {
     auto op = mlir::cast<mlir::cf::BranchOp>(o);
     if (mlir::failed(
             jumpToBlock(op, state, op.getDest(), op.getDestOperands())))
       return mlir::failure();
 
-    return true;
+    return InterpreterResult::Advance;
   }
 };
 
 struct CondBranchOpInterpreterInterface final
     : public hc::typing::TypingInterpreterInterface::ExternalModel<
           CondBranchOpInterpreterInterface, mlir::cf::CondBranchOp> {
-  mlir::FailureOr<bool> interpret(mlir::Operation *o,
-                                  InterpreterState &state) const {
+  mlir::FailureOr<hc::typing::InterpreterResult>
+  interpret(mlir::Operation *o, InterpreterState &state) const {
     auto op = mlir::cast<mlir::cf::CondBranchOp>(o);
     auto cond = getInt(state, op.getCondition());
     if (!cond)
@@ -252,30 +253,30 @@ struct CondBranchOpInterpreterInterface final
     if (mlir::failed(jumpToBlock(op, state, dest, destArgs)))
       return mlir::failure();
 
-    return true;
+    return InterpreterResult::Advance;
   }
 };
 
 struct ConstantOpInterpreterInterface final
     : public hc::typing::TypingInterpreterInterface::ExternalModel<
           ConstantOpInterpreterInterface, mlir::arith::ConstantOp> {
-  mlir::FailureOr<bool> interpret(mlir::Operation *o,
-                                  InterpreterState &state) const {
+  mlir::FailureOr<hc::typing::InterpreterResult>
+  interpret(mlir::Operation *o, InterpreterState &state) const {
     auto op = mlir::cast<mlir::arith::ConstantOp>(o);
     auto attr = mlir::dyn_cast<mlir::IntegerAttr>(op.getValue());
     if (!attr)
       return op->emitError("Expected int attribute but got ") << op.getValue();
 
     state.state[op.getResult()] = setInt(op.getContext(), attr.getInt());
-    return true;
+    return InterpreterResult::Advance;
   }
 };
 
 struct AddOpInterpreterInterface final
     : public hc::typing::TypingInterpreterInterface::ExternalModel<
           AddOpInterpreterInterface, mlir::arith::AddIOp> {
-  mlir::FailureOr<bool> interpret(mlir::Operation *o,
-                                  InterpreterState &state) const {
+  mlir::FailureOr<hc::typing::InterpreterResult>
+  interpret(mlir::Operation *o, InterpreterState &state) const {
     auto op = mlir::cast<mlir::arith::AddIOp>(o);
     auto lhs = getInt(state, op.getLhs());
     if (!lhs)
@@ -286,15 +287,15 @@ struct AddOpInterpreterInterface final
       return op->emitError("Invalid rhs val");
 
     state.state[op.getResult()] = setInt(op.getContext(), *lhs + *rhs);
-    return true;
+    return InterpreterResult::Advance;
   }
 };
 
 struct SubOpInterpreterInterface final
     : public hc::typing::TypingInterpreterInterface::ExternalModel<
           SubOpInterpreterInterface, mlir::arith::SubIOp> {
-  mlir::FailureOr<bool> interpret(mlir::Operation *o,
-                                  InterpreterState &state) const {
+  mlir::FailureOr<hc::typing::InterpreterResult>
+  interpret(mlir::Operation *o, InterpreterState &state) const {
     auto op = mlir::cast<mlir::arith::SubIOp>(o);
     auto lhs = getInt(state, op.getLhs());
     if (!lhs)
@@ -305,15 +306,15 @@ struct SubOpInterpreterInterface final
       return op->emitError("Invalid rhs val");
 
     state.state[op.getResult()] = setInt(op.getContext(), *lhs - *rhs);
-    return true;
+    return InterpreterResult::Advance;
   }
 };
 
 struct OrOpInterpreterInterface final
     : public hc::typing::TypingInterpreterInterface::ExternalModel<
           OrOpInterpreterInterface, mlir::arith::OrIOp> {
-  mlir::FailureOr<bool> interpret(mlir::Operation *o,
-                                  InterpreterState &state) const {
+  mlir::FailureOr<hc::typing::InterpreterResult>
+  interpret(mlir::Operation *o, InterpreterState &state) const {
     auto op = mlir::cast<mlir::arith::OrIOp>(o);
     auto lhs = getInt(state, op.getLhs());
     if (!lhs)
@@ -324,15 +325,15 @@ struct OrOpInterpreterInterface final
       return op->emitError("Invalid rhs val");
 
     state.state[op.getResult()] = setInt(op.getContext(), *lhs | *rhs);
-    return true;
+    return InterpreterResult::Advance;
   }
 };
 
 struct CmpOpInterpreterInterface final
     : public hc::typing::TypingInterpreterInterface::ExternalModel<
           CmpOpInterpreterInterface, mlir::arith::CmpIOp> {
-  mlir::FailureOr<bool> interpret(mlir::Operation *o,
-                                  InterpreterState &state) const {
+  mlir::FailureOr<hc::typing::InterpreterResult>
+  interpret(mlir::Operation *o, InterpreterState &state) const {
     auto op = mlir::cast<mlir::arith::CmpIOp>(o);
     auto lhs = getInt(state, op.getLhs());
     if (!lhs)
@@ -380,15 +381,15 @@ struct CmpOpInterpreterInterface final
     }
 
     state.state[op.getResult()] = setInt(op.getContext(), res);
-    return true;
+    return InterpreterResult::Advance;
   }
 };
 
 struct CallOpInterpreterInterface final
     : public hc::typing::TypingInterpreterInterface::ExternalModel<
           CallOpInterpreterInterface, mlir::func::CallOp> {
-  mlir::FailureOr<bool> interpret(mlir::Operation *o,
-                                  InterpreterState &state) const {
+  mlir::FailureOr<hc::typing::InterpreterResult>
+  interpret(mlir::Operation *o, InterpreterState &state) const {
     auto op = mlir::cast<mlir::func::CallOp>(o);
     auto callee = op.getCalleeAttr();
     auto func = mlir::SymbolTable::lookupNearestSymbolFrom<mlir::func::FuncOp>(
@@ -414,15 +415,15 @@ struct CallOpInterpreterInterface final
     }
     state.callstack.emplace_back(op);
     state.iter = body.begin();
-    return true;
+    return InterpreterResult::Advance;
   }
 };
 
 struct ReturnOpInterpreterInterface final
     : public hc::typing::TypingInterpreterInterface::ExternalModel<
           ReturnOpInterpreterInterface, mlir::func::ReturnOp> {
-  mlir::FailureOr<bool> interpret(mlir::Operation *o,
-                                  InterpreterState &state) const {
+  mlir::FailureOr<hc::typing::InterpreterResult>
+  interpret(mlir::Operation *o, InterpreterState &state) const {
     auto op = mlir::cast<mlir::func::ReturnOp>(o);
     if (state.callstack.empty())
       return op->emitError("Callstack is empty");
@@ -438,7 +439,7 @@ struct ReturnOpInterpreterInterface final
       state.state[dst] = it->second;
     }
     state.iter = std::next(ret->getIterator());
-    return true;
+    return InterpreterResult::Advance;
   }
 };
 
@@ -541,14 +542,14 @@ hc::typing::getTypes(const hc::typing::InterpreterState &state,
   return ret;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::TypeConstantOp::interpret(InterpreterState &state) {
   mlir::Type type = mlir::cast<TypeAttr>(getValue()).getTypeVal();
   state.state[getResult()] = type;
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::TypeResolverReturnOp::interpret(InterpreterState &state) {
   assert(state.result);
   auto &result = *state.result;
@@ -569,11 +570,10 @@ hc::typing::TypeResolverReturnOp::interpret(InterpreterState &state) {
     getTypes(state, args, result);
   }
 
-  state.setCompleted();
-  return true;
+  return InterpreterResult::MatchSuccess;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::MakeIdentOp::interpret(InterpreterState &state) {
   auto name = this->getNameAttr();
   auto paramNames =
@@ -581,10 +581,10 @@ hc::typing::MakeIdentOp::interpret(InterpreterState &state) {
   auto paramTypes = getTypes(state, this->getParams());
   state.state[getResult()] = hc::typing::IdentType::get(
       this->getContext(), name, paramNames, paramTypes);
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::MakeSymbolOp::interpret(InterpreterState &state) {
   auto name = hc::typing::getType(state, getName());
   auto nameLiteral = mlir::dyn_cast<LiteralType>(name);
@@ -594,23 +594,24 @@ hc::typing::MakeSymbolOp::interpret(InterpreterState &state) {
   auto nameStr = mlir::cast<mlir::StringAttr>(nameLiteral.getValue());
   state.state[getResult()] =
       hc::typing::SymbolType::get(this->getContext(), nameStr.getValue());
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::MakeLiteralOp::interpret(InterpreterState &state) {
   state.state[getResult()] = hc::typing::LiteralType::get(getValue());
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::GetNumArgsOp::interpret(InterpreterState &state) {
   state.state[getResult()] =
       setInt(this->getContext(), static_cast<int64_t>(state.args.size()));
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool> hc::typing::GetArgOp::interpret(InterpreterState &state) {
+mlir::FailureOr<hc::typing::InterpreterResult>
+hc::typing::GetArgOp::interpret(InterpreterState &state) {
   auto index = getInt(state, getIndex());
   if (!index)
     return emitOpError("Invalid index val");
@@ -622,10 +623,10 @@ mlir::FailureOr<bool> hc::typing::GetArgOp::interpret(InterpreterState &state) {
            << id << " [0, " << args.size() << "]";
 
   state.state[getResult()] = args[id];
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::GetNamedArgOp::interpret(InterpreterState &state) {
   auto iface =
       mlir::dyn_cast_if_present<hc::typing::GetNamedArgInterface>(state.op);
@@ -639,20 +640,20 @@ hc::typing::GetNamedArgOp::interpret(InterpreterState &state) {
   mlir::Value val = *res;
   if (!val) {
     state.state[getResult()] = mlir::NoneType::get(getContext());
-    return true;
+    return InterpreterResult::Advance;
   }
 
   for (auto &&[i, arg] : llvm::enumerate(state.op->getOperands())) {
     if (arg == val) {
       state.state[getResult()] = state.args[i];
-      return true;
+      return InterpreterResult::Advance;
     }
   }
 
   return emitError("Invalid named arg");
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::GetAttrOp::interpret(InterpreterState &state) {
   auto op = state.op;
   if (!op)
@@ -664,10 +665,10 @@ hc::typing::GetAttrOp::interpret(InterpreterState &state) {
     return emitOpError("Invalid attr: ") << name.getValue() << " " << *op;
 
   state.state[getResult()] = hc::typing::LiteralType::get(attr);
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::GetIdentNameOp::interpret(InterpreterState &state) {
   auto type = hc::typing::getType(state, getIdent());
   auto ident = mlir::dyn_cast_if_present<hc::typing::IdentType>(type);
@@ -676,10 +677,10 @@ hc::typing::GetIdentNameOp::interpret(InterpreterState &state) {
 
   auto name = ident.getName();
   state.state[getResult()] = hc::typing::LiteralType::get(name);
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::GetIdentParamOp::interpret(InterpreterState &state) {
   auto type = hc::typing::getType(state, getIdent());
   auto ident = mlir::dyn_cast_if_present<hc::typing::IdentType>(type);
@@ -702,10 +703,10 @@ hc::typing::GetIdentParamOp::interpret(InterpreterState &state) {
            << ident << " : " << nameAttr.getValue();
 
   state.state[getResult()] = paramVal;
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::GetMetatypeNameOp::interpret(InterpreterState &state) {
   auto *ctx = getContext();
   auto type = hc::typing::getType(state, getValue());
@@ -713,16 +714,16 @@ hc::typing::GetMetatypeNameOp::interpret(InterpreterState &state) {
 
   state.state[getResult()] =
       hc::typing::LiteralType::get(mlir::StringAttr::get(ctx, name));
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::CreateSeqOp::interpret(InterpreterState &state) {
   state.state[getResult()] = SequenceType::get(getContext(), std::nullopt);
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::AppendSeqOp::interpret(InterpreterState &state) {
   auto seq = mlir::dyn_cast_if_present<SequenceType>(
       ::hc::typing::getType(state, getSeq()));
@@ -735,10 +736,10 @@ hc::typing::AppendSeqOp::interpret(InterpreterState &state) {
   newArgs.emplace_back(arg);
 
   state.state[getResult()] = SequenceType::get(getContext(), newArgs);
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::GetSeqElementOp::interpret(InterpreterState &state) {
   auto seq = mlir::dyn_cast_if_present<SequenceType>(
       ::hc::typing::getType(state, getSeq()));
@@ -755,10 +756,10 @@ hc::typing::GetSeqElementOp::interpret(InterpreterState &state) {
     return emitError("Index out of bounds: ") << idx;
 
   state.state[getResult()] = params[idx];
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::GetSeqSizeOp::interpret(InterpreterState &state) {
   auto seq = mlir::dyn_cast_if_present<SequenceType>(
       ::hc::typing::getType(state, getSeq()));
@@ -767,24 +768,26 @@ hc::typing::GetSeqSizeOp::interpret(InterpreterState &state) {
 
   state.state[getResult()] =
       setInt(getContext(), static_cast<int64_t>(seq.getParams().size()));
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool> hc::typing::IsSameOp::interpret(InterpreterState &state) {
+mlir::FailureOr<hc::typing::InterpreterResult>
+hc::typing::IsSameOp::interpret(InterpreterState &state) {
   auto lhs = hc::typing::getType(state, getLhs());
   auto rhs = hc::typing::getType(state, getRhs());
   state.state[getResult()] = setInt(getContext(), lhs == rhs);
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool> hc::typing::CheckOp::interpret(InterpreterState &state) {
+mlir::FailureOr<hc::typing::InterpreterResult>
+hc::typing::CheckOp::interpret(InterpreterState &state) {
   auto val = getInt(state, getCondition());
   if (!val)
     return emitError("Inavlid condition val");
-  return static_cast<bool>(*val);
+  return *val ? InterpreterResult::Advance : InterpreterResult::MatchFail;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::MakeUnionOp::interpret(InterpreterState &state) {
   llvm::SmallSetVector<mlir::Type, 8> types;
   for (mlir::Value arg : getArgs()) {
@@ -801,10 +804,10 @@ hc::typing::MakeUnionOp::interpret(InterpreterState &state) {
 
   state.state[getResult()] =
       hc::typing::UnionType::get(getContext(), types.getArrayRef());
-  return true;
+  return InterpreterResult::Advance;
 }
 
-mlir::FailureOr<bool>
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::GetGlobalAttrOp::interpret(InterpreterState &state) {
   if (!state.op)
     return emitError("op is not set");
@@ -823,7 +826,7 @@ hc::typing::GetGlobalAttrOp::interpret(InterpreterState &state) {
     return emitError("Attribute ") << attr << " is not TypeAttr";
 
   state.state[getResult()] = typeAttr.getTypeVal();
-  return true;
+  return InterpreterResult::Advance;
 }
 
 static bool expandLiterals(llvm::SmallVectorImpl<mlir::Type> &params,

@@ -7,6 +7,12 @@
 namespace hc::typing {
 void registerArithTypingInterpreter(mlir::MLIRContext &ctx);
 
+enum class InterpreterResult {
+  Advance,
+  MatchFail,
+  MatchSuccess,
+};
+
 using InterpreterValue = llvm::PointerUnion<mlir::Type, void *>;
 
 struct InterpreterState {
@@ -17,7 +23,6 @@ struct InterpreterState {
     args = types;
     iter = block.begin();
     op = rootOp;
-    completed = false;
   }
 
   mlir::Operation &getNextOp() {
@@ -25,16 +30,12 @@ struct InterpreterState {
     return *it;
   }
 
-  void setCompleted() { completed = true; }
-  bool isCompleted() const { return completed; }
-
   llvm::DenseMap<mlir::Value, InterpreterValue> state;
   llvm::SmallVector<mlir::Operation *, 4> callstack;
   mlir::TypeRange args;
   mlir::Block::iterator iter;
   mlir::Operation *op = nullptr;
   llvm::SmallVectorImpl<mlir::Type> *result = nullptr;
-  bool completed = false;
 };
 
 InterpreterValue getVal(const InterpreterState &state, mlir::Value val);
