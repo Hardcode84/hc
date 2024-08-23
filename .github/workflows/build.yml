@@ -105,6 +105,7 @@ jobs:
             -DLLVM_ENABLE_BINDINGS=OFF                                         `
             -DLLVM_ENABLE_ZSTD=OFF                                             `
             -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   `
+            -DMLIR_INCLUDE_TESTS=OFF                                           `
             -DLLVM_DISTRIBUTION_COMPONENTS="llvm-headers;llvm-libraries;cmake-exports;FileCheck;count;not;mlir-headers;mlir-libraries;mlir-cmake-exports;mlir-tblgen;mlir-python-sources" `
             -DCMAKE_INSTALL_PREFIX="$env:WORKSPACE/llvm-mlir/_mlir_install"
           ninja install-distribution-stripped
@@ -361,6 +362,7 @@ jobs:
             -DLLVM_ENABLE_BINDINGS=OFF                                         \
             -DLLVM_ENABLE_ZSTD=OFF                                             \
             -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   \
+            -DMLIR_INCLUDE_TESTS=OFF                                           \
             -DLLVM_DISTRIBUTION_COMPONENTS="llvm-headers;llvm-libraries;cmake-exports;FileCheck;count;not;mlir-headers;mlir-libraries;mlir-cmake-exports;mlir-tblgen;mlir-python-sources" \
             -DCMAKE_INSTALL_PREFIX=/home/runner/work/llvm-mlir/_mlir_install
           ninja install-distribution-stripped
