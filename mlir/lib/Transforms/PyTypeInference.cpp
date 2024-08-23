@@ -313,9 +313,10 @@ public:
   TypeAnalysis(mlir::DataFlowSolver &solver, TypingInterpreter &interp)
       : SparseForwardDataFlowAnalysis(solver), interpreter(interp) {}
 
-  void visitOperation(mlir::Operation *op,
-                      llvm::ArrayRef<const TypeValueLattice *> operands,
-                      llvm::ArrayRef<TypeValueLattice *> results) override {
+  mlir::LogicalResult
+  visitOperation(mlir::Operation *op,
+                 llvm::ArrayRef<const TypeValueLattice *> operands,
+                 llvm::ArrayRef<TypeValueLattice *> results) override {
     if (auto resolver = mlir::dyn_cast<hc::typing::ResolveOp>(op)) {
       auto term = mlir::cast<hc::typing::ResolveYieldOp>(
           resolver.getBody()->getTerminator());
@@ -329,7 +330,7 @@ public:
         propagateIfChanged(resultLattice, changed);
       }
 
-      return;
+      return mlir::success();
     }
 
     if (auto joinInterface =
@@ -348,14 +349,14 @@ public:
 
         propagateIfChanged(resultLattice, changed);
       }
-      return;
+      return mlir::success();
     }
 
     llvm::SmallVector<mlir::Type> argTypes;
     for (auto arg : operands) {
       auto &latticeVal = arg->getValue();
       if (!latticeVal.isInitialized() || !latticeVal.isValid())
-        return;
+        return mlir::success();
 
       argTypes.emplace_back(latticeVal.getType());
     }
@@ -368,17 +369,18 @@ public:
         auto changed = resultLattice->join(errState);
         propagateIfChanged(resultLattice, changed);
       }
-      return;
+      return mlir::failure();
     }
 
     if (!*res)
-      return;
+      return mlir::success();
 
     assert(result.size() == results.size());
     for (auto &&[resultLattice, res] : llvm::zip_equal(results, result)) {
       auto changed = resultLattice->join(TypeValue(&interpreter, res));
       propagateIfChanged(resultLattice, changed);
     }
+    return mlir::success();
   }
 
   void
