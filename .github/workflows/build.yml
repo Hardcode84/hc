@@ -105,8 +105,10 @@ jobs:
             -DLLVM_ENABLE_BINDINGS=OFF                                         `
             -DLLVM_ENABLE_ZSTD=OFF                                             `
             -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   `
+            -DMLIR_INCLUDE_TESTS=OFF                                           `
+            -DLLVM_DISTRIBUTION_COMPONENTS="llvm-headers;llvm-libraries;cmake-exports;FileCheck;count;not;mlir-headers;mlir-libraries;mlir-cmake-exports;mlir-tblgen;mlir-python-sources" `
             -DCMAKE_INSTALL_PREFIX="$env:WORKSPACE/llvm-mlir/_mlir_install"
-          ninja install
+          ninja install-distribution-stripped
           cp bin/FileCheck.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
           cp bin/count.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
           cp bin/not.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
@@ -134,6 +136,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Cache conda packages
+        uses: actions/cache@v3
+        env:
+          CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: ~/conda_pkgs_dir
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
@@ -215,6 +226,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Cache conda packages
+        uses: actions/cache@v3
+        env:
+          CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: ~/conda_pkgs_dir
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
@@ -342,8 +362,10 @@ jobs:
             -DLLVM_ENABLE_BINDINGS=OFF                                         \
             -DLLVM_ENABLE_ZSTD=OFF                                             \
             -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   \
+            -DMLIR_INCLUDE_TESTS=OFF                                           \
+            -DLLVM_DISTRIBUTION_COMPONENTS="llvm-headers;llvm-libraries;cmake-exports;FileCheck;count;not;mlir-headers;mlir-libraries;mlir-cmake-exports;mlir-tblgen;mlir-python-sources" \
             -DCMAKE_INSTALL_PREFIX=/home/runner/work/llvm-mlir/_mlir_install
-          ninja install
+          ninja install-distribution-stripped
           cp bin/FileCheck /home/runner/work/llvm-mlir/_mlir_install/bin/
           cp bin/count /home/runner/work/llvm-mlir/_mlir_install/bin/
           cp bin/not /home/runner/work/llvm-mlir/_mlir_install/bin/
@@ -365,6 +387,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Cache conda packages
+        uses: actions/cache@v3
+        env:
+          CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: ~/.conda/pkgs
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
@@ -438,6 +469,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Cache conda packages
+        uses: actions/cache@v3
+        env:
+          CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: ~/.conda/pkgs
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
