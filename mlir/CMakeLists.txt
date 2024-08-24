@@ -32,6 +32,7 @@ add_subdirectory(include/hc/Dialect)
 add_subdirectory(include/hc/Transforms)
 
 set(SOURCES_LIST
+    lib/Dialect/HKernel/IR/HKernelOps.cpp
     lib/Dialect/PyAST/IR/PyASTOps.cpp
     lib/Dialect/PyIR/IR/PyIROps.cpp
     lib/Dialect/Typing/IR/TypingOps.cpp
@@ -87,6 +88,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 
 add_dependencies(${PROJECT_NAME}
     HCTransformsPassIncGen
+    MLIRHKernelOpsIncGen
     MLIRPyASTOpsIncGen
     MLIRPyIROpsIncGen
     MLIRTypingOpsIncGen
