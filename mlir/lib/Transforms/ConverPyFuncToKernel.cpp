@@ -4,13 +4,18 @@
 
 #include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
 #include "hc/Dialect/PyIR/IR/PyIROps.hpp"
+#include "hc/Dialect/Typing/IR/TypingOps.hpp"
 
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/PatternMatch.h>
+#include <mlir/Transforms/DialectConversion.h>
 
 namespace hc {
 #define GEN_PASS_DEF_CONVERPYFUNCTOKERNELFUNCPASS
+#include "hc/Transforms/Passes.h.inc"
+
+#define GEN_PASS_DEF_CONVERPYIRTOKERNELPASS
 #include "hc/Transforms/Passes.h.inc"
 } // namespace hc
 
@@ -74,6 +79,72 @@ struct ConverPyFuncToKernelFuncPass final
       builder.inlineRegionBefore(srcRegion, dstRegion, dstRegion.begin());
       builder.eraseOp(pyModule);
     }
+  }
+};
+
+struct ConverPyIRToKernelPass final
+    : public hc::impl::ConverPyIRToKernelPassBase<ConverPyIRToKernelPass> {
+
+  void runOnOperation() override {
+    auto mod = getOperation();
+
+    auto *ctx = &getContext();
+    mlir::ConversionTarget target(*ctx);
+    mlir::TypeConverter converter;
+
+    // Convert unknown types to itself
+    converter.addConversion([](mlir::Type type) { return type; });
+
+    auto bufferStr = mlir::StringAttr::get(ctx, "Buffer");
+    auto dimsStr = mlir::StringAttr::get(ctx, "dims");
+    auto dtypeStr = mlir::StringAttr::get(ctx, "dtype");
+    auto nameStr = mlir::StringAttr::get(ctx, "name");
+    converter.addConversion(
+        [=](hc::typing::IdentType type) -> std::optional<mlir::Type> {
+          if (type.getName() != bufferStr)
+            return std::nullopt;
+
+          auto dims = type.getParam<hc::typing::SequenceType>(dimsStr);
+          if (!dims)
+            return std::nullopt;
+
+          auto dtype = type.getParam(dtypeStr);
+          if (auto ident =
+                  mlir::dyn_cast_if_present<hc::typing::IdentType>(dtype))
+            dtype = ident.getParam(nameStr);
+
+          if (!dtype)
+            return std::nullopt;
+
+          return hc::hk::BufferType::get(type.getContext(), dims.getParams(),
+                                         dtype);
+        });
+
+    auto materialize = [](mlir::OpBuilder &builder, mlir::Type type,
+                          mlir::ValueRange inputs,
+                          mlir::Location loc) -> std::optional<mlir::Value> {
+      auto cast =
+          builder.create<mlir::UnrealizedConversionCastOp>(loc, type, inputs);
+      return cast.getResult(0);
+    };
+    converter.addArgumentMaterialization(materialize);
+    converter.addSourceMaterialization(materialize);
+    converter.addTargetMaterialization(materialize);
+
+    mlir::RewritePatternSet patterns(ctx);
+
+    mlir::populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
+                                                              converter);
+
+    target.addDynamicallyLegalOp<mlir::func::FuncOp>(
+        [&](mlir::func::FuncOp op) {
+          return converter.isSignatureLegal(op.getFunctionType()) &&
+                 converter.isLegal(&op.getBody());
+        });
+
+    if (mlir::failed(
+            mlir::applyPartialConversion(mod, target, std::move(patterns))))
+      signalPassFailure();
   }
 };
 } // namespace

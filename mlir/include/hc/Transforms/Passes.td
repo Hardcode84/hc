@@ -102,5 +102,19 @@ def ConverPyFuncToKernelFuncPass : Pass<"hc-convert-py-func-to-kernel-func-pass"
   ];
 }
 
+def ConverPyIRToKernelPass : Pass<"hc-convert-py-IR-to-kernel-pass", "::mlir::ModuleOp"> {
+  let summary = "TBD";
+  let description = [{
+    TBD
+  }];
+
+  let dependentDialects = [
+    "::hc::hk::HKernelDialect",
+    "::hc::py_ir::PyIRDialect",
+    "::hc::typing::TypingDialect",
+    "::mlir::func::FuncDialect",
+  ];
+}
+
 
 #endif // _HC_TRANSFORMS_PASSES_TD_INCLUDED_
