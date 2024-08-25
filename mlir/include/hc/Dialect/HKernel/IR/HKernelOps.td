@@ -26,6 +26,16 @@ class HKernel_Type<string name, string typeMnemonic, list<Trait> traits = [],
   let mnemonic = typeMnemonic;
 }
 
+def HKernel_CurrentGroup : HKernel_Type<"CurrentGroup", "current_group", [], "::mlir::Type"> {
+  let summary = "TBD";
+  let description = [{
+    TBD
+  }];
+  let parameters = (ins "int":$num_dims);
+
+  let assemblyFormat = "$num_dims";
+}
+
 def HKernel_Buffer : HKernel_Type<"Buffer", "buffer", [
   SymbolicallyShapedTypeInterface
 ], "::mlir::Type"> {

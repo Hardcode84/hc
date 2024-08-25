@@ -82,6 +82,56 @@ struct ConverPyFuncToKernelFuncPass final
   }
 };
 
+static void popolateTypeConverter(mlir::MLIRContext *ctx,
+                                  mlir::TypeConverter &converter) {
+  // Convert unknown types to itself
+  converter.addConversion([](mlir::Type type) { return type; });
+
+  auto getStr = [&](mlir::StringRef str) -> mlir::StringAttr {
+    return mlir::StringAttr::get(ctx, str);
+  };
+
+  auto currentGroup1Str = getStr("hckernel.kernel_api.CurrentGroup1");
+  auto currentGroup2Str = getStr("hckernel.kernel_api.CurrentGroup2");
+  auto currentGroup3Str = getStr("hckernel.kernel_api.CurrentGroup3");
+  converter.addConversion(
+      [=](hc::typing::IdentType type) -> std::optional<mlir::Type> {
+        if (type.getName() == currentGroup1Str)
+          return hc::hk::CurrentGroupType::get(ctx, 1);
+
+        if (type.getName() == currentGroup2Str)
+          return hc::hk::CurrentGroupType::get(ctx, 2);
+
+        if (type.getName() == currentGroup3Str)
+          return hc::hk::CurrentGroupType::get(ctx, 3);
+
+        return std::nullopt;
+      });
+
+  auto bufferStr = getStr("Buffer");
+  auto dimsStr = getStr("dims");
+  auto dtypeStr = getStr("dtype");
+  auto nameStr = getStr("name");
+  converter.addConversion([=](hc::typing::IdentType type)
+                              -> std::optional<mlir::Type> {
+    if (type.getName() != bufferStr)
+      return std::nullopt;
+
+    auto dims = type.getParam<hc::typing::SequenceType>(dimsStr);
+    if (!dims)
+      return std::nullopt;
+
+    auto dtype = type.getParam(dtypeStr);
+    if (auto ident = mlir::dyn_cast_if_present<hc::typing::IdentType>(dtype))
+      dtype = ident.getParam(nameStr);
+
+    if (!dtype)
+      return std::nullopt;
+
+    return hc::hk::BufferType::get(type.getContext(), dims.getParams(), dtype);
+  });
+}
+
 struct ConverPyIRToKernelPass final
     : public hc::impl::ConverPyIRToKernelPassBase<ConverPyIRToKernelPass> {
 
@@ -92,33 +142,7 @@ struct ConverPyIRToKernelPass final
     mlir::ConversionTarget target(*ctx);
     mlir::TypeConverter converter;
 
-    // Convert unknown types to itself
-    converter.addConversion([](mlir::Type type) { return type; });
-
-    auto bufferStr = mlir::StringAttr::get(ctx, "Buffer");
-    auto dimsStr = mlir::StringAttr::get(ctx, "dims");
-    auto dtypeStr = mlir::StringAttr::get(ctx, "dtype");
-    auto nameStr = mlir::StringAttr::get(ctx, "name");
-    converter.addConversion(
-        [=](hc::typing::IdentType type) -> std::optional<mlir::Type> {
-          if (type.getName() != bufferStr)
-            return std::nullopt;
-
-          auto dims = type.getParam<hc::typing::SequenceType>(dimsStr);
-          if (!dims)
-            return std::nullopt;
-
-          auto dtype = type.getParam(dtypeStr);
-          if (auto ident =
-                  mlir::dyn_cast_if_present<hc::typing::IdentType>(dtype))
-            dtype = ident.getParam(nameStr);
-
-          if (!dtype)
-            return std::nullopt;
-
-          return hc::hk::BufferType::get(type.getContext(), dims.getParams(),
-                                         dtype);
-        });
+    popolateTypeConverter(ctx, converter);
 
     auto materialize = [](mlir::OpBuilder &builder, mlir::Type type,
                           mlir::ValueRange inputs,
