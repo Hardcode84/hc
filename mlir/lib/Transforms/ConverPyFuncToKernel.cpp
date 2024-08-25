@@ -247,6 +247,48 @@ struct ConvertSlice final
   }
 };
 
+template <typename GroupType>
+struct ConvertGroupExpr final
+    : public mlir::OpConversionPattern<hc::py_ir::GetAttrOp> {
+  ConvertGroupExpr(mlir::StringRef name_,
+                   const mlir::TypeConverter &typeConverter,
+                   mlir::MLIRContext *context, mlir::PatternBenefit benefit = 1)
+      : mlir::OpConversionPattern<hc::py_ir::GetAttrOp>(typeConverter, context,
+                                                        benefit),
+        name(mlir::StringAttr::get(context, name_)) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::py_ir::GetAttrOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    if (!mlir::isa<GroupType>(adaptor.getTarget().getType()))
+      return rewriter.notifyMatchFailure(op, "Wrong target type");
+
+    if (op.getNameAttr() != name)
+      return rewriter.notifyMatchFailure(op, "Wrong name");
+
+    const mlir::TypeConverter *converter = getTypeConverter();
+    auto resType = converter->convertType(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    if (auto tuple = mlir::dyn_cast<mlir::TupleType>(resType)) {
+      mlir::Location loc = op.getLoc();
+      llvm::SmallVector<mlir::Value> results(tuple.size());
+      for (auto &&[i, type] : llvm::enumerate(tuple.getTypes()))
+        results[i] = rewriter.create<hc::hk::MaterializeExprOp>(loc, type);
+
+      rewriter.replaceOpWithNewOp<hc::hk::MakeTupleOp>(op, resType, results);
+    } else {
+      rewriter.replaceOpWithNewOp<hc::hk::MaterializeExprOp>(op, resType);
+    }
+
+    return mlir::success();
+  }
+
+private:
+  mlir::StringAttr name;
+};
+
 struct ConverPyIRToKernelPass final
     : public hc::impl::ConverPyIRToKernelPassBase<ConverPyIRToKernelPass> {
 
@@ -285,6 +327,9 @@ struct ConverPyIRToKernelPass final
 
     patterns.insert<ConvertTuplePack, ConvertTupleUnpack, ConvertSlice>(
         converter, ctx);
+
+    patterns.insert<ConvertGroupExpr<hc::hk::CurrentGroupType>>("work_offset",
+                                                                converter, ctx);
 
     if (mlir::failed(
             mlir::applyPartialConversion(mod, target, std::move(patterns))))
