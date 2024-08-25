@@ -4,6 +4,7 @@
 #define HKERNEL_OPS
 
 include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 include "hc/Dialect/HKernel/IR/HKernelOpsTypeInterfaces.td"
 
@@ -25,6 +26,9 @@ class HKernel_Type<string name, string typeMnemonic, list<Trait> traits = [],
     : TypeDef<HKernel_Dialect, name, traits, baseCppClass> {
   let mnemonic = typeMnemonic;
 }
+
+class HKernel_OpBase<string mnemonic, list<Trait> traits = []>
+    : Op<HKernel_Dialect, mnemonic, traits>;
 
 def HKernel_CurrentGroup : HKernel_Type<"CurrentGroup", "current_group", [], "::mlir::Type"> {
   let summary = "TBD";
@@ -55,6 +59,23 @@ def HKernel_Buffer : HKernel_Type<"Buffer", "buffer", [
       std::optional<llvm::ArrayRef<mlir::Type>> shape,
       mlir::Type elementType) const;
   }];
+}
+
+def HKernel_MakeTupleOp : HKernel_OpBase<"make_tuple", [Pure]> {
+  let arguments = (ins Variadic<AnyType>:$args);
+  let results = (outs AnyTuple:$result);
+
+  let assemblyFormat = "attr-dict $args `:` type($args) `->` type($result)";
+}
+
+def HKernel_TupleExtractOp : HKernel_OpBase<"tuple_extract", [Pure]> {
+  let arguments = (ins
+    AnyTuple:$src,
+    Index:$index
+  );
+  let results = (outs AnyType:$result);
+
+  let assemblyFormat = "attr-dict $src `:` type($src) `[` $index `]` `->` type($result)";
 }
 
 #endif // HKERNEL_OPS

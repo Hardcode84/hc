@@ -112,6 +112,7 @@ def ConverPyIRToKernelPass : Pass<"hc-convert-py-IR-to-kernel-pass", "::mlir::Mo
     "::hc::hk::HKernelDialect",
     "::hc::py_ir::PyIRDialect",
     "::hc::typing::TypingDialect",
+    "::mlir::arith::ArithDialect",
     "::mlir::func::FuncDialect",
   ];
 }
