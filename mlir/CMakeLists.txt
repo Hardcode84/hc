@@ -39,6 +39,7 @@ set(SOURCES_LIST
     lib/Dialect/Typing/Transforms/Interpreter.cpp
     lib/Pipelines/FrontendPipeline.cpp
     lib/Transforms/ClenaupPySetVar.cpp
+    lib/Transforms/ConverPyFuncToKernel.cpp
     lib/Transforms/ConvertPyASTToIR.cpp
     lib/Transforms/ConvertPyFuncToFunc.cpp
     lib/Transforms/DropTypeResolvers.cpp
