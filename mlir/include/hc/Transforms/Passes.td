@@ -89,7 +89,7 @@ def ConverPyFuncToFuncPass : Pass<"hc-convert-py-func-to-func-pass"> {
   ];
 }
 
-def ConverPyFuncToKernelPass : Pass<"hc-convert-py-func-to-kernel-pass", "::mlir::ModuleOp"> {
+def ConverPyFuncToKernelFuncPass : Pass<"hc-convert-py-func-to-kernel-func-pass", "::mlir::ModuleOp"> {
   let summary = "TBD";
   let description = [{
     TBD

@@ -10,13 +10,14 @@
 #include <mlir/IR/PatternMatch.h>
 
 namespace hc {
-#define GEN_PASS_DEF_CONVERPYFUNCTOKERNELPASS
+#define GEN_PASS_DEF_CONVERPYFUNCTOKERNELFUNCPASS
 #include "hc/Transforms/Passes.h.inc"
 } // namespace hc
 
 namespace {
-struct ConverPyFuncToKernelPass final
-    : public hc::impl::ConverPyFuncToKernelPassBase<ConverPyFuncToKernelPass> {
+struct ConverPyFuncToKernelFuncPass final
+    : public hc::impl::ConverPyFuncToKernelFuncPassBase<
+          ConverPyFuncToKernelFuncPass> {
 
   void runOnOperation() override {
     auto op = getOperation();

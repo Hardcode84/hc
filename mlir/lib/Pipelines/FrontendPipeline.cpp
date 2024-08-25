@@ -31,5 +31,5 @@ void hc::populateFrontendPipeline(mlir::PassManager &pm) {
   pm.addPass(hc::createDropTypeResolversPass());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createSymbolDCEPass());
-  pm.addPass(hc::createConverPyFuncToKernelPass());
+  pm.addPass(hc::createConverPyFuncToKernelFuncPass());
 }
