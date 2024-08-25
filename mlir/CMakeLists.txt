@@ -32,12 +32,14 @@ add_subdirectory(include/hc/Dialect)
 add_subdirectory(include/hc/Transforms)
 
 set(SOURCES_LIST
+    lib/Dialect/HKernel/IR/HKernelOps.cpp
     lib/Dialect/PyAST/IR/PyASTOps.cpp
     lib/Dialect/PyIR/IR/PyIROps.cpp
     lib/Dialect/Typing/IR/TypingOps.cpp
     lib/Dialect/Typing/Transforms/Interpreter.cpp
     lib/Pipelines/FrontendPipeline.cpp
     lib/Transforms/ClenaupPySetVar.cpp
+    lib/Transforms/ConverPyFuncToKernel.cpp
     lib/Transforms/ConvertPyASTToIR.cpp
     lib/Transforms/ConvertPyFuncToFunc.cpp
     lib/Transforms/DropTypeResolvers.cpp
@@ -87,6 +89,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 
 add_dependencies(${PROJECT_NAME}
     HCTransformsPassIncGen
+    MLIRHKernelOpsIncGen
     MLIRPyASTOpsIncGen
     MLIRPyIROpsIncGen
     MLIRTypingOpsIncGen
