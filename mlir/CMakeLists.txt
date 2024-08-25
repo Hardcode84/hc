@@ -50,6 +50,7 @@ set(SOURCES_LIST
     lib/Transforms/SimplifyAST.cpp
   )
 set(HEADERS_LIST
+    include/hc/Dialect/HKernel/IR/HKernelOps.hpp
     include/hc/Dialect/PyAST/IR/PyASTOps.hpp
     include/hc/Dialect/PyIR/IR/PyIROps.hpp
     include/hc/Dialect/Typing/IR/TypingOps.hpp
@@ -90,6 +91,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 add_dependencies(${PROJECT_NAME}
     HCTransformsPassIncGen
     MLIRHKernelOpsIncGen
+    MLIRHKernelOpsTypeInterfacesIncGen
     MLIRPyASTOpsIncGen
     MLIRPyIROpsIncGen
     MLIRTypingOpsIncGen
