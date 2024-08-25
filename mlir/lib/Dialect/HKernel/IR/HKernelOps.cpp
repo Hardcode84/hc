@@ -2,6 +2,11 @@
 
 #include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
 
+#include <mlir/IR/Builders.h>
+#include <mlir/IR/DialectImplementation.h>
+
+#include <llvm/ADT/TypeSwitch.h>
+
 void hc::hk::HKernelDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
@@ -19,7 +24,16 @@ void hc::hk::HKernelDialect::initialize() {
       >();
 }
 
+hc::hk::SymbolicallyShapedType
+hc::hk::BufferType::cloneWith(std::optional<llvm::ArrayRef<mlir::Type>> shape,
+                              mlir::Type elementType) const {
+  return BufferType::get(getContext(), shape ? *shape : getShape(),
+                         elementType ? elementType : getElementType());
+}
+
 #include "hc/Dialect/HKernel/IR/HKernelOpsDialect.cpp.inc"
+
+#include "hc/Dialect/HKernel/IR/HKernelOpsTypeInterfaces.cpp.inc"
 
 #define GET_OP_CLASSES
 #include "hc/Dialect/HKernel/IR/HKernelOps.cpp.inc"

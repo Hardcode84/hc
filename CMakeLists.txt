@@ -30,6 +30,12 @@ message(STATUS "HC_ENABLE_TOOLS ${HC_ENABLE_TOOLS}")
 message(STATUS "HC_ENABLE_PYTHON ${HC_ENABLE_PYTHON}")
 message(STATUS "HC_ENABLE_TESTS ${HC_ENABLE_TESTS}")
 
+# Disable IPO to speed up pybind11 linking.
+# TODO: Enable for non-develop builds
+option(CMAKE_INTERPROCEDURAL_OPTIMIZATION "Interprocedural optimization" OFF)
+
+message(STATUS "CMAKE_INTERPROCEDURAL_OPTIMIZATION ${CMAKE_INTERPROCEDURAL_OPTIMIZATION}")
+
 macro(apply_llvm_compile_flags target)
     if (MSVC)
         target_compile_options(${target} PRIVATE /EHsc)

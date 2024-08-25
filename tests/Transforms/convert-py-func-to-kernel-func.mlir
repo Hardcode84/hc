@@ -1,4 +1,4 @@
-// RUN: hc-opt -split-input-file %s --hc-convert-py-func-to-kernel-pass | FileCheck %s
+// RUN: hc-opt -split-input-file %s --hc-convert-py-func-to-kernel-func-pass | FileCheck %s
 
 // CHECK-LABEL: func.func @func()
 //       CHECK: return

@@ -83,6 +83,15 @@ def Typing_IdentType : Typing_Type<"Ident", "ident", [], "::mlir::Type"> {
   ];
 
   let assemblyFormat = "$name (`:` $paramNames^)? (`->` $params^)?";
+
+  let extraClassDeclaration = [{
+    ::mlir::Type getParam(::mlir::StringAttr name) const;
+
+    template<typename T>
+    T getParam(::mlir::StringAttr name) const {
+      return ::mlir::dyn_cast_if_present<T>(getParam(name));
+    }
+  }];
 }
 
 def Typing_SequenceType : Typing_Type<"Sequence", "sequence", [], "::mlir::Type"> {

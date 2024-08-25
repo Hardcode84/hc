@@ -89,7 +89,7 @@ def ConverPyFuncToFuncPass : Pass<"hc-convert-py-func-to-func-pass"> {
   ];
 }
 
-def ConverPyFuncToKernelPass : Pass<"hc-convert-py-func-to-kernel-pass", "::mlir::ModuleOp"> {
+def ConverPyFuncToKernelFuncPass : Pass<"hc-convert-py-func-to-kernel-func-pass", "::mlir::ModuleOp"> {
   let summary = "TBD";
   let description = [{
     TBD
@@ -98,6 +98,20 @@ def ConverPyFuncToKernelPass : Pass<"hc-convert-py-func-to-kernel-pass", "::mlir
   let dependentDialects = [
     "::hc::hk::HKernelDialect",
     "::hc::py_ir::PyIRDialect",
+    "::mlir::func::FuncDialect",
+  ];
+}
+
+def ConverPyIRToKernelPass : Pass<"hc-convert-py-IR-to-kernel-pass", "::mlir::ModuleOp"> {
+  let summary = "TBD";
+  let description = [{
+    TBD
+  }];
+
+  let dependentDialects = [
+    "::hc::hk::HKernelDialect",
+    "::hc::py_ir::PyIRDialect",
+    "::hc::typing::TypingDialect",
     "::mlir::func::FuncDialect",
   ];
 }
