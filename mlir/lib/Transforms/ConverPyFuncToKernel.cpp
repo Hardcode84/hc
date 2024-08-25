@@ -83,7 +83,7 @@ struct ConverPyFuncToKernelFuncPass final
   }
 };
 
-static void popolateTypeConverter(mlir::MLIRContext *ctx,
+static void populateTypeConverter(mlir::MLIRContext *ctx,
                                   mlir::TypeConverter &converter) {
   // Convert unknown types to itself
   converter.addConversion([](mlir::Type type) { return type; });
@@ -154,6 +154,30 @@ static void popolateTypeConverter(mlir::MLIRContext *ctx,
 
         return mlir::TupleType::get(ctx, newTypes);
       });
+
+  auto sliceStr = getStr("Slice");
+  auto lowerStr = getStr("lower");
+  auto upperStr = getStr("upper");
+  auto stepStr = getStr("step");
+  converter.addConversion(
+      [=, &converter](hc::typing::IdentType type) -> std::optional<mlir::Type> {
+        if (type.getName() != sliceStr)
+          return std::nullopt;
+
+        auto lower = converter.convertType(type.getParam(lowerStr));
+        if (!lower)
+          return std::nullopt;
+
+        auto upper = converter.convertType(type.getParam(upperStr));
+        if (!upper)
+          return std::nullopt;
+
+        auto step = converter.convertType(type.getParam(stepStr));
+        if (!step)
+          return std::nullopt;
+
+        return hc::hk::SliceType::get(ctx, lower, upper, step);
+      });
 }
 
 struct ConvertTuplePack final
@@ -164,8 +188,7 @@ struct ConvertTuplePack final
   matchAndRewrite(hc::py_ir::TuplePackOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     const mlir::TypeConverter *converter = getTypeConverter();
-    auto resType =
-        converter->convertType<mlir::TupleType>(op.getResult().getType());
+    auto resType = converter->convertType<mlir::TupleType>(op.getType());
     if (!resType)
       return rewriter.notifyMatchFailure(op, "Invalid result type");
 
@@ -206,6 +229,24 @@ struct ConvertTupleUnpack final
   }
 };
 
+struct ConvertSlice final
+    : public mlir::OpConversionPattern<hc::py_ir::SliceOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::py_ir::SliceOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    const mlir::TypeConverter *converter = getTypeConverter();
+    auto resType = converter->convertType<hc::hk::SliceType>(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    rewriter.replaceOpWithNewOp<hc::hk::MakeSliceOp>(
+        op, resType, adaptor.getLower(), adaptor.getUpper(), adaptor.getStep());
+    return mlir::success();
+  }
+};
+
 struct ConverPyIRToKernelPass final
     : public hc::impl::ConverPyIRToKernelPassBase<ConverPyIRToKernelPass> {
 
@@ -216,7 +257,7 @@ struct ConverPyIRToKernelPass final
     mlir::ConversionTarget target(*ctx);
     mlir::TypeConverter converter;
 
-    popolateTypeConverter(ctx, converter);
+    populateTypeConverter(ctx, converter);
 
     auto materialize = [](mlir::OpBuilder &builder, mlir::Type type,
                           mlir::ValueRange inputs,
@@ -242,7 +283,8 @@ struct ConverPyIRToKernelPass final
     target.addIllegalOp<hc::py_ir::TuplePackOp, hc::py_ir::TuplePackOp>();
     target.addLegalDialect<mlir::arith::ArithDialect, hc::hk::HKernelDialect>();
 
-    patterns.insert<ConvertTuplePack, ConvertTupleUnpack>(converter, ctx);
+    patterns.insert<ConvertTuplePack, ConvertTupleUnpack, ConvertSlice>(
+        converter, ctx);
 
     if (mlir::failed(
             mlir::applyPartialConversion(mod, target, std::move(patterns))))
