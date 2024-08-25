@@ -91,6 +91,14 @@ mlir::FailureOr<bool> hc::typing::TypeConstantOp::inferTypes(
   return true;
 }
 
+mlir::Type hc::typing::IdentType::getParam(mlir::StringAttr paramName) const {
+  for (auto &&[name, val] : llvm::zip_equal(getParamNames(), getParams())) {
+    if (name == paramName)
+      return val;
+  }
+  return nullptr;
+}
+
 void hc::typing::ResolveOp::build(::mlir::OpBuilder &odsBuilder,
                                   ::mlir::OperationState &odsState,
                                   mlir::TypeRange resultTypes,
@@ -691,13 +699,7 @@ hc::typing::GetIdentParamOp::interpret(InterpreterState &state) {
   auto params = ident.getParams();
 
   auto nameAttr = getNameAttr();
-  mlir::Type paramVal;
-  for (auto &&[name, val] : llvm::zip_equal(names, params)) {
-    if (name == nameAttr) {
-      paramVal = val;
-      break;
-    }
-  }
+  auto paramVal = ident.getParam(nameAttr);
   if (!paramVal)
     return emitError("Invalid param name for ")
            << ident << " : " << nameAttr.getValue();
