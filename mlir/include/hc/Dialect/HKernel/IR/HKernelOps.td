@@ -119,4 +119,14 @@ def HKernel_MaterializeExprOp : HKernel_OpBase<"materialize_expr", [Pure]> {
   let assemblyFormat = "attr-dict type($result)";
 }
 
+def HKernel_SubViewOp : HKernel_OpBase<"subview", [Pure]> {
+  let arguments = (ins
+    AnyType:$source,
+    Variadic<AnyType>:$index
+  );
+  let results = (outs AnyType:$result);
+
+  let assemblyFormat = "attr-dict $source `:` type($source) `[` $index `]` `:` type($index) `->` type($result)";
+}
+
 #endif // HKERNEL_OPS

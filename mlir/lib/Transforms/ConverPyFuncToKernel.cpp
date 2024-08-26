@@ -289,6 +289,45 @@ private:
   mlir::StringAttr name;
 };
 
+static llvm::SmallVector<mlir::Value>
+unpackTupleArg(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value arg) {
+  llvm::SmallVector<mlir::Value> ret;
+  if (auto tuple = mlir::dyn_cast<mlir::TupleType>(arg.getType())) {
+    ret.resize(tuple.size());
+    for (auto &&[i, type] : llvm::enumerate(tuple.getTypes())) {
+      mlir::Value idx = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
+      ret[i] = builder.create<hc::hk::TupleExtractOp>(loc, type, arg, idx);
+    }
+  } else {
+    ret.emplace_back(arg);
+  }
+
+  return ret;
+}
+
+struct ConvertGetItem final
+    : public mlir::OpConversionPattern<hc::py_ir::GetItemOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::py_ir::GetItemOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::Value target = adaptor.getTarget();
+    if (!mlir::isa<hc::hk::SymbolicallyShapedType>(target.getType()))
+      return rewriter.notifyMatchFailure(op, "Invalid source type");
+
+    const mlir::TypeConverter *converter = getTypeConverter();
+    auto resType =
+        converter->convertType<hc::hk::SymbolicallyShapedType>(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    auto index = unpackTupleArg(rewriter, op.getLoc(), adaptor.getIndex());
+    rewriter.replaceOpWithNewOp<hc::hk::SubViewOp>(op, resType, target, index);
+    return mlir::success();
+  }
+};
+
 struct ConverPyIRToKernelPass final
     : public hc::impl::ConverPyIRToKernelPassBase<ConverPyIRToKernelPass> {
 
@@ -325,8 +364,8 @@ struct ConverPyIRToKernelPass final
     target.addIllegalOp<hc::py_ir::TuplePackOp, hc::py_ir::TuplePackOp>();
     target.addLegalDialect<mlir::arith::ArithDialect, hc::hk::HKernelDialect>();
 
-    patterns.insert<ConvertTuplePack, ConvertTupleUnpack, ConvertSlice>(
-        converter, ctx);
+    patterns.insert<ConvertTuplePack, ConvertTupleUnpack, ConvertSlice,
+                    ConvertGetItem>(converter, ctx);
 
     using ConvertCurrentGroup = ConvertGroupExpr<hc::hk::CurrentGroupType>;
     patterns.insert<ConvertCurrentGroup>("work_offset", converter, ctx);
