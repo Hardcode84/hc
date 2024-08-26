@@ -104,6 +104,11 @@ def check(cond):
 
 
 @_register_func
+def print_val(value):
+    _stub_error()
+
+
+@_register_func
 def get_attr(name):
     _stub_error()
 

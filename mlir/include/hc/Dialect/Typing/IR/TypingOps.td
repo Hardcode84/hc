@@ -447,6 +447,14 @@ def Typing_CheckOp : Typing_OpBase<"check", [
   let assemblyFormat = "attr-dict $condition";
 }
 
+def Typing_PrintOp : Typing_OpBase<"print", [
+  DeclareOpInterfaceMethods<TypingInterpreterInterface>
+]> {
+  let arguments = (ins Typing_ValueType:$value);
+
+  let assemblyFormat = "attr-dict $value";
+}
+
 def Typing_MakeUnionOp : Typing_OpBase<"make_union", [
   Pure, DeclareOpInterfaceMethods<TypingInterpreterInterface>
 ]> {

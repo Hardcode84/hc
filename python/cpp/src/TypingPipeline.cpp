@@ -94,6 +94,7 @@ static mlir::LogicalResult convertCall(mlir::PatternRewriter &builder,
       handlers[] = {
           {"is_same", i1, {vt, vt}, &convertCall<hc::typing::IsSameOp, 2>},
           {"check", none, {i1}, &convertCall<hc::typing::CheckOp, 1, true>},
+          {"print_val", none, {vt}, &convertCall<hc::typing::PrintOp, 1, true>},
           {"make_symbol", vt, {vt}, &convertCall<hc::typing::MakeSymbolOp, 1>},
           {"get_num_args",
            index,

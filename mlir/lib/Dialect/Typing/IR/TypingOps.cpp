@@ -802,6 +802,13 @@ hc::typing::CheckOp::interpret(InterpreterState &state) {
 }
 
 mlir::FailureOr<hc::typing::InterpreterResult>
+hc::typing::PrintOp::interpret(InterpreterState &state) {
+  auto type = hc::typing::getType(state, getValue());
+  llvm::errs() << type << "\n";
+  return InterpreterResult::Advance;
+}
+
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::MakeUnionOp::interpret(InterpreterState &state) {
   llvm::SmallSetVector<mlir::Type, 8> types;
   for (mlir::Value arg : getArgs()) {
