@@ -30,7 +30,7 @@ class HKernel_Type<string name, string typeMnemonic, list<Trait> traits = [],
 class HKernel_OpBase<string mnemonic, list<Trait> traits = []>
     : Op<HKernel_Dialect, mnemonic, traits>;
 
-def HKernel_CurrentGroup : HKernel_Type<"CurrentGroup", "current_group", [], "::mlir::Type"> {
+def HKernel_CurrentGroupType : HKernel_Type<"CurrentGroup", "current_group", [], "::mlir::Type"> {
   let summary = "TBD";
   let description = [{
     TBD
@@ -40,7 +40,22 @@ def HKernel_CurrentGroup : HKernel_Type<"CurrentGroup", "current_group", [], "::
   let assemblyFormat = "$num_dims";
 }
 
-def HKernel_Buffer : HKernel_Type<"Buffer", "buffer", [
+def HKernel_SliceType : HKernel_Type<"Slice", "slice", [], "::mlir::Type"> {
+  let summary = "TBD";
+  let description = [{
+    TBD
+  }];
+  let parameters = (ins
+    "::mlir::Type":$lower,
+    "::mlir::Type":$upper,
+    "::mlir::Type":$step
+  );
+
+  let assemblyFormat = "$lower `:` $upper `:` $step";
+}
+
+
+def HKernel_BufferType : HKernel_Type<"Buffer", "buffer", [
   SymbolicallyShapedTypeInterface
 ], "::mlir::Type"> {
   let summary = "TBD";
@@ -76,6 +91,32 @@ def HKernel_TupleExtractOp : HKernel_OpBase<"tuple_extract", [Pure]> {
   let results = (outs AnyType:$result);
 
   let assemblyFormat = "attr-dict $src `:` type($src) `[` $index `]` `->` type($result)";
+
+  let hasFolder = 1;
+}
+
+def HKernel_MakeSliceOp : HKernel_OpBase<"make_slice", [
+  Pure, AttrSizedOperandSegments
+]> {
+  let arguments = (ins
+      Optional<AnyType>:$lower,
+      Optional<AnyType>:$upper,
+      Optional<AnyType>:$step);
+
+  let results = (outs AnyType:$result);
+
+  let assemblyFormat = [{
+    attr-dict `(` $lower ` ` type($lower) `:`
+                  $upper ` ` type($upper) `:`
+                  $step  ` ` type($step)  `)`
+                  `->` type($result)
+  }];
+}
+
+def HKernel_MaterializeExprOp : HKernel_OpBase<"materialize_expr", [Pure]> {
+  let results = (outs AnyType:$result);
+
+  let assemblyFormat = "attr-dict type($result)";
 }
 
 #endif // HKERNEL_OPS

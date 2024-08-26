@@ -2,6 +2,7 @@
 
 #include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
 
+#include <mlir/Dialect/Utils/StaticValueUtils.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/DialectImplementation.h>
 
@@ -29,6 +30,28 @@ hc::hk::BufferType::cloneWith(std::optional<llvm::ArrayRef<mlir::Type>> shape,
                               mlir::Type elementType) const {
   return BufferType::get(getContext(), shape ? *shape : getShape(),
                          elementType ? elementType : getElementType());
+}
+
+mlir::OpFoldResult hc::hk::TupleExtractOp::fold(FoldAdaptor adaptor) {
+  if (auto idx = mlir::getConstantIntValue(adaptor.getIndex())) {
+    auto src = getSrc();
+    auto def = src.getDefiningOp<MakeTupleOp>();
+    if (!def)
+      return nullptr;
+
+    mlir::ValueRange args = def.getArgs();
+
+    auto i = *idx;
+    auto tupleType = mlir::cast<mlir::TupleType>(src.getType());
+    assert(args.getTypes() == tupleType.getTypes());
+    if (i < 0 || static_cast<size_t>(i) >= tupleType.size() ||
+        tupleType.getType(i) != getType())
+      return nullptr;
+
+    return args[i];
+  }
+
+  return nullptr;
 }
 
 #include "hc/Dialect/HKernel/IR/HKernelOpsDialect.cpp.inc"
