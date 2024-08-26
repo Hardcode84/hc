@@ -85,12 +85,12 @@ def HKernel_MakeTupleOp : HKernel_OpBase<"make_tuple", [Pure]> {
 
 def HKernel_TupleExtractOp : HKernel_OpBase<"tuple_extract", [Pure]> {
   let arguments = (ins
-    AnyTuple:$src,
+    AnyTuple:$source,
     Index:$index
   );
   let results = (outs AnyType:$result);
 
-  let assemblyFormat = "attr-dict $src `:` type($src) `[` $index `]` `->` type($result)";
+  let assemblyFormat = "attr-dict $source `:` type($source) `[` $index `]` `->` type($result)";
 
   let hasFolder = 1;
 }

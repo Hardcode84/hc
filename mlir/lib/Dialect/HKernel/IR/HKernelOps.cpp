@@ -34,7 +34,7 @@ hc::hk::BufferType::cloneWith(std::optional<llvm::ArrayRef<mlir::Type>> shape,
 
 mlir::OpFoldResult hc::hk::TupleExtractOp::fold(FoldAdaptor adaptor) {
   if (auto idx = mlir::getConstantIntValue(adaptor.getIndex())) {
-    auto src = getSrc();
+    auto src = getSource();
     auto def = src.getDefiningOp<MakeTupleOp>();
     if (!def)
       return nullptr;
