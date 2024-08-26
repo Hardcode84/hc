@@ -152,7 +152,7 @@ def HKernel_SubViewOp : HKernel_OpBase<"subview", [Pure]> {
 
 def HKernel_LoadOp : HKernel_OpBase<"load", []> {
   let arguments = (ins
-    AnyType:$source,
+    Arg<AnyType, "", [MemRead]>:$source,
     Variadic<AnyType>:$index
   );
   let results = (outs AnyType:$result);
@@ -162,8 +162,8 @@ def HKernel_LoadOp : HKernel_OpBase<"load", []> {
 
 def HKernel_StoreOp : HKernel_OpBase<"store", []> {
   let arguments = (ins
-    AnyType:$target,
-    AnyType:$source
+    Arg<AnyType, "", [MemWrite]>:$target,
+    Arg<AnyType, "", [MemRead]>:$source
   );
 
   let assemblyFormat = "attr-dict $target `:` type($target) `=` $source `:` type($source)";
