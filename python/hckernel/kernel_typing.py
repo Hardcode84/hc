@@ -226,8 +226,17 @@ def getitem_typing(dims: ValueType, index: ValueType):
         if is_same(elem, NoneTyp):
             res_dims = append_seq(res_dims, 1)
         elif is_same(get_type_name(elem), "Slice"):
-            end = get_seq_element(dims, dim_idx)  # TODO: proper size
-            res_dims = append_seq(res_dims, end)
+            lower = get_type_param(elem, "lower")
+            # TODO: check for literals
+            if is_same(lower, NoneTyp):
+                lower = 0
+
+            upper = get_type_param(elem, "upper")
+            if is_same(upper, NoneTyp):
+                upper = get_seq_element(dims, dim_idx)
+
+            # size = upper - lower TODO
+            res_dims = append_seq(res_dims, upper)
             dim_idx += 1
         else:
             dim_idx += 1
