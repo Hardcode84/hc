@@ -328,8 +328,9 @@ struct ConverPyIRToKernelPass final
     patterns.insert<ConvertTuplePack, ConvertTupleUnpack, ConvertSlice>(
         converter, ctx);
 
-    patterns.insert<ConvertGroupExpr<hc::hk::CurrentGroupType>>("work_offset",
-                                                                converter, ctx);
+    using ConvertCurrentGroup = ConvertGroupExpr<hc::hk::CurrentGroupType>;
+    patterns.insert<ConvertCurrentGroup>("work_offset", converter, ctx);
+    patterns.insert<ConvertCurrentGroup>("shape", converter, ctx);
 
     if (mlir::failed(
             mlir::applyPartialConversion(mod, target, std::move(patterns))))
