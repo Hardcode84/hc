@@ -71,6 +71,7 @@ apply_llvm_compile_flags(${PROJECT_NAME})
 target_link_libraries(${PROJECT_NAME} PRIVATE
     MLIRComplexDialect
     MLIRControlFlowDialect
+    MLIRDialectUtils
     MLIRFuncDialect
     MLIRIR
     MLIRTransformUtils

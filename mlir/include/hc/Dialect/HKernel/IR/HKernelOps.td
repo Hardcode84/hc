@@ -91,6 +91,8 @@ def HKernel_TupleExtractOp : HKernel_OpBase<"tuple_extract", [Pure]> {
   let results = (outs AnyType:$result);
 
   let assemblyFormat = "attr-dict $src `:` type($src) `[` $index `]` `->` type($result)";
+
+  let hasFolder = 1;
 }
 
 def HKernel_MakeSliceOp : HKernel_OpBase<"make_slice", [
