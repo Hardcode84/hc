@@ -150,7 +150,7 @@ def HKernel_SubViewOp : HKernel_OpBase<"subview", [Pure]> {
   let assemblyFormat = "attr-dict $source `:` type($source) `[` $index `]` `:` type($index) `->` type($result)";
 }
 
-def HKernel_LoadOp : HKernel_OpBase<"load", [Pure]> {
+def HKernel_LoadOp : HKernel_OpBase<"load", []> {
   let arguments = (ins
     AnyType:$source,
     Variadic<AnyType>:$index
@@ -158,6 +158,15 @@ def HKernel_LoadOp : HKernel_OpBase<"load", [Pure]> {
   let results = (outs AnyType:$result);
 
   let assemblyFormat = "attr-dict $source `:` type($source) `[` $index `]` `:` type($index) `->` type($result)";
+}
+
+def HKernel_StoreOp : HKernel_OpBase<"store", []> {
+  let arguments = (ins
+    AnyType:$target,
+    AnyType:$source
+  );
+
+  let assemblyFormat = "attr-dict $target `:` type($target) `=` $source `:` type($source)";
 }
 
 #endif // HKERNEL_OPS

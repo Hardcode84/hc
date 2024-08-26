@@ -443,6 +443,50 @@ private:
   mlir::StringAttr shapeName;
 };
 
+struct ConvertStore final
+    : public mlir::OpConversionPattern<hc::py_ir::CallOp> {
+  ConvertStore(const mlir::TypeConverter &typeConverter,
+               mlir::MLIRContext *context, mlir::PatternBenefit benefit = 1)
+      : mlir::OpConversionPattern<hc::py_ir::CallOp>(typeConverter, context,
+                                                     benefit),
+        funcName(mlir::StringAttr::get(
+            context, "hckernel.kernel_api.CurrentGroup.store")),
+        dstName(mlir::StringAttr::get(context, "dst")),
+        srcName(mlir::StringAttr::get(context, "src")) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::py_ir::CallOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    if (!op->use_empty())
+      return rewriter.notifyMatchFailure(op, "Op still has uses");
+
+    if (!checkIsIdent(adaptor.getFunc().getType(), funcName))
+      return rewriter.notifyMatchFailure(op, "Invalid func type");
+
+    const mlir::TypeConverter *converter = getTypeConverter();
+    if (!converter->convertType<mlir::NoneType>(op.getType()))
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    auto args = decodeFuncArgs(adaptor, {dstName, srcName});
+    mlir::Value dst = args[0];
+    mlir::Value src = args[1];
+    if (!mlir::isa_and_present<hc::hk::SymbolicallyShapedType>(dst.getType()))
+      return rewriter.notifyMatchFailure(op, "Invalid destination type");
+
+    if (!mlir::isa_and_present<hc::hk::SymbolicallyShapedType>(src.getType()))
+      return rewriter.notifyMatchFailure(op, "Invalid source type");
+
+    rewriter.create<hc::hk::StoreOp>(op.getLoc(), dst, src);
+    rewriter.eraseOp(op);
+    return mlir::success();
+  }
+
+private:
+  mlir::StringAttr funcName;
+  mlir::StringAttr dstName;
+  mlir::StringAttr srcName;
+};
+
 struct ConverPyIRToKernelPass final
     : public hc::impl::ConverPyIRToKernelPassBase<ConverPyIRToKernelPass> {
 
@@ -480,7 +524,7 @@ struct ConverPyIRToKernelPass final
     target.addLegalDialect<mlir::arith::ArithDialect, hc::hk::HKernelDialect>();
 
     patterns.insert<ConvertTuplePack, ConvertTupleUnpack, ConvertSlice,
-                    ConvertGetItem, ConvertLoad>(converter, ctx);
+                    ConvertGetItem, ConvertLoad, ConvertStore>(converter, ctx);
 
     using ConvertCurrentGroup = ConvertGroupExpr<hc::hk::CurrentGroupType>;
     patterns.insert<ConvertCurrentGroup>("work_offset", converter, ctx);
