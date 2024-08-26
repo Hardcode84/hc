@@ -220,18 +220,18 @@ def getitem_typing(dims: ValueType, index: ValueType):
     res_dims = create_seq()
     indices_len = get_seq_size(indices)
     i = 0
-    drop_count = 0
+    dim_idx = 0
     while i < indices_len:
-        if is_same(get_seq_element(indices, i), NoneTyp):
+        elem = get_seq_element(indices, i)
+        if is_same(elem, NoneTyp):
             res_dims = append_seq(res_dims, 1)
+        elif is_same(get_type_name(elem), "Slice"):
+            end = get_seq_element(dims, dim_idx)  # TODO: proper size
+            res_dims = append_seq(res_dims, end)
+            dim_idx += 1
         else:
-            drop_count += 1
-        i += 1
+            dim_idx += 1
 
-    dims_count = get_seq_size(dims)
-    i = drop_count
-    while i < dims_count:
-        res_dims = append_seq(res_dims, get_seq_element(dims, i))
         i += 1
 
     return res_dims
