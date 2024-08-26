@@ -76,6 +76,27 @@ def HKernel_BufferType : HKernel_Type<"Buffer", "buffer", [
   }];
 }
 
+def HKernel_TensorType : HKernel_Type<"Tensor", "tensor", [
+  SymbolicallyShapedTypeInterface
+], "::mlir::Type"> {
+  let summary = "TBD";
+  let description = [{
+    TBD
+  }];
+  let parameters = (ins
+    ArrayRefParameter<"::mlir::Type">:$shape,
+    "::mlir::Type":$elementType
+  );
+
+  let assemblyFormat = "$shape `x` $elementType";
+
+  let extraClassDeclaration = [{
+    ::hc::hk::SymbolicallyShapedType cloneWith(
+      std::optional<llvm::ArrayRef<mlir::Type>> shape,
+      mlir::Type elementType) const;
+  }];
+}
+
 def HKernel_MakeTupleOp : HKernel_OpBase<"make_tuple", [Pure]> {
   let arguments = (ins Variadic<AnyType>:$args);
   let results = (outs AnyTuple:$result);
@@ -85,12 +106,12 @@ def HKernel_MakeTupleOp : HKernel_OpBase<"make_tuple", [Pure]> {
 
 def HKernel_TupleExtractOp : HKernel_OpBase<"tuple_extract", [Pure]> {
   let arguments = (ins
-    AnyTuple:$src,
+    AnyTuple:$source,
     Index:$index
   );
   let results = (outs AnyType:$result);
 
-  let assemblyFormat = "attr-dict $src `:` type($src) `[` $index `]` `->` type($result)";
+  let assemblyFormat = "attr-dict $source `:` type($source) `[` $index `]` `->` type($result)";
 
   let hasFolder = 1;
 }
@@ -117,6 +138,35 @@ def HKernel_MaterializeExprOp : HKernel_OpBase<"materialize_expr", [Pure]> {
   let results = (outs AnyType:$result);
 
   let assemblyFormat = "attr-dict type($result)";
+}
+
+def HKernel_SubViewOp : HKernel_OpBase<"subview", [Pure]> {
+  let arguments = (ins
+    AnyType:$source,
+    Variadic<AnyType>:$index
+  );
+  let results = (outs AnyType:$result);
+
+  let assemblyFormat = "attr-dict $source `:` type($source) `[` $index `]` `:` type($index) `->` type($result)";
+}
+
+def HKernel_LoadOp : HKernel_OpBase<"load", []> {
+  let arguments = (ins
+    Arg<AnyType, "", [MemRead]>:$source,
+    Variadic<AnyType>:$index
+  );
+  let results = (outs AnyType:$result);
+
+  let assemblyFormat = "attr-dict $source `:` type($source) `[` $index `]` `:` type($index) `->` type($result)";
+}
+
+def HKernel_StoreOp : HKernel_OpBase<"store", []> {
+  let arguments = (ins
+    Arg<AnyType, "", [MemWrite]>:$target,
+    Arg<AnyType, "", [MemRead]>:$source
+  );
+
+  let assemblyFormat = "attr-dict $target `:` type($target) `=` $source `:` type($source)";
 }
 
 #endif // HKERNEL_OPS

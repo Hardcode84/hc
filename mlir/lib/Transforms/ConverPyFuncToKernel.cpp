@@ -110,6 +110,7 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
       });
 
   auto bufferStr = getStr("Buffer");
+  auto tensorStr = getStr("Tensor");
   auto dimsStr = getStr("dims");
   auto dtypeStr = getStr("dtype");
   auto nameStr = getStr("name");
@@ -130,6 +131,24 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
       return std::nullopt;
 
     return hc::hk::BufferType::get(type.getContext(), dims.getParams(), dtype);
+  });
+  converter.addConversion([=](hc::typing::IdentType type)
+                              -> std::optional<mlir::Type> {
+    if (type.getName() != tensorStr)
+      return std::nullopt;
+
+    auto dims = type.getParam<hc::typing::SequenceType>(dimsStr);
+    if (!dims)
+      return std::nullopt;
+
+    auto dtype = type.getParam(dtypeStr);
+    if (auto ident = mlir::dyn_cast_if_present<hc::typing::IdentType>(dtype))
+      dtype = ident.getParam(nameStr);
+
+    if (!dtype)
+      return std::nullopt;
+
+    return hc::hk::TensorType::get(type.getContext(), dims.getParams(), dtype);
   });
 
   auto tupleStr = getStr("Tuple");
@@ -289,6 +308,185 @@ private:
   mlir::StringAttr name;
 };
 
+static llvm::SmallVector<mlir::Value>
+unpackTupleArg(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value arg) {
+  llvm::SmallVector<mlir::Value> ret;
+  if (auto tuple = mlir::dyn_cast<mlir::TupleType>(arg.getType())) {
+    ret.resize(tuple.size());
+    for (auto &&[i, type] : llvm::enumerate(tuple.getTypes())) {
+      mlir::Value idx = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
+      ret[i] = builder.create<hc::hk::TupleExtractOp>(loc, type, arg, idx);
+    }
+  } else {
+    ret.emplace_back(arg);
+  }
+
+  return ret;
+}
+
+struct ConvertGetItem final
+    : public mlir::OpConversionPattern<hc::py_ir::GetItemOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::py_ir::GetItemOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::Value target = adaptor.getTarget();
+    if (!mlir::isa<hc::hk::SymbolicallyShapedType>(target.getType()))
+      return rewriter.notifyMatchFailure(op, "Invalid source type");
+
+    const mlir::TypeConverter *converter = getTypeConverter();
+    auto resType =
+        converter->convertType<hc::hk::SymbolicallyShapedType>(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    auto index = unpackTupleArg(rewriter, op.getLoc(), adaptor.getIndex());
+    rewriter.replaceOpWithNewOp<hc::hk::SubViewOp>(op, resType, target, index);
+    return mlir::success();
+  }
+};
+
+static bool checkIsIdent(mlir::Type type, mlir::StringAttr name) {
+  auto ident = mlir::dyn_cast<hc::typing::IdentType>(type);
+  return ident && ident.getName() == name;
+}
+
+static llvm::SmallVector<mlir::Value>
+decodeFuncArgs(hc::py_ir::CallOpAdaptor op,
+               mlir::ArrayRef<mlir::StringAttr> resArgsNames) {
+  llvm::SmallVector<mlir::Value> ret;
+  ret.reserve(resArgsNames.size());
+
+  mlir::ValueRange args = op.getArgs();
+  mlir::ArrayRef<mlir::Attribute> argsNames = op.getArgsNames().getValue();
+  assert(args.size() == argsNames.size());
+
+  auto getCurrent = [&]() -> std::pair<mlir::Value, mlir::StringAttr> {
+    return {args.front(), mlir::cast<mlir::StringAttr>(argsNames.front())};
+  };
+
+  auto getByName = [&](mlir::StringAttr argName) -> mlir::Value {
+    for (auto &&[arg, name] : llvm::zip_equal(args, argsNames))
+      if (name == argName)
+        return arg;
+
+    return nullptr;
+  };
+
+  auto popCurrent = [&]() {
+    assert(!args.empty());
+    args = args.drop_front();
+    argsNames = argsNames.drop_front();
+  };
+
+  for (auto expectedName : resArgsNames) {
+    assert(!expectedName.empty());
+
+    if (args.empty()) {
+      ret.emplace_back(nullptr);
+      continue;
+    }
+
+    auto &&[arg, name] = getCurrent();
+    if (name.empty()) {
+      ret.emplace_back(arg);
+      popCurrent();
+      continue;
+    }
+
+    arg = getByName(expectedName);
+    ret.emplace_back(arg);
+  }
+  return ret;
+}
+
+struct ConvertLoad final : public mlir::OpConversionPattern<hc::py_ir::CallOp> {
+  ConvertLoad(const mlir::TypeConverter &typeConverter,
+              mlir::MLIRContext *context, mlir::PatternBenefit benefit = 1)
+      : mlir::OpConversionPattern<hc::py_ir::CallOp>(typeConverter, context,
+                                                     benefit),
+        funcName(mlir::StringAttr::get(
+            context, "hckernel.kernel_api.CurrentGroup.load")),
+        arrayName(mlir::StringAttr::get(context, "array")),
+        shapeName(mlir::StringAttr::get(context, "shape")) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::py_ir::CallOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    if (!checkIsIdent(adaptor.getFunc().getType(), funcName))
+      return rewriter.notifyMatchFailure(op, "Invalid func type");
+
+    const mlir::TypeConverter *converter = getTypeConverter();
+    auto resType =
+        converter->convertType<hc::hk::SymbolicallyShapedType>(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    auto args = decodeFuncArgs(adaptor, {arrayName, shapeName});
+    mlir::Value array = args[0];
+    mlir::Value shape = args[1];
+    if (!mlir::isa_and_present<hc::hk::SymbolicallyShapedType>(array.getType()))
+      return rewriter.notifyMatchFailure(op, "Invalid source type");
+
+    if (!shape)
+      return rewriter.notifyMatchFailure(op, "No shape");
+
+    auto shapeArr = unpackTupleArg(rewriter, op.getLoc(), shape);
+    rewriter.replaceOpWithNewOp<hc::hk::LoadOp>(op, resType, array, shapeArr);
+    return mlir::success();
+  }
+
+private:
+  mlir::StringAttr funcName;
+  mlir::StringAttr arrayName;
+  mlir::StringAttr shapeName;
+};
+
+struct ConvertStore final
+    : public mlir::OpConversionPattern<hc::py_ir::CallOp> {
+  ConvertStore(const mlir::TypeConverter &typeConverter,
+               mlir::MLIRContext *context, mlir::PatternBenefit benefit = 1)
+      : mlir::OpConversionPattern<hc::py_ir::CallOp>(typeConverter, context,
+                                                     benefit),
+        funcName(mlir::StringAttr::get(
+            context, "hckernel.kernel_api.CurrentGroup.store")),
+        dstName(mlir::StringAttr::get(context, "dst")),
+        srcName(mlir::StringAttr::get(context, "src")) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::py_ir::CallOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    if (!op->use_empty())
+      return rewriter.notifyMatchFailure(op, "Op still has uses");
+
+    if (!checkIsIdent(adaptor.getFunc().getType(), funcName))
+      return rewriter.notifyMatchFailure(op, "Invalid func type");
+
+    const mlir::TypeConverter *converter = getTypeConverter();
+    if (!converter->convertType<mlir::NoneType>(op.getType()))
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    auto args = decodeFuncArgs(adaptor, {dstName, srcName});
+    mlir::Value dst = args[0];
+    mlir::Value src = args[1];
+    if (!mlir::isa_and_present<hc::hk::SymbolicallyShapedType>(dst.getType()))
+      return rewriter.notifyMatchFailure(op, "Invalid destination type");
+
+    if (!mlir::isa_and_present<hc::hk::SymbolicallyShapedType>(src.getType()))
+      return rewriter.notifyMatchFailure(op, "Invalid source type");
+
+    rewriter.create<hc::hk::StoreOp>(op.getLoc(), dst, src);
+    rewriter.eraseOp(op);
+    return mlir::success();
+  }
+
+private:
+  mlir::StringAttr funcName;
+  mlir::StringAttr dstName;
+  mlir::StringAttr srcName;
+};
+
 struct ConverPyIRToKernelPass final
     : public hc::impl::ConverPyIRToKernelPassBase<ConverPyIRToKernelPass> {
 
@@ -325,8 +523,8 @@ struct ConverPyIRToKernelPass final
     target.addIllegalOp<hc::py_ir::TuplePackOp, hc::py_ir::TuplePackOp>();
     target.addLegalDialect<mlir::arith::ArithDialect, hc::hk::HKernelDialect>();
 
-    patterns.insert<ConvertTuplePack, ConvertTupleUnpack, ConvertSlice>(
-        converter, ctx);
+    patterns.insert<ConvertTuplePack, ConvertTupleUnpack, ConvertSlice,
+                    ConvertGetItem, ConvertLoad, ConvertStore>(converter, ctx);
 
     using ConvertCurrentGroup = ConvertGroupExpr<hc::hk::CurrentGroupType>;
     patterns.insert<ConvertCurrentGroup>("work_offset", converter, ctx);

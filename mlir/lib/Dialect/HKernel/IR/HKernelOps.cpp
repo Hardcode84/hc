@@ -32,9 +32,16 @@ hc::hk::BufferType::cloneWith(std::optional<llvm::ArrayRef<mlir::Type>> shape,
                          elementType ? elementType : getElementType());
 }
 
+hc::hk::SymbolicallyShapedType
+hc::hk::TensorType::cloneWith(std::optional<llvm::ArrayRef<mlir::Type>> shape,
+                              mlir::Type elementType) const {
+  return TensorType::get(getContext(), shape ? *shape : getShape(),
+                         elementType ? elementType : getElementType());
+}
+
 mlir::OpFoldResult hc::hk::TupleExtractOp::fold(FoldAdaptor adaptor) {
   if (auto idx = mlir::getConstantIntValue(adaptor.getIndex())) {
-    auto src = getSrc();
+    auto src = getSource();
     auto def = src.getDefiningOp<MakeTupleOp>();
     if (!def)
       return nullptr;
