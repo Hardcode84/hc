@@ -76,6 +76,27 @@ def HKernel_BufferType : HKernel_Type<"Buffer", "buffer", [
   }];
 }
 
+def HKernel_TensorType : HKernel_Type<"Tensor", "tensor", [
+  SymbolicallyShapedTypeInterface
+], "::mlir::Type"> {
+  let summary = "TBD";
+  let description = [{
+    TBD
+  }];
+  let parameters = (ins
+    ArrayRefParameter<"::mlir::Type">:$shape,
+    "::mlir::Type":$elementType
+  );
+
+  let assemblyFormat = "$shape `x` $elementType";
+
+  let extraClassDeclaration = [{
+    ::hc::hk::SymbolicallyShapedType cloneWith(
+      std::optional<llvm::ArrayRef<mlir::Type>> shape,
+      mlir::Type elementType) const;
+  }];
+}
+
 def HKernel_MakeTupleOp : HKernel_OpBase<"make_tuple", [Pure]> {
   let arguments = (ins Variadic<AnyType>:$args);
   let results = (outs AnyTuple:$result);
@@ -120,6 +141,16 @@ def HKernel_MaterializeExprOp : HKernel_OpBase<"materialize_expr", [Pure]> {
 }
 
 def HKernel_SubViewOp : HKernel_OpBase<"subview", [Pure]> {
+  let arguments = (ins
+    AnyType:$source,
+    Variadic<AnyType>:$index
+  );
+  let results = (outs AnyType:$result);
+
+  let assemblyFormat = "attr-dict $source `:` type($source) `[` $index `]` `:` type($index) `->` type($result)";
+}
+
+def HKernel_LoadOp : HKernel_OpBase<"load", [Pure]> {
   let arguments = (ins
     AnyType:$source,
     Variadic<AnyType>:$index
