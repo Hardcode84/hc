@@ -264,14 +264,6 @@ def resolver(target: ValueType):
     return make_type("Tuple", elements=dims)
 
 
-@type_resolver(_registry, ["py_ir.getitem"])
-def resolver(target: ValueType, index: ValueType):
-    check_is_tensor(target)
-    return make_type(
-        "Tensor", dims=getitem_typing(get_type_param(target, "dims"), index)
-    )
-
-
 @type_resolver(_registry, ["py_ir.binop"])
 def resolver(lhs: ValueType, rhs: ValueType):
     # TODO: broadcasting
