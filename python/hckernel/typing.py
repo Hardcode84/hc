@@ -149,6 +149,11 @@ def get_seq_size(seq):
 
 
 @_register_func
+def unpack_seq(seq):
+    _stub_error()
+
+
+@_register_func
 def make_type(name, **kwargs):
     _stub_error()
 

@@ -563,11 +563,11 @@ hc::typing::TypeResolverReturnOp::interpret(InterpreterState &state) {
   auto &result = *state.result;
   mlir::ValueRange args = getArgs();
 
-  auto isSeq = [&]() -> typing::SequenceType {
+  auto isSeq = [&]() -> typing::UnpackedSequenceType {
     if (args.size() != 1)
       return {};
 
-    return mlir::dyn_cast_if_present<typing::SequenceType>(
+    return mlir::dyn_cast_if_present<typing::UnpackedSequenceType>(
         getType(state, args.front()));
   };
 
@@ -770,6 +770,18 @@ hc::typing::GetSeqSizeOp::interpret(InterpreterState &state) {
 
   state.state[getResult()] =
       setInt(getContext(), static_cast<int64_t>(seq.getParams().size()));
+  return InterpreterResult::Advance;
+}
+
+mlir::FailureOr<hc::typing::InterpreterResult>
+hc::typing::UnpackSeqOp::interpret(InterpreterState &state) {
+  auto seq = mlir::dyn_cast_if_present<SequenceType>(
+      ::hc::typing::getType(state, getSeq()));
+  if (!seq)
+    return emitError("Invalid seq type");
+
+  state.state[getResult()] =
+      UnpackedSequenceType::get(getContext(), seq.getParams());
   return InterpreterResult::Advance;
 }
 

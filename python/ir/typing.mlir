@@ -340,6 +340,30 @@ typing.type_resolver ["py_ir.call"] {
   typing.type_resolver_return %3
 }
 
+// typing.unpack_seq
+
+typing.type_resolver ["py_ir.getattr", "unpack_seq"] {
+  %c0 = arith.constant 0: index
+  %0 = typing.make_ident "hckernel.typing" []
+  %1 = typing.get_arg %c0
+  %2 = typing.is_same %0 %1
+  typing.check %2
+
+  %3 = typing.make_ident "hckernel.typing.unpack_seq" []
+  typing.type_resolver_return %3
+}
+
+typing.type_resolver ["py_ir.call"] {
+  %c0 = arith.constant 0: index
+  %0 = typing.make_ident "hckernel.typing.unpack_seq" []
+  %1 = typing.get_arg %c0
+  %2 = typing.is_same %0 %1
+  typing.check %2
+
+  %3 = typing.type_constant #typing.type_attr<!typing.value> : !typing.value
+  typing.type_resolver_return %3
+}
+
 // typing.make_ident
 
 typing.type_resolver ["py_ir.getattr", "make_type"] {

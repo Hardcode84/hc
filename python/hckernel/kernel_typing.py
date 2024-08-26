@@ -135,7 +135,7 @@ def resolver(a: ValueType):
 @type_resolver(_registry, ["py_ir.tuple_unpack"])
 def resolver(a: ValueType):
     check_is_tuple(a)
-    return get_type_param(a, "elements")
+    return unpack_seq(get_type_param(a, "elements"))
 
 
 @type_resolver(_registry, ["py_ir.getitem"])
