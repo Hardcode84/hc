@@ -563,11 +563,11 @@ hc::typing::TypeResolverReturnOp::interpret(InterpreterState &state) {
   auto &result = *state.result;
   mlir::ValueRange args = getArgs();
 
-  auto isSeq = [&]() -> typing::SequenceType {
+  auto isSeq = [&]() -> typing::UnpackedSequenceType {
     if (args.size() != 1)
       return {};
 
-    return mlir::dyn_cast_if_present<typing::SequenceType>(
+    return mlir::dyn_cast_if_present<typing::UnpackedSequenceType>(
         getType(state, args.front()));
   };
 
@@ -774,6 +774,18 @@ hc::typing::GetSeqSizeOp::interpret(InterpreterState &state) {
 }
 
 mlir::FailureOr<hc::typing::InterpreterResult>
+hc::typing::UnpackSeqOp::interpret(InterpreterState &state) {
+  auto seq = mlir::dyn_cast_if_present<SequenceType>(
+      ::hc::typing::getType(state, getSeq()));
+  if (!seq)
+    return emitError("Invalid seq type");
+
+  state.state[getResult()] =
+      UnpackedSequenceType::get(getContext(), seq.getParams());
+  return InterpreterResult::Advance;
+}
+
+mlir::FailureOr<hc::typing::InterpreterResult>
 hc::typing::IsSameOp::interpret(InterpreterState &state) {
   auto lhs = hc::typing::getType(state, getLhs());
   auto rhs = hc::typing::getType(state, getRhs());
@@ -787,6 +799,13 @@ hc::typing::CheckOp::interpret(InterpreterState &state) {
   if (!val)
     return emitError("Inavlid condition val");
   return *val ? InterpreterResult::Advance : InterpreterResult::MatchFail;
+}
+
+mlir::FailureOr<hc::typing::InterpreterResult>
+hc::typing::PrintOp::interpret(InterpreterState &state) {
+  auto type = hc::typing::getType(state, getValue());
+  llvm::errs() << type << "\n";
+  return InterpreterResult::Advance;
 }
 
 mlir::FailureOr<hc::typing::InterpreterResult>

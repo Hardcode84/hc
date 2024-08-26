@@ -375,7 +375,9 @@ public:
     if (!*res)
       return mlir::success();
 
-    assert(result.size() == results.size());
+    if (result.size() != results.size())
+      return op->emitOpError("Invalid op results count");
+
     for (auto &&[resultLattice, res] : llvm::zip_equal(results, result)) {
       auto changed = resultLattice->join(TypeValue(&interpreter, res));
       propagateIfChanged(resultLattice, changed);

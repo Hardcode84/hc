@@ -102,6 +102,15 @@ def Typing_SequenceType : Typing_Type<"Sequence", "sequence", [], "::mlir::Type"
   let assemblyFormat = "$params";
 }
 
+def Typing_UnpackedSequenceType : Typing_Type<"UnpackedSequence", "unpacked_sequence", [], "::mlir::Type"> {
+  let parameters = (ins
+    ArrayRefParameter<"::mlir::Type">:$params
+  );
+
+  let assemblyFormat = "$params";
+}
+
+
 def Typing_SymbolType : Typing_Type<"Symbol", "symbol", [], "::mlir::Type"> {
   let parameters = (ins "::mlir::StringAttr":$name);
 
@@ -409,6 +418,16 @@ def Typing_GetSeqSizeOp : Typing_OpBase<"get_seq_size", [
   let assemblyFormat = "attr-dict $seq";
 }
 
+def Typing_UnpackSeqOp : Typing_OpBase<"unpack_seq", [
+  Pure,
+  DeclareOpInterfaceMethods<TypingInterpreterInterface>
+]> {
+  let arguments = (ins Typing_ValueType:$seq);
+  let results = (outs Typing_ValueType:$result);
+
+  let assemblyFormat = "attr-dict $seq";
+}
+
 def Typing_IsSameOp : Typing_OpBase<"is_same", [
   Pure, DeclareOpInterfaceMethods<TypingInterpreterInterface>
 ]> {
@@ -426,6 +445,14 @@ def Typing_CheckOp : Typing_OpBase<"check", [
   let arguments = (ins I1:$condition);
 
   let assemblyFormat = "attr-dict $condition";
+}
+
+def Typing_PrintOp : Typing_OpBase<"print", [
+  DeclareOpInterfaceMethods<TypingInterpreterInterface>
+]> {
+  let arguments = (ins Typing_ValueType:$value);
+
+  let assemblyFormat = "attr-dict $value";
 }
 
 def Typing_MakeUnionOp : Typing_OpBase<"make_union", [

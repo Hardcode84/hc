@@ -104,6 +104,11 @@ def check(cond):
 
 
 @_register_func
+def print_val(value):
+    _stub_error()
+
+
+@_register_func
 def get_attr(name):
     _stub_error()
 
@@ -145,6 +150,11 @@ def get_seq_element(seq, index):
 
 @_register_func
 def get_seq_size(seq):
+    _stub_error()
+
+
+@_register_func
+def unpack_seq(seq):
     _stub_error()
 
 

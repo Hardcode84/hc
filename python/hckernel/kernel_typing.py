@@ -135,7 +135,7 @@ def resolver(a: ValueType):
 @type_resolver(_registry, ["py_ir.tuple_unpack"])
 def resolver(a: ValueType):
     check_is_tuple(a)
-    return get_type_param(a, "elements")
+    return unpack_seq(get_type_param(a, "elements"))
 
 
 @type_resolver(_registry, ["py_ir.getitem"])
@@ -220,18 +220,27 @@ def getitem_typing(dims: ValueType, index: ValueType):
     res_dims = create_seq()
     indices_len = get_seq_size(indices)
     i = 0
-    drop_count = 0
+    dim_idx = 0
     while i < indices_len:
-        if is_same(get_seq_element(indices, i), NoneTyp):
+        elem = get_seq_element(indices, i)
+        if is_same(elem, NoneTyp):
             res_dims = append_seq(res_dims, 1)
-        else:
-            drop_count += 1
-        i += 1
+        elif is_same(get_type_name(elem), "Slice"):
+            lower = get_type_param(elem, "lower")
+            # TODO: check for literals
+            if is_same(lower, NoneTyp):
+                lower = 0
 
-    dims_count = get_seq_size(dims)
-    i = drop_count
-    while i < dims_count:
-        res_dims = append_seq(res_dims, get_seq_element(dims, i))
+            upper = get_type_param(elem, "upper")
+            if is_same(upper, NoneTyp):
+                upper = get_seq_element(dims, dim_idx)
+
+            # size = upper - lower TODO
+            res_dims = append_seq(res_dims, upper)
+            dim_idx += 1
+        else:
+            dim_idx += 1
+
         i += 1
 
     return res_dims
@@ -262,14 +271,6 @@ def resolver(target: ValueType):
     check_is_shaped(target)
     dims = get_type_param(target, "dims")
     return make_type("Tuple", elements=dims)
-
-
-@type_resolver(_registry, ["py_ir.getitem"])
-def resolver(target: ValueType, index: ValueType):
-    check_is_tensor(target)
-    return make_type(
-        "Tensor", dims=getitem_typing(get_type_param(target, "dims"), index)
-    )
 
 
 @type_resolver(_registry, ["py_ir.binop"])
