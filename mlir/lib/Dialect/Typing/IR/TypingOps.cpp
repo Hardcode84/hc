@@ -1042,6 +1042,54 @@ static void printExprType(mlir::AsmPrinter &printer,
   printer << expr;
 }
 
+bool SymbolicTypeBase::classof(mlir::Type type) {
+  return llvm::isa<LiteralType, SymbolType, ExprType>(type);
+}
+
+static SymbolicTypeBase foldExpr(ExprType expr) {
+  auto params = expr.getParams();
+  if (params.size() != 1)
+    return expr;
+
+  if (expr.getExpr() != mlir::getAffineSymbolExpr(0, expr.getContext()))
+    return expr;
+
+  return mlir::cast<SymbolicTypeBase>(params.front());
+}
+
+template <typename F>
+static SymbolicTypeBase makeExpr(SymbolicTypeBase lhs, SymbolicTypeBase rhs,
+                                 F &&func) {
+  auto ctx = lhs.getContext();
+  auto op = func(mlir::getAffineSymbolExpr(0, ctx),
+                 mlir::getAffineSymbolExpr(1, ctx));
+  return foldExpr(hc::typing::ExprType::get(ctx, {lhs, rhs}, op));
+}
+
+SymbolicTypeBase SymbolicTypeBase::operator+(SymbolicTypeBase rhs) const {
+  return makeExpr(*this, rhs, [](auto a, auto b) { return a + b; });
+}
+
+SymbolicTypeBase SymbolicTypeBase::operator-(SymbolicTypeBase rhs) const {
+  return makeExpr(*this, rhs, [](auto a, auto b) { return a - b; });
+}
+
+SymbolicTypeBase SymbolicTypeBase::operator*(SymbolicTypeBase rhs) const {
+  return makeExpr(*this, rhs, [](auto a, auto b) { return a * b; });
+}
+
+SymbolicTypeBase SymbolicTypeBase::operator%(SymbolicTypeBase rhs) const {
+  return makeExpr(*this, rhs, [](auto a, auto b) { return a % b; });
+}
+
+SymbolicTypeBase SymbolicTypeBase::floorDiv(SymbolicTypeBase rhs) const {
+  return makeExpr(*this, rhs, [](auto a, auto b) { return a.floorDiv(b); });
+}
+
+SymbolicTypeBase SymbolicTypeBase::ceilDiv(SymbolicTypeBase rhs) const {
+  return makeExpr(*this, rhs, [](auto a, auto b) { return a.ceilDiv(b); });
+}
+
 #include "hc/Dialect/Typing/IR/TypingOpsDialect.cpp.inc"
 
 #define GET_OP_CLASSES

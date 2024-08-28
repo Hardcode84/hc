@@ -177,18 +177,31 @@ public:
 };
 
 template <typename Op>
-static PyExprType makeExpr(mlir::python::PyType lhs, mlir::python::PyType rhs) {
-  auto ulhs = unwrap(lhs.get());
-  auto urhs = unwrap(rhs.get());
-  auto ctx = ulhs.getContext();
-  auto op = Op()(mlir::getAffineSymbolExpr(0, ctx),
-                 mlir::getAffineSymbolExpr(1, ctx));
-  auto expr = hc::typing::ExprType::get(ctx, {ulhs, urhs}, op);
-  return PyExprType(lhs.getContext(), wrap(expr));
+static PyType makeExpr(mlir::python::PyType lhs, mlir::python::PyType rhs) {
+  auto ulhs = mlir::cast<hc::typing::SymbolicTypeBase>(unwrap(lhs.get()));
+  auto urhs = mlir::cast<hc::typing::SymbolicTypeBase>(unwrap(rhs.get()));
+  auto res = Op()(ulhs, urhs);
+  return PyType(lhs.getContext(), wrap(res));
 }
 
+struct FloorDiv {
+  template <typename T> constexpr auto operator()(T &&lhs, T &&rhs) const {
+    return lhs.floorDiv(rhs);
+  }
+};
+struct CeilDiv {
+  template <typename T> constexpr auto operator()(T &&lhs, T &&rhs) const {
+    return lhs.ceilDiv(rhs);
+  }
+};
+
 template <typename ClassTy> static void defExprOpearators(ClassTy &c) {
+  c.def("__add__", &makeExpr<std::plus<void>>, py::arg("rhs"), "mul op");
+  c.def("__sub__", &makeExpr<std::minus<void>>, py::arg("rhs"), "mul op");
   c.def("__mul__", &makeExpr<std::multiplies<void>>, py::arg("rhs"), "mul op");
+  c.def("__mod__", &makeExpr<std::modulus<void>>, py::arg("rhs"), "mul op");
+  c.def("__floordiv__", &makeExpr<FloorDiv>, py::arg("rhs"), "mul op");
+  c.def("__truediv__", &makeExpr<CeilDiv>, py::arg("rhs"), "mul op");
 }
 
 class PyTypeAttr : public PyConcreteAttribute<PyTypeAttr> {

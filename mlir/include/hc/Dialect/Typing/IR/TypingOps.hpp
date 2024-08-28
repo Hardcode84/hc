@@ -15,6 +15,22 @@
 
 #include "hc/Dialect/Typing/IR/TypingOpsInterfaces.hpp"
 
+namespace hc::typing {
+class SymbolicTypeBase : public mlir::Type {
+public:
+  using Type::Type;
+
+  static bool classof(Type type);
+
+  SymbolicTypeBase operator+(SymbolicTypeBase rhs) const;
+  SymbolicTypeBase operator-(SymbolicTypeBase rhs) const;
+  SymbolicTypeBase operator*(SymbolicTypeBase rhs) const;
+  SymbolicTypeBase operator%(SymbolicTypeBase rhs) const;
+  SymbolicTypeBase floorDiv(SymbolicTypeBase rhs) const;
+  SymbolicTypeBase ceilDiv(SymbolicTypeBase rhs) const;
+};
+} // namespace hc::typing
+
 #include "hc/Dialect/Typing/IR/TypingOpsDialect.h.inc"
 #include "hc/Dialect/Typing/IR/TypingOpsEnums.h.inc"
 

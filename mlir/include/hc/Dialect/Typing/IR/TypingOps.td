@@ -111,7 +111,7 @@ def Typing_UnpackedSequenceType : Typing_Type<"UnpackedSequence", "unpacked_sequ
 }
 
 
-def Typing_SymbolType : Typing_Type<"Symbol", "symbol", [], "::mlir::Type"> {
+def Typing_SymbolType : Typing_Type<"Symbol", "symbol", [], "::hc::typing::SymbolicTypeBase"> {
   let parameters = (ins "::mlir::StringAttr":$name);
 
   let builders = [
@@ -126,7 +126,7 @@ def Typing_SymbolType : Typing_Type<"Symbol", "symbol", [], "::mlir::Type"> {
   let assemblyFormat = "$name";
 }
 
-def Typing_LiteralType : Typing_Type<"Literal", "literal", [], "::mlir::Type"> {
+def Typing_LiteralType : Typing_Type<"Literal", "literal", [], "::hc::typing::SymbolicTypeBase"> {
   let parameters = (ins "::mlir::TypedAttr":$value);
 
   let builders = [
@@ -140,16 +140,7 @@ def Typing_LiteralType : Typing_Type<"Literal", "literal", [], "::mlir::Type"> {
   let assemblyFormat = "$value";
 }
 
-def Typing_UnionType : Typing_Type<"Union", "union", [], "::mlir::Type"> {
-  let parameters = (ins
-    ArrayRefParameter<"::mlir::Type">:$params
-  );
-
-  let assemblyFormat = "$params";
-}
-
-
-def Typing_ExprType : Typing_Type<"Expr", "expr", [], "::mlir::Type"> {
+def Typing_ExprType : Typing_Type<"Expr", "expr", [], "::hc::typing::SymbolicTypeBase"> {
   let parameters = (ins
     ArrayRefParameter<"::mlir::Type">:$params,
     "::mlir::AffineExpr":$expr
@@ -165,6 +156,14 @@ def Typing_ExprType : Typing_Type<"Expr", "expr", [], "::mlir::Type"> {
       return Base::get($_ctxt, std::move(newParams), std::move(newExpr));
     }]>
   ];
+}
+
+def Typing_UnionType : Typing_Type<"Union", "union", [], "::mlir::Type"> {
+  let parameters = (ins
+    ArrayRefParameter<"::mlir::Type">:$params
+  );
+
+  let assemblyFormat = "$params";
 }
 
 
