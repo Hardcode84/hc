@@ -15,6 +15,13 @@
 
 #include "hc/Dialect/Typing/IR/TypingOpsInterfaces.hpp"
 
+namespace hc::typing {
+class SymbolicTypeBase : public mlir::Type {
+public:
+  using Type::Type;
+};
+} // namespace hc::typing
+
 #include "hc/Dialect/Typing/IR/TypingOpsDialect.h.inc"
 #include "hc/Dialect/Typing/IR/TypingOpsEnums.h.inc"
 
