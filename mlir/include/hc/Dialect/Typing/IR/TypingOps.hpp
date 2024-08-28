@@ -19,6 +19,15 @@ namespace hc::typing {
 class SymbolicTypeBase : public mlir::Type {
 public:
   using Type::Type;
+
+  static bool classof(Type type);
+
+  SymbolicTypeBase operator+(SymbolicTypeBase rhs) const;
+  SymbolicTypeBase operator-(SymbolicTypeBase rhs) const;
+  SymbolicTypeBase operator*(SymbolicTypeBase rhs) const;
+  SymbolicTypeBase operator%(SymbolicTypeBase rhs) const;
+  SymbolicTypeBase floorDiv(SymbolicTypeBase rhs) const;
+  SymbolicTypeBase ceilDiv(SymbolicTypeBase rhs) const;
 };
 } // namespace hc::typing
 
