@@ -7,6 +7,7 @@ include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
+include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
 include "hc/Dialect/Typing/IR/TypingOpsInterfaces.td"
@@ -472,5 +473,31 @@ def Typing_GetGlobalAttrOp : Typing_OpBase<"get_global_attr", [
 
   let assemblyFormat = "attr-dict $name";
 }
+
+def Typing_BinOpAttr : I64EnumAttr<
+    "BinOpVal", "",
+    [
+      I64EnumAttrCase<"add", 0>,
+      I64EnumAttrCase<"sub", 1>,
+      I64EnumAttrCase<"mul", 2>,
+      I64EnumAttrCase<"ceil_div", 3>,
+      I64EnumAttrCase<"floor_div", 4>,
+      I64EnumAttrCase<"mod", 5>,
+    ]> {
+  let cppNamespace = "::hc::typing";
+}
+
+def Typing_BinOp : Typing_OpBase<"binop", [
+  Pure, DeclareOpInterfaceMethods<TypingInterpreterInterface>
+]> {
+  let arguments = (ins
+      Typing_ValueType:$lhs,
+      Typing_BinOpAttr:$op,
+      Typing_ValueType:$rhs);
+  let results = (outs Typing_ValueType:$result);
+
+  let assemblyFormat = "attr-dict $lhs $op $rhs";
+}
+
 
 #endif // TYPING_OPS

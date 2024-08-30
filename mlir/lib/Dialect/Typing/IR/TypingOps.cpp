@@ -918,6 +918,44 @@ hc::typing::GetGlobalAttrOp::interpret(InterpreterState &state) {
   return InterpreterResult::Advance;
 }
 
+mlir::FailureOr<hc::typing::InterpreterResult>
+hc::typing::BinOp::interpret(InterpreterState &state) {
+  auto lhs = ::getType<SymbolicTypeBase>(state, getLhs());
+  if (!lhs)
+    return emitError("Invalid lhs value");
+
+  auto rhs = ::getType<SymbolicTypeBase>(state, getLhs());
+  if (!rhs)
+    return emitError("Invalid rhs value");
+
+  InterpreterValue res;
+  switch (getOp()) {
+  case BinOpVal::add:
+    res = lhs + rhs;
+    break;
+  case BinOpVal::sub:
+    res = lhs - rhs;
+    break;
+  case BinOpVal::mul:
+    res = lhs * rhs;
+    break;
+  case BinOpVal::ceil_div:
+    res = lhs.ceilDiv(rhs);
+    break;
+  case BinOpVal::floor_div:
+    res = lhs.floorDiv(rhs);
+    break;
+  case BinOpVal::mod:
+    res = lhs % rhs;
+    break;
+  default:
+    return emitError("Unsupported op: ") << getOpAttr();
+  }
+
+  state.state[getResult()] = res;
+  return InterpreterResult::Advance;
+}
+
 static bool expandLiterals(llvm::SmallVectorImpl<mlir::Type> &params,
                            mlir::AffineExpr &expr) {
   bool changed = false;

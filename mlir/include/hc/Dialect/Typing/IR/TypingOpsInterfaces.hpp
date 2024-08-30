@@ -47,6 +47,11 @@ InterpreterValue setInt(mlir::MLIRContext *ctx, int64_t val);
 
 mlir::Type getType(const hc::typing::InterpreterState &state, mlir::Value val);
 
+template <typename T>
+T getType(const hc::typing::InterpreterState &state, mlir::Value val) {
+  return mlir::dyn_cast_if_present<T>(getType(state, val));
+}
+
 void getTypes(const hc::typing::InterpreterState &state, mlir::ValueRange vals,
               llvm::SmallVectorImpl<mlir::Type> &result);
 
