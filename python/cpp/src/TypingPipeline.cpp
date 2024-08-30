@@ -259,16 +259,16 @@ static mlir::Value doCast(mlir::OpBuilder &builder, mlir::Location loc,
 }
 
 template <typename Op>
-static mlir::Value createBinOp(mlir::OpBuilder &builder, mlir::Location loc,
-                               mlir::Value lhs, mlir::Value rhs,
-                               mlir::Type dstType) {
+static mlir::Value createArithBinOp(mlir::OpBuilder &builder,
+                                    mlir::Location loc, mlir::Value lhs,
+                                    mlir::Value rhs, mlir::Type dstType) {
   lhs = doCast(builder, loc, lhs, dstType);
   rhs = doCast(builder, loc, rhs, dstType);
   return builder.create<Op>(loc, lhs, rhs);
 }
 
 template <typename BinOp>
-class ConvertBinop final : public mlir::OpRewritePattern<BinOp> {
+class ConvertArithBinop final : public mlir::OpRewritePattern<BinOp> {
 public:
   using mlir::OpRewritePattern<BinOp>::OpRewritePattern;
 
@@ -284,13 +284,60 @@ public:
     using Op = hc::py_ir::BinOpVal;
     namespace arith = mlir::arith;
     const std::pair<Op, fptr> handlers[] = {
-        {Op::add, createBinOp<arith::AddIOp>},
-        {Op::sub, createBinOp<arith::SubIOp>},
-        {Op::mul, createBinOp<arith::MulIOp>},
-        {Op::bool_and, createBinOp<arith::AndIOp>},
-        {Op::bool_or, createBinOp<arith::OrIOp>},
-        {Op::bit_and, createBinOp<arith::AndIOp>},
-        {Op::bit_or, createBinOp<arith::OrIOp>},
+        {Op::add, createArithBinOp<arith::AddIOp>},
+        {Op::sub, createArithBinOp<arith::SubIOp>},
+        {Op::mul, createArithBinOp<arith::MulIOp>},
+        {Op::bool_and, createArithBinOp<arith::AndIOp>},
+        {Op::bool_or, createArithBinOp<arith::OrIOp>},
+        {Op::bit_and, createArithBinOp<arith::AndIOp>},
+        {Op::bit_or, createArithBinOp<arith::OrIOp>},
+    };
+
+    auto opType = op.getOp();
+    for (auto &&[type, handler] : handlers) {
+      if (type == opType) {
+        mlir::Value res = handler(rewriter, op.getLoc(), op.getLeft(),
+                                  op.getRight(), retType);
+        rewriter.replaceOp(op, res);
+        return mlir::success();
+      }
+    }
+    return mlir::failure();
+  }
+};
+
+template <hc::typing::BinOpVal Op>
+static mlir::Value createTypingBinOp(mlir::OpBuilder &builder,
+                                     mlir::Location loc, mlir::Value lhs,
+                                     mlir::Value rhs, mlir::Type dstType) {
+  lhs = doCast(builder, loc, lhs, dstType);
+  rhs = doCast(builder, loc, rhs, dstType);
+  return builder.create<hc::typing::BinOp>(loc, dstType, lhs, Op, rhs);
+}
+
+template <typename BinOp>
+class ConvertTypingBinop final : public mlir::OpRewritePattern<BinOp> {
+public:
+  using mlir::OpRewritePattern<BinOp>::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(BinOp op, mlir::PatternRewriter &rewriter) const override {
+    auto retType = op.getType();
+    if (!mlir::isa<hc::typing::ValueType>(retType))
+      return mlir::failure();
+
+    using fptr =
+        mlir::Value (*)(mlir::OpBuilder & builder, mlir::Location loc,
+                        mlir::Value lhs, mlir::Value rhs, mlir::Type dstType);
+    using Op = hc::py_ir::BinOpVal;
+    namespace ty = hc::typing;
+    const std::pair<Op, fptr> handlers[] = {
+        {Op::add, createTypingBinOp<ty::BinOpVal::add>},
+        {Op::sub, createTypingBinOp<ty::BinOpVal::sub>},
+        {Op::mul, createTypingBinOp<ty::BinOpVal::mul>},
+        {Op::div, createTypingBinOp<ty::BinOpVal::ceil_div>},
+        {Op::floor_div, createTypingBinOp<ty::BinOpVal::floor_div>},
+        {Op::mod, createTypingBinOp<ty::BinOpVal::mod>},
     };
 
     auto opType = op.getOp();
@@ -405,9 +452,10 @@ struct GenResolversFuncsPass
   void runOnOperation() override {
     auto *ctx = &getContext();
     mlir::RewritePatternSet patterns(ctx);
-    patterns.insert<ConvertCall, ConvertBinop<hc::py_ir::BinOp>,
-                    ConvertBinop<hc::py_ir::InplaceBinOp>, ConvertCmp,
-                    ConvertConst>(ctx);
+    patterns.insert<ConvertCall, ConvertArithBinop<hc::py_ir::BinOp>,
+                    ConvertArithBinop<hc::py_ir::InplaceBinOp>, ConvertCmp,
+                    ConvertConst, ConvertTypingBinop<hc::py_ir::BinOp>,
+                    ConvertTypingBinop<hc::py_ir::InplaceBinOp>>(ctx);
 
     if (mlir::failed(
             applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
