@@ -23,7 +23,7 @@ hc::typing::Interpreter::run(mlir::Operation *rootOp, TypeResolverOp resolver,
     mlir::Operation &op = state.getNextOp();
     auto res = handleOp(state, op);
     if (mlir::failed(res))
-      return mlir::failure();
+      return resolver->emitError("Type resolver failed");
 
     switch (*res) {
     case InterpreterResult::MatchFail:

@@ -115,6 +115,58 @@ void hc::typing::ResolveOp::build(::mlir::OpBuilder &odsBuilder,
   odsBuilder.createBlock(region, {}, mlir::TypeRange(args), locs);
 }
 
+namespace {
+static mlir::Value makeCast(mlir::OpBuilder &builder, mlir::Location loc,
+                            mlir::Value src, mlir::Type type) {
+  if (src.getType() == type)
+    return src;
+
+  return builder.create<hc::typing::ValueCastOp>(loc, type, src);
+}
+
+struct ResolveSelect final
+    : public mlir::OpRewritePattern<hc::typing::ResolveOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::typing::ResolveOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op->getNumResults() != 1)
+      return mlir::failure();
+
+    mlir::Block *body = op.getBody();
+    if (!llvm::hasSingleElement(body->without_terminator()))
+      return mlir::failure();
+
+    auto select = mlir::dyn_cast<mlir::arith::SelectOp>(body->front());
+    if (!select)
+      return mlir::failure();
+
+    mlir::Type resType = op.getResult(0).getType();
+    auto getArg = [&](mlir::Value src) -> mlir::Value {
+      auto idx = mlir::cast<mlir::BlockArgument>(src).getArgNumber();
+      return op->getOperand(idx);
+    };
+
+    mlir::Location loc = select.getLoc();
+    mlir::Value cond = getArg(select.getCondition());
+    mlir::Value trueVal =
+        makeCast(rewriter, loc, getArg(select.getTrueValue()), resType);
+    mlir::Value falseVal =
+        makeCast(rewriter, loc, getArg(select.getFalseValue()), resType);
+    rewriter.replaceOpWithNewOp<mlir::arith::SelectOp>(op, cond, trueVal,
+                                                       falseVal);
+    return mlir::success();
+  }
+};
+} // namespace
+
+void hc::typing::ResolveOp::getCanonicalizationPatterns(
+    ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
+  results.insert<ResolveSelect>(context);
+}
+
 bool hc::typing::CastOp::areCastCompatible(mlir::TypeRange inputs,
                                            mlir::TypeRange outputs) {
   (void)inputs;
@@ -451,6 +503,24 @@ struct ReturnOpInterpreterInterface final
   }
 };
 
+struct SelectOpInterpreterInterface final
+    : public hc::typing::TypingInterpreterInterface::ExternalModel<
+          SelectOpInterpreterInterface, mlir::arith::SelectOp> {
+  mlir::FailureOr<hc::typing::InterpreterResult>
+  interpret(mlir::Operation *o, InterpreterState &state) const {
+    auto op = mlir::cast<mlir::arith::SelectOp>(o);
+
+    auto cond = getInt(state, op.getCondition());
+    if (!cond)
+      return op->emitError("Invalid cond value");
+
+    auto it = state.state.find(*cond ? op.getTrueValue() : op.getFalseValue());
+    assert(it != state.state.end());
+    state.state[op.getResult()] = it->second;
+    return InterpreterResult::Advance;
+  }
+};
+
 struct SelectOpDataflowJoinInterface final
     : public hc::typing::DataflowJoinInterface::ExternalModel<
           SelectOpDataflowJoinInterface, mlir::arith::SelectOp> {
@@ -481,6 +551,7 @@ void hc::typing::registerArithTypingInterpreter(mlir::MLIRContext &ctx) {
   mlir::func::CallOp::attachInterface<CallOpInterpreterInterface>(ctx);
   mlir::func::ReturnOp::attachInterface<ReturnOpInterpreterInterface>(ctx);
 
+  mlir::arith::SelectOp::attachInterface<SelectOpInterpreterInterface>(ctx);
   mlir::arith::SelectOp::attachInterface<SelectOpDataflowJoinInterface>(ctx);
 }
 
@@ -695,9 +766,6 @@ hc::typing::GetIdentParamOp::interpret(InterpreterState &state) {
   if (!ident)
     return emitError("Invalid ident type, got: ") << type;
 
-  auto names = ident.getParamNames();
-  auto params = ident.getParams();
-
   auto nameAttr = getNameAttr();
   auto paramVal = ident.getParam(nameAttr);
   if (!paramVal)
@@ -847,6 +915,44 @@ hc::typing::GetGlobalAttrOp::interpret(InterpreterState &state) {
     return emitError("Attribute ") << attr << " is not TypeAttr";
 
   state.state[getResult()] = typeAttr.getTypeVal();
+  return InterpreterResult::Advance;
+}
+
+mlir::FailureOr<hc::typing::InterpreterResult>
+hc::typing::BinOp::interpret(InterpreterState &state) {
+  auto lhs = ::getType<SymbolicTypeBase>(state, getLhs());
+  if (!lhs)
+    return emitError("Invalid lhs value");
+
+  auto rhs = ::getType<SymbolicTypeBase>(state, getRhs());
+  if (!rhs)
+    return emitError("Invalid rhs value");
+
+  InterpreterValue res;
+  switch (getOp()) {
+  case BinOpVal::add:
+    res = lhs + rhs;
+    break;
+  case BinOpVal::sub:
+    res = lhs - rhs;
+    break;
+  case BinOpVal::mul:
+    res = lhs * rhs;
+    break;
+  case BinOpVal::ceil_div:
+    res = lhs.ceilDiv(rhs);
+    break;
+  case BinOpVal::floor_div:
+    res = lhs.floorDiv(rhs);
+    break;
+  case BinOpVal::mod:
+    res = lhs % rhs;
+    break;
+  default:
+    return emitError("Unsupported op: ") << getOpAttr();
+  }
+
+  state.state[getResult()] = res;
   return InterpreterResult::Advance;
 }
 
