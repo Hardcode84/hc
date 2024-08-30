@@ -503,6 +503,24 @@ struct ReturnOpInterpreterInterface final
   }
 };
 
+struct SelectOpInterpreterInterface final
+    : public hc::typing::TypingInterpreterInterface::ExternalModel<
+          SelectOpInterpreterInterface, mlir::arith::SelectOp> {
+  mlir::FailureOr<hc::typing::InterpreterResult>
+  interpret(mlir::Operation *o, InterpreterState &state) const {
+    auto op = mlir::cast<mlir::arith::SelectOp>(o);
+
+    auto cond = getInt(state, op.getCondition());
+    if (!cond)
+      return op->emitError("Invalid cond value");
+
+    auto it = state.state.find(*cond ? op.getTrueValue() : op.getFalseValue());
+    assert(it != state.state.end());
+    state.state[op.getResult()] = it->second;
+    return InterpreterResult::Advance;
+  }
+};
+
 struct SelectOpDataflowJoinInterface final
     : public hc::typing::DataflowJoinInterface::ExternalModel<
           SelectOpDataflowJoinInterface, mlir::arith::SelectOp> {
@@ -533,6 +551,7 @@ void hc::typing::registerArithTypingInterpreter(mlir::MLIRContext &ctx) {
   mlir::func::CallOp::attachInterface<CallOpInterpreterInterface>(ctx);
   mlir::func::ReturnOp::attachInterface<ReturnOpInterpreterInterface>(ctx);
 
+  mlir::arith::SelectOp::attachInterface<SelectOpInterpreterInterface>(ctx);
   mlir::arith::SelectOp::attachInterface<SelectOpDataflowJoinInterface>(ctx);
 }
 
