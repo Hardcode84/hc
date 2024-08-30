@@ -924,7 +924,7 @@ hc::typing::BinOp::interpret(InterpreterState &state) {
   if (!lhs)
     return emitError("Invalid lhs value");
 
-  auto rhs = ::getType<SymbolicTypeBase>(state, getLhs());
+  auto rhs = ::getType<SymbolicTypeBase>(state, getRhs());
   if (!rhs)
     return emitError("Invalid rhs value");
 
