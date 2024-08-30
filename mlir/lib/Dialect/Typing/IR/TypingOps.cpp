@@ -747,9 +747,6 @@ hc::typing::GetIdentParamOp::interpret(InterpreterState &state) {
   if (!ident)
     return emitError("Invalid ident type, got: ") << type;
 
-  auto names = ident.getParamNames();
-  auto params = ident.getParams();
-
   auto nameAttr = getNameAttr();
   auto paramVal = ident.getParam(nameAttr);
   if (!paramVal)
