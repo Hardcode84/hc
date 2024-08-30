@@ -207,6 +207,7 @@ def Typing_ResolveOp : Typing_OpBase<"resolve", [
   ];
 
   let skipDefaultBuilders = 1;
+  let hasCanonicalizer = 1;
 
   let assemblyFormat = [{
     attr-dict-with-keyword ($args^ `:` type($args))?

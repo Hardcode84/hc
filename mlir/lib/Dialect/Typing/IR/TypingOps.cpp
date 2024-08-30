@@ -115,6 +115,58 @@ void hc::typing::ResolveOp::build(::mlir::OpBuilder &odsBuilder,
   odsBuilder.createBlock(region, {}, mlir::TypeRange(args), locs);
 }
 
+namespace {
+static mlir::Value makeCast(mlir::OpBuilder &builder, mlir::Location loc,
+                            mlir::Value src, mlir::Type type) {
+  if (src.getType() == type)
+    return src;
+
+  return builder.create<hc::typing::ValueCastOp>(loc, type, src);
+}
+
+struct ResolveSelect final
+    : public mlir::OpRewritePattern<hc::typing::ResolveOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::typing::ResolveOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op->getNumResults() != 1)
+      return mlir::failure();
+
+    mlir::Block *body = op.getBody();
+    if (!llvm::hasSingleElement(body->without_terminator()))
+      return mlir::failure();
+
+    auto select = mlir::dyn_cast<mlir::arith::SelectOp>(body->front());
+    if (!select)
+      return mlir::failure();
+
+    mlir::Type resType = op.getResult(0).getType();
+    auto getArg = [&](mlir::Value src) -> mlir::Value {
+      auto idx = mlir::cast<mlir::BlockArgument>(src).getArgNumber();
+      return op->getOperand(idx);
+    };
+
+    mlir::Location loc = select.getLoc();
+    mlir::Value cond = getArg(select.getCondition());
+    mlir::Value trueVal =
+        makeCast(rewriter, loc, getArg(select.getTrueValue()), resType);
+    mlir::Value falseVal =
+        makeCast(rewriter, loc, getArg(select.getFalseValue()), resType);
+    rewriter.replaceOpWithNewOp<mlir::arith::SelectOp>(op, cond, trueVal,
+                                                       falseVal);
+    return mlir::success();
+  }
+};
+} // namespace
+
+void hc::typing::ResolveOp::getCanonicalizationPatterns(
+    ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
+  results.insert<ResolveSelect>(context);
+}
+
 bool hc::typing::CastOp::areCastCompatible(mlir::TypeRange inputs,
                                            mlir::TypeRange outputs) {
   (void)inputs;
