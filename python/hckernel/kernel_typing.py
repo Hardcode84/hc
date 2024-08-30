@@ -235,8 +235,8 @@ def getitem_typing(dims: ValueType, index: ValueType):
             if is_same(upper, NoneTyp):
                 upper = get_seq_element(dims, dim_idx)
 
-            # size = upper - lower TODO
-            res_dims = append_seq(res_dims, upper)
+            size = upper - lower
+            res_dims = append_seq(res_dims, size)
             dim_idx += 1
         else:
             dim_idx += 1

@@ -517,6 +517,22 @@ typing.type_resolver ["py_ir.call"] {
 // join types
 
 typing.type_resolver "join_types" {
+  %0 = typing.type_constant #typing.type_attr<!typing.value> : !typing.value
+  %c0 = arith.constant 0: index
+  %1 = typing.get_arg %c0
+
+  %c1 = arith.constant 1: index
+  %2 = typing.get_arg %c1
+
+  %3 = typing.is_same %0 %1
+  %4 = typing.is_same %0 %2
+  %5 = arith.ori %3, %4 : i1
+  typing.check %5
+
+  typing.type_resolver_return %0
+}
+
+typing.type_resolver "join_types" {
   %0 = typing.type_constant #typing.type_attr<index> : !typing.value
   %c0 = arith.constant 0: index
   %1 = typing.get_arg %c0
@@ -570,8 +586,8 @@ typing.type_resolver ["py_ir.binop"] {
   %a1 = typing.get_arg %c1
   %i0 = typing.is_same %a0 %0
   %i1 = typing.is_same %a1 %0
-  typing.check %i0
-  typing.check %i1
+  %r = arith.ori %i0, %i1 : i1
+  typing.check %r
 
   typing.type_resolver_return %0
 }
@@ -584,8 +600,8 @@ typing.type_resolver ["py_ir.inplace_binop"] {
   %a1 = typing.get_arg %c1
   %i0 = typing.is_same %a0 %0
   %i1 = typing.is_same %a1 %0
-  typing.check %i0
-  typing.check %i1
+  %r = arith.ori %i0, %i1 : i1
+  typing.check %r
 
   typing.type_resolver_return %0
 }
