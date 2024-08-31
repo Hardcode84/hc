@@ -54,7 +54,6 @@ def HKernel_SliceType : HKernel_Type<"Slice", "slice", [], "::mlir::Type"> {
   let assemblyFormat = "$lower `:` $upper `:` $step";
 }
 
-
 def HKernel_BufferType : HKernel_Type<"Buffer", "buffer", [
   SymbolicallyShapedTypeInterface
 ], "::mlir::Type"> {
