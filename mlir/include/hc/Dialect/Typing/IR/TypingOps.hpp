@@ -22,6 +22,8 @@ public:
 
   static bool classof(Type type);
 
+  static SymbolicTypeBase foldExpr(SymbolicTypeBase src);
+
   SymbolicTypeBase operator+(SymbolicTypeBase rhs) const;
   SymbolicTypeBase operator-(SymbolicTypeBase rhs) const;
   SymbolicTypeBase operator*(SymbolicTypeBase rhs) const;

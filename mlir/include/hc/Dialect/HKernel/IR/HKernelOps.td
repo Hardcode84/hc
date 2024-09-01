@@ -17,6 +17,8 @@ def HKernel_Dialect : Dialect {
     TBD
   }];
 
+  let dependentDialects = ["::hc::typing::TypingDialect"];
+
 //  let useDefaultAttributePrinterParser = 1;
   let useDefaultTypePrinterParser = 1;
 }
@@ -54,7 +56,6 @@ def HKernel_SliceType : HKernel_Type<"Slice", "slice", [], "::mlir::Type"> {
   let assemblyFormat = "$lower `:` $upper `:` $step";
 }
 
-
 def HKernel_BufferType : HKernel_Type<"Buffer", "buffer", [
   SymbolicallyShapedTypeInterface
 ], "::mlir::Type"> {
@@ -67,7 +68,7 @@ def HKernel_BufferType : HKernel_Type<"Buffer", "buffer", [
     "::mlir::Type":$elementType
   );
 
-  let assemblyFormat = "$shape `x` $elementType";
+  let assemblyFormat = "custom<SymbolicShape>($shape) `x` $elementType";
 
   let extraClassDeclaration = [{
     ::hc::hk::SymbolicallyShapedType cloneWith(

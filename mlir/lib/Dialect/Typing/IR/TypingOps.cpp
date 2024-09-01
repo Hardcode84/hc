@@ -1152,7 +1152,11 @@ bool SymbolicTypeBase::classof(mlir::Type type) {
   return llvm::isa<LiteralType, SymbolType, ExprType>(type);
 }
 
-static SymbolicTypeBase foldExpr(ExprType expr) {
+SymbolicTypeBase SymbolicTypeBase::foldExpr(SymbolicTypeBase src) {
+  auto expr = mlir::dyn_cast<ExprType>(src);
+  if (!expr)
+    return src;
+
   auto params = expr.getParams();
   if (params.size() != 1)
     return expr;
@@ -1169,7 +1173,8 @@ static SymbolicTypeBase makeExpr(SymbolicTypeBase lhs, SymbolicTypeBase rhs,
   auto ctx = lhs.getContext();
   auto op = func(mlir::getAffineSymbolExpr(0, ctx),
                  mlir::getAffineSymbolExpr(1, ctx));
-  return foldExpr(hc::typing::ExprType::get(ctx, {lhs, rhs}, op));
+  return SymbolicTypeBase::foldExpr(
+      hc::typing::ExprType::get(ctx, {lhs, rhs}, op));
 }
 
 SymbolicTypeBase SymbolicTypeBase::operator+(SymbolicTypeBase rhs) const {
