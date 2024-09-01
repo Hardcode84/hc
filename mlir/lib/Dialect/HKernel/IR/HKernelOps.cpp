@@ -7,6 +7,7 @@
 #include <mlir/Dialect/Utils/StaticValueUtils.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/DialectImplementation.h>
+#include <mlir/IR/PatternMatch.h>
 
 #include <llvm/ADT/TypeSwitch.h>
 
@@ -61,6 +62,301 @@ mlir::OpFoldResult hc::hk::TupleExtractOp::fold(FoldAdaptor adaptor) {
   }
 
   return nullptr;
+}
+
+/// Given the region at `index`, or the parent operation if `index` is None,
+/// return the successor regions. These are the regions that may be selected
+/// during the flow of control. `operands` is a set of optional attributes that
+/// correspond to a constant value for each operand, or null if that operand is
+/// not a constant.
+void hc::hk::EnvironmentRegionOp::getSuccessorRegions(
+    mlir::RegionBranchPoint point,
+    mlir::SmallVectorImpl<mlir::RegionSuccessor> &regions) {
+  // If the predecessor is the ExecuteRegionOp, branch into the body.
+  if (point.isParent()) {
+    regions.push_back(mlir::RegionSuccessor(&getRegion()));
+    return;
+  }
+
+  // Otherwise, the region branches back to the parent operation.
+  regions.push_back(mlir::RegionSuccessor(getResults()));
+}
+
+/// Propagate yielded values, defined outside region.
+struct EnvRegionPropagateOutsideValues
+    : public mlir::OpRewritePattern<hc::hk::EnvironmentRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::EnvironmentRegionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto oldResults = op.getResults();
+    auto count = static_cast<unsigned>(oldResults.size());
+
+    mlir::Block *body = &op.getRegion().front();
+    auto term =
+        mlir::cast<hc::hk::EnvironmentRegionYieldOp>(body->getTerminator());
+    auto termArgs = term.getResults();
+    assert(oldResults.size() == termArgs.size());
+
+    // Build list of propagated and new yield args.
+    llvm::SmallVector<mlir::Value> newResults(count);
+    llvm::SmallVector<mlir::Value> newYieldArgs;
+    for (auto i : llvm::seq(0u, count)) {
+      auto arg = termArgs[i];
+      if (!op.getRegion().isAncestor(arg.getParentRegion())) {
+        // Value defined outside op region - use it directly instead of
+        // yielding.
+        newResults[i] = arg;
+      } else {
+        newYieldArgs.emplace_back(arg);
+      }
+    }
+
+    // Same yield results count - nothing changed.
+    if (newYieldArgs.size() == count)
+      return mlir::failure();
+
+    // Contruct new env region op, only yielding values that weren't propagated.
+    mlir::ValueRange newYieldArgsRange(newYieldArgs);
+    auto newOp = rewriter.create<hc::hk::EnvironmentRegionOp>(
+        op->getLoc(), newYieldArgsRange.getTypes(), op.getEnvironment(),
+        op.getArgs());
+    mlir::Region &newRegion = newOp.getRegion();
+    rewriter.inlineRegionBefore(op.getRegion(), newRegion, newRegion.end());
+    {
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(term);
+      rewriter.replaceOpWithNewOp<hc::hk::EnvironmentRegionYieldOp>(
+          term, newYieldArgs);
+    }
+
+    mlir::ValueRange newOpResults = newOp.getResults();
+
+    // Fill results that weren't propagated with results of new op.
+    for (auto i : llvm::seq(0u, count)) {
+      if (!newResults[i]) {
+        newResults[i] = newOpResults.front();
+        newOpResults = newOpResults.drop_front();
+      }
+    }
+    assert(newOpResults.empty() &&
+           "Some values weren't consumed - yield args count mismatch?");
+
+    rewriter.replaceOp(op, newResults);
+    return mlir::success();
+  }
+};
+
+namespace {
+/// Merge nested env region if parent have same environment and args.
+struct MergeNestedEnvRegion
+    : public mlir::OpRewritePattern<hc::hk::EnvironmentRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::EnvironmentRegionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto parent = op->getParentOfType<hc::hk::EnvironmentRegionOp>();
+    if (!parent)
+      return mlir::failure();
+
+    if (parent.getEnvironment() != op.getEnvironment() ||
+        parent.getArgs() != op.getArgs())
+      return mlir::failure();
+
+    hc::hk::EnvironmentRegionOp::inlineIntoParent(rewriter, op);
+    return mlir::success();
+  }
+};
+
+/// Remove duplicated and unused env region yield args.
+struct CleanupRegionYieldArgs
+    : public mlir::OpRewritePattern<hc::hk::EnvironmentRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::EnvironmentRegionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    mlir::Block *body = &op.getRegion().front();
+    auto term =
+        mlir::cast<hc::hk::EnvironmentRegionYieldOp>(body->getTerminator());
+
+    auto results = op.getResults();
+    auto yieldArgs = term.getResults();
+    assert(results.size() == yieldArgs.size());
+    auto count = static_cast<unsigned>(results.size());
+
+    // Build new yield args list, and mapping between old and new results
+    llvm::SmallVector<mlir::Value> newYieldArgs;
+    llvm::SmallVector<int> newResultsMapping(count, -1);
+    llvm::SmallDenseMap<mlir::Value, int> argsMap;
+    for (auto i : llvm::seq(0u, count)) {
+      auto res = results[i];
+
+      // Unused result.
+      if (res.getUses().empty())
+        continue;
+
+      auto arg = yieldArgs[i];
+      auto it = argsMap.find_as(arg);
+      if (it == argsMap.end()) {
+        // Add new result, compute index mapping for it.
+        auto ind = static_cast<int>(newYieldArgs.size());
+        argsMap.insert({arg, ind});
+        newYieldArgs.emplace_back(arg);
+        newResultsMapping[i] = ind;
+      } else {
+        // Duplicated result, reuse prev result index.
+        newResultsMapping[i] = it->second;
+      }
+    }
+
+    // Same yield results count - nothing changed.
+    if (newYieldArgs.size() == count)
+      return mlir::failure();
+
+    // Contruct new env region op, only yielding values we selected.
+    mlir::ValueRange newYieldArgsRange(newYieldArgs);
+    auto newOp = rewriter.create<hc::hk::EnvironmentRegionOp>(
+        op->getLoc(), newYieldArgsRange.getTypes(), op.getEnvironment(),
+        op.getArgs());
+    mlir::Region &newRegion = newOp.getRegion();
+    rewriter.inlineRegionBefore(op.getRegion(), newRegion, newRegion.end());
+    {
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(term);
+      rewriter.replaceOpWithNewOp<hc::hk::EnvironmentRegionYieldOp>(
+          term, newYieldArgs);
+    }
+
+    // Contruct new result list, using mapping previously constructed.
+    auto newResults = newOp.getResults();
+    llvm::SmallVector<mlir::Value> newResultsToTeplace(count);
+    for (auto i : llvm::seq(0u, count)) {
+      auto mapInd = newResultsMapping[i];
+      if (mapInd != -1)
+        newResultsToTeplace[i] = newResults[mapInd];
+    }
+
+    rewriter.replaceOp(op, newResultsToTeplace);
+    return mlir::success();
+  }
+};
+
+/// Merge adjacent env regions.
+struct MergeAdjacentRegions
+    : public mlir::OpRewritePattern<hc::hk::EnvironmentRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::EnvironmentRegionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    // Get next pos and check if it is also env region op, current op cannot be
+    // last as it is not a terminator.
+    auto opPos = op->getIterator();
+    auto nextOp =
+        mlir::dyn_cast<hc::hk::EnvironmentRegionOp>(*std::next(opPos));
+    if (!nextOp)
+      return mlir::failure();
+
+    if (nextOp.getEnvironment() != op.getEnvironment() ||
+        nextOp.getArgs() != op.getArgs())
+      return mlir::failure();
+
+    mlir::Block *body = &op.getRegion().front();
+    auto term =
+        mlir::cast<hc::hk::EnvironmentRegionYieldOp>(body->getTerminator());
+
+    auto results = op.getResults();
+    auto yieldArgs = term.getResults();
+    assert(results.size() == yieldArgs.size());
+    auto count = static_cast<unsigned>(results.size());
+
+    // Check if any results from first op are being used in second one, we need
+    // to replace them by direct values.
+    for (auto i : llvm::seq(0u, count)) {
+      auto res = results[i];
+      for (auto &use : llvm::make_early_inc_range(res.getUses())) {
+        auto *owner = use.getOwner();
+        if (nextOp->isProperAncestor(owner)) {
+          auto arg = yieldArgs[i];
+          rewriter.modifyOpInPlace(owner, [&]() { use.set(arg); });
+        }
+      }
+    }
+
+    mlir::Block *nextBody = &nextOp.getRegion().front();
+    auto nextTerm =
+        mlir::cast<hc::hk::EnvironmentRegionYieldOp>(nextBody->getTerminator());
+    auto nextYieldArgs = nextTerm.getResults();
+
+    // Contruct merged yield args list, some of the results may become unused,
+    // but they will be cleaned up by other pattern.
+    llvm::SmallVector<mlir::Value> newYieldArgs(count + nextYieldArgs.size());
+    llvm::copy(nextYieldArgs, llvm::copy(yieldArgs, newYieldArgs.begin()));
+
+    {
+      // Merge region from second op into ferst one.
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      rewriter.inlineBlockBefore(nextBody, term);
+      rewriter.setInsertionPoint(term);
+      rewriter.create<hc::hk::EnvironmentRegionYieldOp>(term->getLoc(),
+                                                        newYieldArgs);
+      rewriter.eraseOp(term);
+      rewriter.eraseOp(nextTerm);
+    }
+
+    // Contruct new env region op and steal new merged region into it.
+    mlir::ValueRange newYieldArgsRange(newYieldArgs);
+    auto newOp = rewriter.create<hc::hk::EnvironmentRegionOp>(
+        op->getLoc(), newYieldArgsRange.getTypes(), op.getEnvironment(),
+        op.getArgs());
+    mlir::Region &newRegion = newOp.getRegion();
+    rewriter.inlineRegionBefore(op.getRegion(), newRegion, newRegion.end());
+
+    auto newResults = newOp.getResults();
+
+    rewriter.replaceOp(op, newResults.take_front(count));
+    rewriter.replaceOp(nextOp, newResults.drop_front(count));
+    return mlir::success();
+  }
+};
+} // namespace
+
+void hc::hk::EnvironmentRegionOp::getCanonicalizationPatterns(
+    mlir::RewritePatternSet &results, mlir::MLIRContext *context) {
+  results.insert<EnvRegionPropagateOutsideValues, MergeNestedEnvRegion,
+                 CleanupRegionYieldArgs, MergeAdjacentRegions>(context);
+}
+
+void hc::hk::EnvironmentRegionOp::inlineIntoParent(
+    mlir::PatternRewriter &builder, EnvironmentRegionOp op) {
+  mlir::Block *block = &op.getRegion().front();
+  auto term = mlir::cast<EnvironmentRegionYieldOp>(block->getTerminator());
+  auto args = llvm::to_vector(term.getResults());
+  builder.eraseOp(term);
+  builder.inlineBlockBefore(block, op);
+  builder.replaceOp(op, args);
+}
+
+void hc::hk::EnvironmentRegionOp::build(
+    ::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState,
+    ::mlir::Attribute environment, ::mlir::ValueRange args,
+    ::mlir::TypeRange results,
+    ::llvm::function_ref<void(::mlir::OpBuilder &, ::mlir::Location)>
+        bodyBuilder) {
+  build(odsBuilder, odsState, results, environment, args);
+  mlir::Region *bodyRegion = odsState.regions.back().get();
+
+  bodyRegion->push_back(new mlir::Block);
+  mlir::Block &bodyBlock = bodyRegion->front();
+  if (bodyBuilder) {
+    mlir::OpBuilder::InsertionGuard guard(odsBuilder);
+    odsBuilder.setInsertionPointToStart(&bodyBlock);
+    bodyBuilder(odsBuilder, odsState.location);
+  }
+  ensureTerminator(*bodyRegion, odsBuilder, odsState.location);
 }
 
 // TODO: Upstream changes in affine parser
