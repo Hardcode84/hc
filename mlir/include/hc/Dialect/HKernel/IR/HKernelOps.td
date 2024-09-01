@@ -17,6 +17,8 @@ def HKernel_Dialect : Dialect {
     TBD
   }];
 
+  let dependentDialects = ["::hc::typing::TypingDialect"];
+
 //  let useDefaultAttributePrinterParser = 1;
   let useDefaultTypePrinterParser = 1;
 }
