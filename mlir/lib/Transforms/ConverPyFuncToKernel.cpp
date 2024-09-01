@@ -60,13 +60,13 @@ struct ConverPyFuncToKernelFuncPass final
           continue;
 
         if (!mlir::isa<mlir::NoneType>(term.getOperand().getType())) {
-          term->emitError("kernel musr return none");
+          term->emitError("kernel must return none");
           return signalPassFailure();
         }
 
         mlir::OpBuilder::InsertionGuard g(builder);
         builder.setInsertionPoint(term);
-        builder.replaceOpWithNewOp<mlir::func::ReturnOp>(term);
+        builder.replaceOpWithNewOp<hc::hk::EnvironmentRegionYieldOp>(term);
       }
 
       mlir::TypeRange argTypes =
@@ -76,8 +76,27 @@ struct ConverPyFuncToKernelFuncPass final
       auto newFunc =
           builder.create<mlir::func::FuncOp>(loc, pyFunc.getName(), funcType);
 
-      mlir::Region &dstRegion = newFunc.getBody();
+      llvm::SmallVector<mlir::Type> types;
+      llvm::SmallVector<mlir::Location> locs;
+      for (auto &&arg : srcRegion.getArguments()) {
+        types.emplace_back(arg.getType());
+        locs.emplace_back(arg.getLoc());
+      }
+      builder.createBlock(&newFunc.getBody(), {}, types, locs);
+      auto env = hc::hk::WorkgroupScopeAttr::get(builder.getContext());
+      auto envRegion = builder.create<hc::hk::EnvironmentRegionOp>(loc, env);
+      mlir::Region &dstRegion = envRegion.getRegion();
+      if (!dstRegion.empty())
+        builder.eraseBlock(&dstRegion.front());
+
+      builder.create<mlir::func::ReturnOp>(loc);
+
       builder.inlineRegionBefore(srcRegion, dstRegion, dstRegion.begin());
+      for (auto &&[regArg, funcArg] :
+           llvm::zip_equal(dstRegion.getArguments(), newFunc.getArguments()))
+        regArg.replaceAllUsesWith(funcArg);
+
+      dstRegion.front().eraseArguments(0, dstRegion.getNumArguments());
       builder.eraseOp(pyModule);
     }
   }

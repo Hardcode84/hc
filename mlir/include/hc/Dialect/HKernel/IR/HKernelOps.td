@@ -3,8 +3,9 @@
 #ifndef HKERNEL_OPS
 #define HKERNEL_OPS
 
-include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/OpBase.td"
 
 include "hc/Dialect/HKernel/IR/HKernelOpsTypeInterfaces.td"
 
@@ -19,7 +20,7 @@ def HKernel_Dialect : Dialect {
 
   let dependentDialects = ["::hc::typing::TypingDialect"];
 
-//  let useDefaultAttributePrinterParser = 1;
+  let useDefaultAttributePrinterParser = 1;
   let useDefaultTypePrinterParser = 1;
 }
 
@@ -29,8 +30,17 @@ class HKernel_Type<string name, string typeMnemonic, list<Trait> traits = [],
   let mnemonic = typeMnemonic;
 }
 
+class HKernel_Attr<string name, string attrMnemonic, list<Trait> traits = []>
+    : AttrDef<HKernel_Dialect, name, traits> {
+  let mnemonic = attrMnemonic;
+}
+
 class HKernel_OpBase<string mnemonic, list<Trait> traits = []>
     : Op<HKernel_Dialect, mnemonic, traits>;
+
+
+def HKernel_WorkgroupScopeAttr : HKernel_Attr<"WorkgroupScope", "workgroup_scope">;
+
 
 def HKernel_CurrentGroupType : HKernel_Type<"CurrentGroup", "current_group", [], "::mlir::Type"> {
   let summary = "TBD";
@@ -89,7 +99,7 @@ def HKernel_TensorType : HKernel_Type<"Tensor", "tensor", [
     "::mlir::Type":$elementType
   );
 
-  let assemblyFormat = "$shape `x` $elementType";
+  let assemblyFormat = "custom<SymbolicShape>($shape) `x` $elementType";
 
   let extraClassDeclaration = [{
     ::hc::hk::SymbolicallyShapedType cloneWith(
@@ -168,6 +178,71 @@ def HKernel_StoreOp : HKernel_OpBase<"store", []> {
   );
 
   let assemblyFormat = "attr-dict $target `:` type($target) `=` $source `:` type($source)";
+}
+
+def EnvironmentRegionOp : HKernel_OpBase<"env_region", [
+    DeclareOpInterfaceMethods<RegionBranchOpInterface>,
+    SingleBlockImplicitTerminator<"::hc::hk::EnvironmentRegionYieldOp">,
+    RecursiveMemoryEffects
+]> {
+  let summary = "Operation that executes its region with a specific environment";
+  let description = [{
+    "env_region" executes operations inside its region within a specific
+    enviroment. Operations are executed exactly once. All SSA values that
+    dominate the op can be accessed inside the op.
+
+    "env_region" takes "environment" attribute and zero or more SSA arguments.
+
+    Actual intepretation of the "environment" attribute and arguments is not
+    specified here and is left to the lowering passes.
+
+    Values can be yielded from "env_region" region using "env_region_yield" op.
+    Values yielded from this op's region define the op's results.
+  }];
+
+
+  let arguments = (ins AnyAttr:$environment, Variadic<AnyType>:$args);
+  let results = (outs Variadic<AnyType>:$results);
+
+  let regions = (region SizedRegion<1>:$region);
+
+  let assemblyFormat =
+      "attr-dict $environment ($args^ `:` type($args))? (`->` type($results)^)? $region";
+
+  let extraClassDeclaration = [{
+    /// Inline op body into parent region and erase the op.
+    static void inlineIntoParent(::mlir::PatternRewriter &builder, EnvironmentRegionOp op);
+  }];
+
+  let builders = [
+    OpBuilder<(ins "::mlir::Attribute":$environment,
+      CArg<"::mlir::ValueRange", "std::nullopt">:$args,
+      CArg<"::mlir::TypeRange", "std::nullopt">:$results,
+      CArg<"::llvm::function_ref<void(::mlir::OpBuilder &, ::mlir::Location)>", "nullptr">)>
+  ];
+
+  let hasCanonicalizer = 1;
+}
+
+def EnvironmentRegionYieldOp : HKernel_OpBase<"env_region_yield", [
+  Pure,
+  ReturnLike,
+  Terminator,
+  HasParent<"::hc::hk::EnvironmentRegionOp">
+]> {
+  let summary = "Environment region yield and termination operation";
+  let description = [{
+    "env_region_yield" yields an SSA value from the "env_region" op region and
+    terminates it.
+
+    If "env_region_yield" has any operands, the operands must match the parent
+    operation's results.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$results);
+  let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
+
+  let assemblyFormat = "attr-dict ($results^ `:` type($results))?";
 }
 
 #endif // HKERNEL_OPS
