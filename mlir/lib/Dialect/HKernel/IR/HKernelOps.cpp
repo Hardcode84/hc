@@ -63,17 +63,299 @@ mlir::OpFoldResult hc::hk::TupleExtractOp::fold(FoldAdaptor adaptor) {
   return nullptr;
 }
 
-static mlir::LogicalResult
-parseSymbolicShape(mlir::AsmParser &parser,
-                   llvm::SmallVectorImpl<mlir::Type> &shape) {
-  // TODO: parse
-  return mlir::failure();
-}
+// TODO: Upstream changes in affine parser
+namespace {
+using namespace mlir;
+/// Lower precedence ops (all at the same precedence level). LNoOp is false in
+/// the boolean sense.
+enum AffineLowPrecOp {
+  /// Null value.
+  LNoOp,
+  Add,
+  Sub
+};
+
+/// Higher precedence ops - all at the same precedence level. HNoOp is false
+/// in the boolean sense.
+enum AffineHighPrecOp {
+  /// Null value.
+  HNoOp,
+  Mul,
+  FloorDiv,
+  CeilDiv,
+  Mod
+};
 
 enum class BindingStrength {
   Weak,   // + and -
   Strong, // All other binary operators.
 };
+
+} // namespace
+
+using SymbolMap = llvm::SmallMapVector<mlir::StringAttr, unsigned, 8>;
+
+static mlir::AffineExpr parseAffineExprImpl(mlir::AsmParser &parser,
+                                            SymbolMap &symbolMap);
+
+static mlir::AffineExpr parseParentheticalExpr(mlir::AsmParser &parser,
+                                               SymbolMap &symbolMap) {
+  if (!parser.parseRParen())
+    return parser.emitError(parser.getCurrentLocation(),
+                            "no expression inside parentheses"),
+           nullptr;
+
+  auto expr = parseAffineExprImpl(parser, symbolMap);
+  if (!expr)
+    return nullptr;
+
+  if (parser.parseRParen())
+    return parser.emitError(parser.getCurrentLocation(), "expected ')'"),
+           nullptr;
+
+  return expr;
+}
+
+static mlir::AffineExpr parseAffineOperandExpr(mlir::AsmParser &parser,
+                                               SymbolMap &symbolMap,
+                                               AffineExpr lhs) {
+  int64_t val;
+  if (parser.parseOptionalInteger(val).has_value())
+    return mlir::getAffineConstantExpr(val, parser.getContext());
+
+  std::string str;
+  if (!parser.parseOptionalString(&str)) {
+    auto attr = parser.getBuilder().getStringAttr(str);
+    auto it = symbolMap.find(attr);
+    if (it == symbolMap.end())
+      it = symbolMap.insert({attr, static_cast<unsigned>(symbolMap.size())})
+               .first;
+
+    return mlir::getAffineSymbolExpr(it->second, parser.getContext());
+  }
+
+  if (!parser.parseOptionalLParen())
+    return parseParentheticalExpr(parser, symbolMap);
+
+  if (!parser.parseOptionalKeyword("floordiv") ||
+      !parser.parseOptionalKeyword("ceildiv") ||
+      !parser.parseOptionalKeyword("mod") || !parser.parseOptionalPlus() ||
+      !parser.parseOptionalStar()) {
+    auto loc = parser.getCurrentLocation();
+    if (lhs)
+      parser.emitError(loc, "missing right operand of binary operator");
+    else
+      parser.emitError(loc, "missing left operand of binary operator");
+    return nullptr;
+  }
+
+  // TODO: parse unary minus
+
+  auto loc = parser.getCurrentLocation();
+  if (lhs)
+    parser.emitError(loc, "missing right operand of binary operator");
+  else
+    parser.emitError(loc, "expected affine expression");
+  return nullptr;
+}
+
+static AffineLowPrecOp consumeIfLowPrecOp(mlir::AsmParser &parser) {
+  if (!parser.parseOptionalPlus())
+    return AffineLowPrecOp::Add;
+
+  // TODO: Parse minus
+  return AffineLowPrecOp::LNoOp;
+}
+
+static AffineHighPrecOp consumeIfHighPrecOp(mlir::AsmParser &parser) {
+  if (!parser.parseOptionalStar())
+    return Mul;
+
+  if (!parser.parseOptionalKeyword("floordiv"))
+    return FloorDiv;
+
+  if (!parser.parseOptionalKeyword("ceildiv"))
+    return CeilDiv;
+
+  if (!parser.parseOptionalKeyword("mod"))
+    return Mod;
+
+  return HNoOp;
+}
+
+static mlir::AffineExpr getAffineBinaryOpExpr(mlir::AsmParser &parser,
+                                              AffineHighPrecOp op,
+                                              AffineExpr lhs, AffineExpr rhs,
+                                              SMLoc opLoc) {
+  // TODO: make the error location info accurate.
+  switch (op) {
+  case Mul:
+    if (!lhs.isSymbolicOrConstant() && !rhs.isSymbolicOrConstant()) {
+      parser.emitError(opLoc,
+                       "non-affine expression: at least one of the multiply "
+                       "operands has to be either a constant or symbolic");
+      return nullptr;
+    }
+    return lhs * rhs;
+  case FloorDiv:
+    if (!rhs.isSymbolicOrConstant()) {
+      parser.emitError(opLoc,
+                       "non-affine expression: right operand of floordiv "
+                       "has to be either a constant or symbolic");
+      return nullptr;
+    }
+    return lhs.floorDiv(rhs);
+  case CeilDiv:
+    if (!rhs.isSymbolicOrConstant()) {
+      parser.emitError(opLoc, "non-affine expression: right operand of ceildiv "
+                              "has to be either a constant or symbolic");
+      return nullptr;
+    }
+    return lhs.ceilDiv(rhs);
+  case Mod:
+    if (!rhs.isSymbolicOrConstant()) {
+      parser.emitError(opLoc, "non-affine expression: right operand of mod "
+                              "has to be either a constant or symbolic");
+      return nullptr;
+    }
+    return lhs % rhs;
+  case HNoOp:
+    llvm_unreachable("can't create affine expression for null high prec op");
+    return nullptr;
+  }
+  llvm_unreachable("Unknown AffineHighPrecOp");
+}
+
+static mlir::AffineExpr getAffineBinaryOpExpr(AffineLowPrecOp op,
+                                              AffineExpr lhs, AffineExpr rhs) {
+  switch (op) {
+  case AffineLowPrecOp::Add:
+    return lhs + rhs;
+  case AffineLowPrecOp::Sub:
+    return lhs - rhs;
+  case AffineLowPrecOp::LNoOp:
+    llvm_unreachable("can't create affine expression for null low prec op");
+    return nullptr;
+  }
+  llvm_unreachable("Unknown AffineLowPrecOp");
+}
+
+static mlir::AffineExpr parseAffineHighPrecOpExpr(mlir::AsmParser &parser,
+                                                  SymbolMap &symbolMap,
+                                                  AffineExpr llhs,
+                                                  AffineHighPrecOp llhsOp,
+                                                  SMLoc llhsOpLoc) {
+  AffineExpr lhs = parseAffineOperandExpr(parser, symbolMap, llhs);
+  if (!lhs)
+    return nullptr;
+
+  // Found an LHS. Parse the remaining expression.
+  auto opLoc = parser.getCurrentLocation();
+  if (AffineHighPrecOp op = consumeIfHighPrecOp(parser)) {
+    if (llhs) {
+      AffineExpr expr = getAffineBinaryOpExpr(parser, llhsOp, llhs, lhs, opLoc);
+      if (!expr)
+        return nullptr;
+      return parseAffineHighPrecOpExpr(parser, symbolMap, expr, op, opLoc);
+    }
+    // No LLHS, get RHS
+    return parseAffineHighPrecOpExpr(parser, symbolMap, lhs, op, opLoc);
+  }
+
+  // This is the last operand in this expression.
+  if (llhs)
+    return getAffineBinaryOpExpr(parser, llhsOp, llhs, lhs, llhsOpLoc);
+
+  // No llhs, 'lhs' itself is the expression.
+  return lhs;
+}
+
+static mlir::AffineExpr parseAffineLowPrecOpExpr(mlir::AsmParser &parser,
+                                                 SymbolMap &symbolMap,
+                                                 AffineExpr llhs,
+                                                 AffineLowPrecOp llhsOp) {
+  AffineExpr lhs;
+  if (!(lhs = parseAffineOperandExpr(parser, symbolMap, llhs)))
+    return nullptr;
+
+  // Found an LHS. Deal with the ops.
+  if (AffineLowPrecOp lOp = consumeIfLowPrecOp(parser)) {
+    if (llhs) {
+      AffineExpr sum = getAffineBinaryOpExpr(llhsOp, llhs, lhs);
+      return parseAffineLowPrecOpExpr(parser, symbolMap, sum, lOp);
+    }
+    // No LLHS, get RHS and form the expression.
+    return parseAffineLowPrecOpExpr(parser, symbolMap, lhs, lOp);
+  }
+  auto opLoc = parser.getCurrentLocation();
+  if (AffineHighPrecOp hOp = consumeIfHighPrecOp(parser)) {
+    // We have a higher precedence op here. Get the rhs operand for the llhs
+    // through parseAffineHighPrecOpExpr.
+    AffineExpr highRes =
+        parseAffineHighPrecOpExpr(parser, symbolMap, lhs, hOp, opLoc);
+    if (!highRes)
+      return nullptr;
+
+    // If llhs is null, the product forms the first operand of the yet to be
+    // found expression. If non-null, the op to associate with llhs is llhsOp.
+    AffineExpr expr =
+        llhs ? getAffineBinaryOpExpr(llhsOp, llhs, highRes) : highRes;
+
+    // Recurse for subsequent low prec op's after the affine high prec op
+    // expression.
+    if (AffineLowPrecOp nextOp = consumeIfLowPrecOp(parser))
+      return parseAffineLowPrecOpExpr(parser, symbolMap, expr, nextOp);
+    return expr;
+  }
+  // Last operand in the expression list.
+  if (llhs)
+    return getAffineBinaryOpExpr(llhsOp, llhs, lhs);
+  // No llhs, 'lhs' itself is the expression.
+  return lhs;
+}
+
+static mlir::AffineExpr parseAffineExprImpl(mlir::AsmParser &parser,
+                                            SymbolMap &symbolMap) {
+  return parseAffineLowPrecOpExpr(parser, symbolMap, nullptr,
+                                  AffineLowPrecOp::LNoOp);
+}
+
+static mlir::Type parseExpr(mlir::AsmParser &parser) {
+  SymbolMap symbolMap;
+  auto expr = parseAffineExprImpl(parser, symbolMap);
+  if (!expr)
+    return nullptr;
+
+  llvm::SmallVector<mlir::Type> args;
+  args.reserve(symbolMap.size());
+  for (auto &&[key, val] : symbolMap) {
+    (void)val;
+    args.emplace_back(hc::typing::SymbolType::get(parser.getContext(), key));
+  }
+  symbolMap.clear();
+  auto symExpr = hc::typing::ExprType::get(parser.getContext(), args, expr);
+  return hc::typing::SymbolicTypeBase::foldExpr(symExpr);
+}
+
+static mlir::LogicalResult
+parseSymbolicShape(mlir::AsmParser &parser,
+                   llvm::SmallVectorImpl<mlir::Type> &shape) {
+  if (parser.parseLess())
+    return parser.emitError(parser.getCurrentLocation(), "'<' expected");
+
+  if (!parser.parseOptionalGreater())
+    return mlir::success();
+
+  do {
+    auto expr = parseExpr(parser);
+    if (!expr)
+      return parser.emitError(parser.getCurrentLocation(),
+                              "failed to parse expr");
+
+    shape.emplace_back(expr);
+  } while (!parser.parseOptionalKeyword("x"));
+  return parser.parseGreater();
+}
 
 static void printAffineExprInternal(
     mlir::AsmPrinter &os, mlir::AffineExpr expr,
@@ -222,6 +504,7 @@ printAffineExpr(mlir::AsmPrinter &os, mlir::AffineExpr expr,
 
 static void printSymbolicShape(mlir::AsmPrinter &printer,
                                mlir::ArrayRef<mlir::Type> shape) {
+  printer << "<";
   llvm::interleave(
       shape, printer,
       [&](mlir::Type t) {
@@ -241,6 +524,7 @@ static void printSymbolicShape(mlir::AsmPrinter &printer,
         printer << ")";
       },
       " x ");
+  printer << ">";
 }
 
 #include "hc/Dialect/HKernel/IR/HKernelOpsDialect.cpp.inc"
