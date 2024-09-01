@@ -99,7 +99,7 @@ def HKernel_TensorType : HKernel_Type<"Tensor", "tensor", [
     "::mlir::Type":$elementType
   );
 
-  let assemblyFormat = "$shape `x` $elementType";
+  let assemblyFormat = "custom<SymbolicShape>($shape) `x` $elementType";
 
   let extraClassDeclaration = [{
     ::hc::hk::SymbolicallyShapedType cloneWith(
