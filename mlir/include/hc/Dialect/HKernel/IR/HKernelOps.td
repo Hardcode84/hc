@@ -20,7 +20,7 @@ def HKernel_Dialect : Dialect {
 
   let dependentDialects = ["::hc::typing::TypingDialect"];
 
-//  let useDefaultAttributePrinterParser = 1;
+  let useDefaultAttributePrinterParser = 1;
   let useDefaultTypePrinterParser = 1;
 }
 
@@ -30,8 +30,17 @@ class HKernel_Type<string name, string typeMnemonic, list<Trait> traits = [],
   let mnemonic = typeMnemonic;
 }
 
+class HKernel_Attr<string name, string attrMnemonic, list<Trait> traits = []>
+    : AttrDef<HKernel_Dialect, name, traits> {
+  let mnemonic = attrMnemonic;
+}
+
 class HKernel_OpBase<string mnemonic, list<Trait> traits = []>
     : Op<HKernel_Dialect, mnemonic, traits>;
+
+
+def HKernel_WorkgroupScopeAttr : HKernel_Attr<"WorkgroupScope", "workgroup_scope">;
+
 
 def HKernel_CurrentGroupType : HKernel_Type<"CurrentGroup", "current_group", [], "::mlir::Type"> {
   let summary = "TBD";
