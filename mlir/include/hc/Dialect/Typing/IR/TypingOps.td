@@ -141,6 +141,20 @@ def Typing_LiteralType : Typing_Type<"Literal", "literal", [], "::hc::typing::Sy
   let assemblyFormat = "$value";
 }
 
+def Typing_BitsizeType : Typing_Type<"Bitsize", "bitsize", [], "::hc::typing::SymbolicTypeBase"> {
+  let parameters = (ins "::mlir::Type":$arg);
+
+  let builders = [
+    TypeBuilderWithInferredContext<(ins
+      "::mlir::Type":$value
+    ), [{
+      return $_get(value.getContext(), value);
+    }]>
+  ];
+
+  let assemblyFormat = "$arg";
+}
+
 def Typing_ExprType : Typing_Type<"Expr", "expr", [], "::hc::typing::SymbolicTypeBase"> {
   let parameters = (ins
     ArrayRefParameter<"::mlir::Type">:$params,

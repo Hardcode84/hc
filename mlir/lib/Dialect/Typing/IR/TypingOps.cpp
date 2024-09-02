@@ -1083,6 +1083,9 @@ static void sortParams(llvm::SmallVectorImpl<mlir::Type> &params,
 static std::pair<llvm::SmallVector<mlir::Type>, mlir::AffineExpr>
 simplifyExpr(llvm::ArrayRef<mlir::Type> params, mlir::AffineExpr expr) {
   llvm::SmallVector<mlir::Type> retParams(params);
+  for (auto i : llvm::seq<size_t>(0, retParams.size()))
+    retParams[i] =
+        SymbolicTypeBase::foldExpr(mlir::cast<SymbolicTypeBase>(retParams[i]));
 
   bool changed;
   do {
@@ -1149,10 +1152,19 @@ static void printExprType(mlir::AsmPrinter &printer,
 }
 
 bool SymbolicTypeBase::classof(mlir::Type type) {
-  return llvm::isa<LiteralType, SymbolType, ExprType>(type);
+  return llvm::isa<LiteralType, SymbolType, BitsizeType, ExprType>(type);
 }
 
 SymbolicTypeBase SymbolicTypeBase::foldExpr(SymbolicTypeBase src) {
+  if (auto bitsize = mlir::dyn_cast<BitsizeType>(src)) {
+    auto arg = bitsize.getArg();
+    if (arg.isIntOrFloat()) {
+      auto index = mlir::IndexType::get(src.getContext());
+      return LiteralType::get(
+          mlir::IntegerAttr::get(index, arg.getIntOrFloatBitWidth()));
+    }
+    return src;
+  }
   auto expr = mlir::dyn_cast<ExprType>(src);
   if (!expr)
     return src;
