@@ -47,3 +47,9 @@ func.func private @func(!typing<expr ( !typing<expr ( !typing<symbol "A">, !typi
 // CHECK: ![[EXPR:.*]] = !typing<expr -3>
 // CHECK: func.func private @func(![[EXPR]])
 func.func private @func(!typing<expr ( !typing<literal 2 : i64>, !typing<literal -5 : i64> ) -> s0 + s1 >)
+
+// -----
+
+// CHECK: ![[EXPR:.*]] = !typing<expr 32>
+// CHECK: func.func private @func(![[EXPR]])
+func.func private @func(!typing<expr ( !typing<bitsize f32> ) -> s0 >)
