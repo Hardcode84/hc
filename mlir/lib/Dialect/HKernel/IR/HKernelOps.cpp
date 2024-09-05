@@ -414,6 +414,27 @@ static mlir::AffineExpr parseParentheticalExpr(mlir::AsmParser &parser,
 
 static mlir::AffineExpr parseAffineOperandExpr(mlir::AsmParser &parser,
                                                SymbolMap &symbolMap,
+                                               AffineExpr lhs);
+
+static mlir::AffineExpr parseNegateExpression(mlir::AsmParser &parser,
+                                              SymbolMap &symbolMap,
+                                              AffineExpr lhs) {
+  AffineExpr operand = parseAffineOperandExpr(parser, symbolMap, lhs);
+  // Since negation has the highest precedence of all ops (including high
+  // precedence ops) but lower than parentheses, we are only going to use
+  // parseAffineOperandExpr instead of parseAffineExpr here.
+  if (!operand) {
+    // Extra error message although parseAffineOperandExpr would have
+    // complained. Leads to a better diagnostic.
+    parser.emitError(parser.getCurrentLocation(),
+                     "missing operand of negation");
+    return nullptr;
+  }
+  return (-1) * operand;
+}
+
+static mlir::AffineExpr parseAffineOperandExpr(mlir::AsmParser &parser,
+                                               SymbolMap &symbolMap,
                                                AffineExpr lhs) {
   int64_t val;
   if (parser.parseOptionalInteger(val).has_value())
@@ -433,6 +454,9 @@ static mlir::AffineExpr parseAffineOperandExpr(mlir::AsmParser &parser,
   if (!parser.parseOptionalLParen())
     return parseParentheticalExpr(parser, symbolMap);
 
+  if (!parser.parseOptionalMinus())
+    return parseNegateExpression(parser, symbolMap, lhs);
+
   if (!parser.parseOptionalKeyword("floordiv") ||
       !parser.parseOptionalKeyword("ceildiv") ||
       !parser.parseOptionalKeyword("mod") || !parser.parseOptionalPlus() ||
@@ -444,8 +468,6 @@ static mlir::AffineExpr parseAffineOperandExpr(mlir::AsmParser &parser,
       parser.emitError(loc, "missing left operand of binary operator");
     return nullptr;
   }
-
-  // TODO: parse unary minus
 
   auto loc = parser.getCurrentLocation();
   if (lhs)
@@ -459,7 +481,9 @@ static AffineLowPrecOp consumeIfLowPrecOp(mlir::AsmParser &parser) {
   if (!parser.parseOptionalPlus())
     return AffineLowPrecOp::Add;
 
-  // TODO: Parse minus
+  if (!parser.parseOptionalMinus())
+    return AffineLowPrecOp::Sub;
+
   return AffineLowPrecOp::LNoOp;
 }
 
