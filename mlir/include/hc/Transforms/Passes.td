@@ -117,5 +117,15 @@ def ConverPyIRToKernelPass : Pass<"hc-convert-py-IR-to-kernel-pass", "::mlir::Mo
   ];
 }
 
+def LowerWorkgroupScopePass : Pass<"hc-lower-workgroup-scope-pass"> {
+  let summary = "TBD";
+  let description = [{
+    TBD
+  }];
+
+  let dependentDialects = [
+    "::hc::hk::HKernelDialect",
+  ];
+}
 
 #endif // _HC_TRANSFORMS_PASSES_TD_INCLUDED_

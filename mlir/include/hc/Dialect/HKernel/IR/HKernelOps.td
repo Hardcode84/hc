@@ -41,6 +41,9 @@ class HKernel_OpBase<string mnemonic, list<Trait> traits = []>
 
 def HKernel_WorkgroupScopeAttr : HKernel_Attr<"WorkgroupScope", "workgroup_scope">;
 
+def HKernel_SubgroupScopeAttr : HKernel_Attr<"SubgroupScope", "subgroup_scope">;
+
+def HKernel_WorkitemScopeAttr : HKernel_Attr<"WorkitemScope", "workitem_scope">;
 
 def HKernel_CurrentGroupType : HKernel_Type<"CurrentGroup", "current_group", [], "::mlir::Type"> {
   let summary = "TBD";
@@ -143,12 +146,23 @@ def HKernel_MakeSliceOp : HKernel_OpBase<"make_slice", [
                   $step  ` ` type($step)  `)`
                   `->` type($result)
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      CArg<"::mlir::Value", "nullptr">:$lower,
+      CArg<"::mlir::Value", "nullptr">:$upper,
+      CArg<"::mlir::Value", "nullptr">:$step)>,
+  ];
 }
 
-def HKernel_MaterializeExprOp : HKernel_OpBase<"materialize_expr", [Pure]> {
+def HKernel_MaterializeExprOp : HKernel_OpBase<"materialize_expr", [
+  Pure, ConstantLike
+]> {
   let results = (outs AnyType:$result);
 
   let assemblyFormat = "attr-dict type($result)";
+
+  let hasFolder = 1;
 }
 
 def HKernel_SubViewOp : HKernel_OpBase<"subview", [Pure]> {

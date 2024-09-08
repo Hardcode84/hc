@@ -122,7 +122,34 @@ public:
   }
 };
 
-template <typename ClassTy> static void defExprOpearators(ClassTy &c);
+template <typename ClassTy> static void defExprOperators(ClassTy &c);
+
+class PyLiteralType : public PyConcreteType<PyLiteralType> {
+public:
+  static constexpr IsAFunctionTy isaFunction =
+      genTypeIsA<hc::typing::LiteralType>;
+  static constexpr GetTypeIDFunctionTy getTypeIdFunction =
+      genGetTypeID<hc::typing::LiteralType>;
+  static constexpr const char *pyClassName = "LiteralType";
+  using PyConcreteType::PyConcreteType;
+
+  static void bindDerived(ClassTy &c) {
+    c.def_static(
+        "get",
+        [](PyAttribute attr, DefaultingPyMlirContext context) {
+          auto typedAttr = mlir::dyn_cast<mlir::TypedAttr>(unwrap(attr));
+          if (!typedAttr)
+            throw std::runtime_error("Expected TypedAttr");
+
+          MlirType t = wrap(hc::typing::LiteralType::get(typedAttr));
+          return PyLiteralType(context->getRef(), t);
+        },
+        py::arg("params"), py::arg("context") = py::none(),
+        "Create symbol type");
+
+    defExprOperators(c);
+  }
+};
 
 class PySymbolType : public PyConcreteType<PySymbolType> {
 public:
@@ -145,7 +172,7 @@ public:
         py::arg("params"), py::arg("context") = py::none(),
         "Create symbol type");
 
-    defExprOpearators(c);
+    defExprOperators(c);
   }
 };
 
@@ -172,7 +199,7 @@ public:
         },
         py::arg("params"), py::arg("expr"), "Create expr type");
 
-    defExprOpearators(c);
+    defExprOperators(c);
   }
 };
 
@@ -195,7 +222,7 @@ struct CeilDiv {
   }
 };
 
-template <typename ClassTy> static void defExprOpearators(ClassTy &c) {
+template <typename ClassTy> static void defExprOperators(ClassTy &c) {
   c.def("__add__", &makeExpr<std::plus<void>>, py::arg("rhs"), "mul op");
   c.def("__sub__", &makeExpr<std::minus<void>>, py::arg("rhs"), "mul op");
   c.def("__mul__", &makeExpr<std::multiplies<void>>, py::arg("rhs"), "mul op");
@@ -231,6 +258,7 @@ static void populateTypingTypes(py::module &m) {
   PyValueType::bind(m);
   PyIdentType::bind(m);
   PySequenceType::bind(m);
+  PyLiteralType::bind(m);
   PySymbolType::bind(m);
   PyExprType::bind(m);
 
