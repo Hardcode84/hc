@@ -41,6 +41,9 @@ class HKernel_OpBase<string mnemonic, list<Trait> traits = []>
 
 def HKernel_WorkgroupScopeAttr : HKernel_Attr<"WorkgroupScope", "workgroup_scope">;
 
+def HKernel_SubgroupScopeAttr : HKernel_Attr<"SubgroupScope", "subgroup_scope">;
+
+def HKernel_WorkitemScopeAttr : HKernel_Attr<"WorkitemScope", "workitem_scope">;
 
 def HKernel_CurrentGroupType : HKernel_Type<"CurrentGroup", "current_group", [], "::mlir::Type"> {
   let summary = "TBD";
