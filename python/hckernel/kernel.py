@@ -128,6 +128,8 @@ def _get_global_attrs(work_shape, group_shape, subgroup_size, literals):
     ret["kernel.subgroup_size"] = _get_symbol_attr(subgroup_size)
     ret["kernel.subgroup_id"] = _get_symbol_attr(local_id[-1] // subgroup_size)
 
+    ret["kernel.local_id"] = _get_shape_attr(local_id)
+
     return ret
 
 
