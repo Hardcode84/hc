@@ -5,6 +5,7 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/IRMapping.h>
+#include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 
 #include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
 #include "hc/Dialect/Typing/IR/TypingOps.hpp"
@@ -238,6 +239,9 @@ struct LowerWorkgroupScopePass final
             ->walk<mlir::WalkOrder::PostOrder>(visitor)
             .wasInterrupted())
       return signalPassFailure();
+
+    // DCE
+    (void)applyPatternsAndFoldGreedily(getOperation(), {});
   }
 };
 } // namespace
