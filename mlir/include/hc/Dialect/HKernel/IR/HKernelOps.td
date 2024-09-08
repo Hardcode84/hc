@@ -148,10 +148,14 @@ def HKernel_MakeSliceOp : HKernel_OpBase<"make_slice", [
   }];
 }
 
-def HKernel_MaterializeExprOp : HKernel_OpBase<"materialize_expr", [Pure]> {
+def HKernel_MaterializeExprOp : HKernel_OpBase<"materialize_expr", [
+  Pure, ConstantLike
+]> {
   let results = (outs AnyType:$result);
 
   let assemblyFormat = "attr-dict type($result)";
+
+  let hasFolder = 1;
 }
 
 def HKernel_SubViewOp : HKernel_OpBase<"subview", [Pure]> {

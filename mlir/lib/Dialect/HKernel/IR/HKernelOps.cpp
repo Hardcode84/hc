@@ -42,6 +42,10 @@ hc::hk::TensorType::cloneWith(std::optional<llvm::ArrayRef<mlir::Type>> shape,
                          elementType ? elementType : getElementType());
 }
 
+mlir::OpFoldResult hc::hk::MaterializeExprOp::fold(FoldAdaptor adaptor) {
+  return hc::typing::TypeAttr::get(getType());
+}
+
 mlir::OpFoldResult hc::hk::TupleExtractOp::fold(FoldAdaptor adaptor) {
   if (auto idx = mlir::getConstantIntValue(adaptor.getIndex())) {
     auto src = getSource();
