@@ -191,6 +191,18 @@ static mlir::LogicalResult lowerWGScope(hc::hk::EnvironmentRegionOp region) {
       mapping.map(load.getIndex(), genShapeArray(newResType));
       auto newOp = builder.clone(*op, mapping);
       newOp->getResult(0).setType(newResType);
+      return mlir::WalkResult::advance();
+    }
+
+    if (auto store = mlir::dyn_cast<hc::hk::StoreOp>(op)) {
+      if (!mapping.lookupOrNull(store.getSource()))
+        return mlir::WalkResult::advance();
+
+      builder.setInsertionPoint(op);
+      getShaped(store.getTarget()); // Populate mapper
+      builder.clone(*op, mapping);
+      store->erase();
+      return mlir::WalkResult::advance();
     }
 
     return mlir::WalkResult::advance();
