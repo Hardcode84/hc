@@ -122,9 +122,11 @@ def _get_global_attrs(work_shape, group_shape, subgroup_size, literals):
 
     local_id = tuple(_index_symbol_internal(f"LOCAL_ID{i}") for i in range(n))
 
-    sg_size = _index_symbol_internal("SUBGROUP_SIZE")
-    ret["kernel.subgroup_size"] = _get_symbol_attr(sg_size)
-    ret["kernel.subgroup_id"] = _get_symbol_attr(local_id[-1] // sg_size)
+    if subgroup_size is None:
+        subgroup_size = _index_symbol_internal("SUBGROUP_SIZE")
+
+    ret["kernel.subgroup_size"] = _get_symbol_attr(subgroup_size)
+    ret["kernel.subgroup_id"] = _get_symbol_attr(local_id[-1] // subgroup_size)
 
     return ret
 
