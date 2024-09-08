@@ -42,6 +42,17 @@ hc::hk::TensorType::cloneWith(std::optional<llvm::ArrayRef<mlir::Type>> shape,
                          elementType ? elementType : getElementType());
 }
 
+void hc::hk::MakeSliceOp::build(::mlir::OpBuilder &odsBuilder,
+                                ::mlir::OperationState &odsState,
+                                mlir::Value lower, mlir::Value upper,
+                                mlir::Value step) {
+  auto type = SliceType::get(odsBuilder.getContext(),
+                             lower ? lower.getType() : odsBuilder.getNoneType(),
+                             upper ? upper.getType() : odsBuilder.getNoneType(),
+                             step ? step.getType() : odsBuilder.getNoneType());
+  build(odsBuilder, odsState, type, lower, upper, step);
+}
+
 mlir::OpFoldResult hc::hk::MaterializeExprOp::fold(FoldAdaptor adaptor) {
   return hc::typing::TypeAttr::get(getType());
 }

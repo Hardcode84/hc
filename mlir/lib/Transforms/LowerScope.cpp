@@ -144,8 +144,8 @@ static mlir::LogicalResult lowerWGScope(hc::hk::EnvironmentRegionOp region) {
     for (auto &&[ind, s] :
          llvm::zip(llvm::ArrayRef(ids).take_back(rank),
                    shapedType.getShape().take_back(grCount))) {
-      newIndices.emplace_back(
-          builder.create<hc::hk::MaterializeExprOp>(loc, ind));
+      mlir::Value idx = builder.create<hc::hk::MaterializeExprOp>(loc, ind);
+      newIndices.emplace_back(builder.create<hc::hk::MakeSliceOp>(loc, idx));
       auto newDim = mlir::cast<hc::typing::SymbolicTypeBase>(s) -
                     mlir::cast<hc::typing::SymbolicTypeBase>(ind);
       newShape.emplace_back(newDim);

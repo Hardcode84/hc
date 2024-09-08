@@ -146,6 +146,13 @@ def HKernel_MakeSliceOp : HKernel_OpBase<"make_slice", [
                   $step  ` ` type($step)  `)`
                   `->` type($result)
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      CArg<"::mlir::Value", "nullptr">:$lower,
+      CArg<"::mlir::Value", "nullptr">:$upper,
+      CArg<"::mlir::Value", "nullptr">:$step)>,
+  ];
 }
 
 def HKernel_MaterializeExprOp : HKernel_OpBase<"materialize_expr", [
