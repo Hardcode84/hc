@@ -101,6 +101,12 @@ def Typing_SequenceType : Typing_Type<"Sequence", "sequence", [], "::mlir::Type"
   );
 
   let assemblyFormat = "$params";
+
+  let extraClassDeclaration = [{
+    size_t size() const {
+      return getParams().size();
+    }
+  }];
 }
 
 def Typing_UnpackedSequenceType : Typing_Type<"UnpackedSequence", "unpacked_sequence", [], "::mlir::Type"> {
