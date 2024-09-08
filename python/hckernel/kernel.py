@@ -5,6 +5,7 @@ from .kernel_api import _verify_kernel_params
 from .kernel_api import *
 from .dispatcher import create_dispatcher
 from .indexing import _index_symbol_internal
+from .mlir import ir
 from .mlir import typing
 
 
@@ -60,29 +61,48 @@ def _resolve_globals(func, mapping):
     return g
 
 
+def _get_literal(value):
+    attr = ir.IntegerAttr.get(ir.IndexType.get(), int(value))
+    return typing.LiteralType.get(attr)
+
+
 def _get_typing_module():
     from .kernel_typing import get_typing_module
 
     return get_typing_module()
 
 
-def _get_symbol_attr(term):
+def _get_symbol_type(term):
     match term:
         case sympy.Symbol():
             return typing.SymbolType.get(term.name)
 
         case sympy.Mul():
             lhs, rhs = term.args
-            lhs = _get_symbol_attr(lhs)
-            rhs = _get_symbol_attr(rhs)
-            return lhs * rhs
+            lhs = _get_symbol_type(lhs)
+            if isinstance(rhs, sympy.Pow):
+                arg, p = rhs.args
+                assert p == -1, f"Only -1 power is supported, got {p}"
+                arg = _get_symbol_type(arg)
+                return lhs // arg
+            else:
+                rhs = _get_symbol_type(rhs)
+                return lhs * rhs
 
-    assert False, f"Can't convert value {sym} : {type(sym)}"
+        case sympy.floor():
+            return _get_symbol_type(term.args[0])
+
+    assert False, f"Can't convert value {term} : {type(term)}"
 
 
 def _get_shape_attr(src):
-    seq = typing.SequenceType.get([_get_symbol_attr(s) for s in src])
+    seq = typing.SequenceType.get([_get_symbol_type(s) for s in src])
     return typing.TypeAttr.get(seq)
+
+
+def _get_symbol_attr(sym):
+    sym = _get_symbol_type(sym)
+    return typing.TypeAttr.get(sym)
 
 
 def _get_global_attrs(work_shape, group_shape, subgroup_size, literals):
@@ -99,6 +119,13 @@ def _get_global_attrs(work_shape, group_shape, subgroup_size, literals):
     ret["kernel.group_shape"] = _get_shape_attr(group_shape)
     ret["kernel.group_id"] = _get_shape_attr(group_id)
     ret["kernel.work_offset"] = _get_shape_attr(work_offset)
+
+    local_id = tuple(_index_symbol_internal(f"LOCAL_ID{i}") for i in range(n))
+
+    sg_size = _index_symbol_internal("SUBGROUP_SIZE")
+    ret["kernel.subgroup_size"] = _get_symbol_attr(sg_size)
+    ret["kernel.subgroup_id"] = _get_symbol_attr(local_id[-1] // sg_size)
+
     return ret
 
 
