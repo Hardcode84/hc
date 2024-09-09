@@ -125,6 +125,19 @@ def LowerWorkgroupScopePass : Pass<"hc-lower-workgroup-scope-pass"> {
 
   let dependentDialects = [
     "::hc::hk::HKernelDialect",
+    "::hc::typing::TypingDialect",
+  ];
+}
+
+def LowerSubgroupScopePass : Pass<"hc-lower-subgroup-scope-pass"> {
+  let summary = "TBD";
+  let description = [{
+    TBD
+  }];
+
+  let dependentDialects = [
+    "::hc::hk::HKernelDialect",
+    "::hc::typing::TypingDialect",
   ];
 }
 
