@@ -1155,19 +1155,25 @@ bool SymbolicTypeBase::classof(mlir::Type type) {
   return llvm::isa<LiteralType, SymbolType, BitsizeType, ExprType>(type);
 }
 
+static SymbolicTypeBase getLiteral(mlir::MLIRContext *ctx, int64_t val) {
+  auto index = mlir::IndexType::get(ctx);
+  return LiteralType::get(mlir::IntegerAttr::get(index, val));
+}
+
 SymbolicTypeBase SymbolicTypeBase::foldExpr(SymbolicTypeBase src) {
   if (auto bitsize = mlir::dyn_cast<BitsizeType>(src)) {
     auto arg = bitsize.getArg();
-    if (arg.isIntOrFloat()) {
-      auto index = mlir::IndexType::get(src.getContext());
-      return LiteralType::get(
-          mlir::IntegerAttr::get(index, arg.getIntOrFloatBitWidth()));
-    }
+    if (arg.isIntOrFloat())
+      return getLiteral(src.getContext(), arg.getIntOrFloatBitWidth());
+
     return src;
   }
   auto expr = mlir::dyn_cast<ExprType>(src);
   if (!expr)
     return src;
+
+  if (auto lit = mlir::dyn_cast<mlir::AffineConstantExpr>(expr.getExpr()))
+    return getLiteral(src.getContext(), lit.getValue());
 
   auto params = expr.getParams();
   if (params.size() != 1)

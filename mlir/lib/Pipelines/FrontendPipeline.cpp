@@ -36,4 +36,6 @@ void hc::populateFrontendPipeline(mlir::PassManager &pm) {
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(hc::createLowerWorkgroupScopePass());
   pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(hc::createLowerSubgroupScopePass());
+  pm.addPass(mlir::createCanonicalizerPass());
 }

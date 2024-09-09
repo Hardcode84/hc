@@ -173,6 +173,8 @@ def HKernel_SubViewOp : HKernel_OpBase<"subview", [Pure]> {
   let results = (outs AnyType:$result);
 
   let assemblyFormat = "attr-dict $source `:` type($source) `[` $index `]` `:` type($index) `->` type($result)";
+
+  let hasCanonicalizer = 1;
 }
 
 def HKernel_LoadOp : HKernel_OpBase<"load", []> {
