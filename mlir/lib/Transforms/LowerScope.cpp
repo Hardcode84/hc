@@ -67,45 +67,18 @@ static bool checkShapedDivisible(mlir::Type type, mlir::TypeRange div) {
   return false;
 }
 
-static mlir::LogicalResult lowerWGScope(hc::hk::EnvironmentRegionOp region) {
-  auto mod = region->getParentOfType<mlir::ModuleOp>();
-  if (!mod)
-    return region.emitError("No parent module");
-
-  auto groupShape =
-      getTypeAttr<hc::typing::SequenceType>(mod, "kernel.group_shape");
-  if (!groupShape)
-    return region->emitError("Group shape is not defined");
-
-  auto localId = getTypeAttr<hc::typing::SequenceType>(mod, "kernel.local_id");
-  if (!localId)
-    return region->emitError("Local ID is not defined");
-
-  if (groupShape.size() != localId.size())
-    return region->emitError("Invalid group shape");
-
-  auto subgroupId =
-      getTypeAttr<hc::typing::SymbolicTypeBase>(mod, "kernel.subgroup_id");
-  if (!subgroupId)
-    return region->emitError("Subgroup ID is not defined");
-
-  auto subgroupSize =
-      getTypeAttr<hc::typing::SymbolicTypeBase>(mod, "kernel.subgroup_size");
-  if (!subgroupSize)
-    return region->emitError("Subgroup size is not defined");
-
-  llvm::SmallVector<mlir::Type> ids(localId.getParams());
-  ids.back() = subgroupId;
-
+static mlir::LogicalResult
+lowerScope(hc::hk::EnvironmentRegionOp region, mlir::TypeRange groupShape,
+           mlir::TypeRange ids, hc::typing::SymbolicTypeBase subgroupSize) {
   mlir::OpBuilder builder(region.getContext());
 
+  auto grCount = groupShape.size();
   auto distributeShapedType = [&](hc::hk::SymbolicallyShapedType shapedType)
       -> hc::hk::SymbolicallyShapedType {
     auto rank = shapedType.getShape().size();
-    auto grCount = groupShape.size();
     llvm::SmallVector<mlir::Type> newShape(
         shapedType.getShape().drop_back(grCount));
-    auto groupShapeRef = llvm::ArrayRef(groupShape.getParams()).take_back(rank);
+    auto groupShapeRef = groupShape.take_back(rank);
     for (auto &&[s, g] :
          llvm::zip(shapedType.getShape().take_back(grCount), groupShapeRef)) {
       auto symbolic = mlir::cast<hc::typing::SymbolicTypeBase>(s);
@@ -130,7 +103,6 @@ static mlir::LogicalResult lowerWGScope(hc::hk::EnvironmentRegionOp region) {
     }
 
     auto rank = shapedType.getShape().size();
-    auto grCount = groupShape.size();
 
     mlir::Location loc = builder.getUnknownLoc();
     llvm::SmallVector<mlir::Value> newIndices;
@@ -142,9 +114,8 @@ static mlir::LogicalResult lowerWGScope(hc::hk::EnvironmentRegionOp region) {
       newIndices.resize(rank - grCount, zero);
     }
 
-    for (auto &&[ind, s] :
-         llvm::zip(llvm::ArrayRef(ids).take_back(rank),
-                   shapedType.getShape().take_back(grCount))) {
+    for (auto &&[ind, s] : llvm::zip(
+             ids.take_back(rank), shapedType.getShape().take_back(grCount))) {
       mlir::Value idx = builder.create<hc::hk::MaterializeExprOp>(loc, ind);
       newIndices.emplace_back(builder.create<hc::hk::MakeSliceOp>(loc, idx));
       auto newDim = mlir::cast<hc::typing::SymbolicTypeBase>(s) -
@@ -178,7 +149,7 @@ static mlir::LogicalResult lowerWGScope(hc::hk::EnvironmentRegionOp region) {
     }
 
     if (auto load = mlir::dyn_cast<hc::hk::LoadOp>(op)) {
-      if (!checkShapedDivisible(load.getType(), groupShape.getParams())) {
+      if (!checkShapedDivisible(load.getType(), groupShape)) {
         load.emitError("load shape is not divisible by group size");
         return mlir::WalkResult::interrupt();
       }
@@ -209,9 +180,43 @@ static mlir::LogicalResult lowerWGScope(hc::hk::EnvironmentRegionOp region) {
     return mlir::WalkResult::advance();
   };
 
-  if (region.getBody()
-          ->walk<mlir::WalkOrder::PostOrder>(visitor)
-          .wasInterrupted())
+  return mlir::failure(region.getBody()
+                           ->walk<mlir::WalkOrder::PostOrder>(visitor)
+                           .wasInterrupted());
+}
+
+static mlir::LogicalResult lowerWGScope(hc::hk::EnvironmentRegionOp region) {
+  auto mod = region->getParentOfType<mlir::ModuleOp>();
+  if (!mod)
+    return region.emitError("No parent module");
+
+  auto groupShape =
+      getTypeAttr<hc::typing::SequenceType>(mod, "kernel.group_shape");
+  if (!groupShape)
+    return region->emitError("Group shape is not defined");
+
+  auto localId = getTypeAttr<hc::typing::SequenceType>(mod, "kernel.local_id");
+  if (!localId)
+    return region->emitError("Local ID is not defined");
+
+  if (groupShape.size() != localId.size())
+    return region->emitError("Invalid group shape");
+
+  auto subgroupId =
+      getTypeAttr<hc::typing::SymbolicTypeBase>(mod, "kernel.subgroup_id");
+  if (!subgroupId)
+    return region->emitError("Subgroup ID is not defined");
+
+  auto subgroupSize =
+      getTypeAttr<hc::typing::SymbolicTypeBase>(mod, "kernel.subgroup_size");
+  if (!subgroupSize)
+    return region->emitError("Subgroup size is not defined");
+
+  llvm::SmallVector<mlir::Type> ids(localId.getParams());
+  ids.back() = subgroupId;
+
+  if (mlir::failed(
+          lowerScope(region, groupShape.getParams(), ids, subgroupSize)))
     return mlir::failure();
 
   region.setEnvironmentAttr(
