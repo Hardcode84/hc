@@ -79,6 +79,60 @@ mlir::OpFoldResult hc::hk::TupleExtractOp::fold(FoldAdaptor adaptor) {
   return nullptr;
 }
 
+namespace {
+struct FoldSubviewChain : public mlir::OpRewritePattern<hc::hk::SubViewOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::SubViewOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto src = op.getSource().getDefiningOp<hc::hk::SubViewOp>();
+    if (!src)
+      return mlir::failure();
+
+    if (src.getIndex().size() != op.getIndex().size())
+      return mlir::failure();
+
+    auto check = [](mlir::Value v) -> bool {
+      auto slice = mlir::dyn_cast<hc::hk::SliceType>(v.getType());
+      if (!slice)
+        return false;
+
+      return mlir::isa<hc::typing::SymbolicTypeBase>(slice.getLower()) &&
+             mlir::isa<mlir::NoneType>(slice.getUpper()) &&
+             mlir::isa<mlir::NoneType>(slice.getStep());
+    };
+    if (!llvm::all_of(src.getIndex(), check) ||
+        !llvm::all_of(op.getIndex(), check))
+      return mlir::failure();
+
+    auto getLower = [&](mlir::Type t) -> hc::typing::SymbolicTypeBase {
+      auto slice = mlir::cast<hc::hk::SliceType>(t);
+      return mlir::cast<hc::typing::SymbolicTypeBase>(slice.getLower());
+    };
+
+    mlir::Location loc = op.getLoc();
+    llvm::SmallVector<mlir::Value> index;
+    for (auto &&[s, d] : llvm::zip_equal(src.getIndex(), op.getIndex())) {
+      auto srcType = getLower(s.getType());
+      auto dstType = getLower(d.getType());
+      mlir::Value idx =
+          rewriter.create<hc::hk::MaterializeExprOp>(loc, srcType + dstType);
+      index.emplace_back(rewriter.create<hc::hk::MakeSliceOp>(loc, idx));
+    }
+
+    rewriter.replaceOpWithNewOp<hc::hk::SubViewOp>(op, op.getType(),
+                                                   src.getSource(), index);
+    return mlir::success();
+  }
+};
+} // namespace
+
+void hc::hk::SubViewOp::getCanonicalizationPatterns(
+    mlir::RewritePatternSet &results, mlir::MLIRContext *context) {
+  results.insert<FoldSubviewChain>(context);
+}
+
 /// Given the region at `index`, or the parent operation if `index` is None,
 /// return the successor regions. These are the regions that may be selected
 /// during the flow of control. `operands` is a set of optional attributes that
