@@ -66,7 +66,7 @@ def pairwise_distance_kernel(group: CurrentGroup,
 
     # Create tensor of specified shape, but with boundary checks of X1 and X2
     x1 = group.load(X1[gid[0]:], shape=(group.shape[0], X1.shape[1]))
-    x2 = group.load(X2[gid[0]:], shape=(group.shape[0], X2.shape[1]))
+    x2 = group.load(X2[gid[1]:], shape=(group.shape[1], X2.shape[1]))
 
     # calculating pairwise distance with numpy-style broadcasting
     diff = ((x1[None, :, :] - x2[:, None, :])**2).sum(axis=2)
