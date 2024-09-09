@@ -465,7 +465,7 @@ static mlir::AffineExpr parseAffineExprImpl(mlir::AsmParser &parser,
 
 static mlir::AffineExpr parseParentheticalExpr(mlir::AsmParser &parser,
                                                SymbolMap &symbolMap) {
-  if (!parser.parseRParen())
+  if (!parser.parseOptionalRParen())
     return parser.emitError(parser.getCurrentLocation(),
                             "no expression inside parentheses"),
            nullptr;
@@ -899,6 +899,10 @@ static void printSymbolicShape(mlir::AsmPrinter &printer,
       [&](mlir::Type t) {
         if (auto sym = mlir::dyn_cast<hc::typing::SymbolType>(t)) {
           printer << sym.getName();
+          return;
+        }
+        if (auto lit = mlir::dyn_cast<hc::typing::LiteralType>(t)) {
+          printer << mlir::cast<mlir::IntegerAttr>(lit.getValue()).getInt();
           return;
         }
         auto expr = mlir::cast<hc::typing::ExprType>(t);
