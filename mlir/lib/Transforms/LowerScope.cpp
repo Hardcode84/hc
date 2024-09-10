@@ -53,23 +53,44 @@ static bool isDivisible(mlir::Type src, mlir::Type sym) {
   return false;
 }
 
-static bool checkShapeDivisible(mlir::TypeRange shape, mlir::TypeRange div) {
-  if (div.size() > shape.size())
-    div = div.take_back(shape.size());
+static const constexpr unsigned UnsetIdx = static_cast<unsigned>(-1);
 
-  for (auto &&[s, d] : llvm::zip_equal(shape.take_back(div.size()), div)) {
-    if (!isDivisible(s, d))
-      return false;
+static std::optional<llvm::SmallVector<unsigned, 3>>
+findDivisibleShape(mlir::TypeRange shape, mlir::TypeRange div) {
+  llvm::SmallVector<unsigned, 3> ret(div.size(), UnsetIdx);
+  unsigned set = 0;
+
+  while (!shape.empty()) {
+    auto dim = shape.back();
+    shape = shape.drop_back(1);
+    auto idx = static_cast<unsigned>(shape.size());
+    for (auto i : llvm::reverse(llvm::seq<size_t>(0, div.size()))) {
+      if (ret[i] != UnsetIdx)
+        continue;
+
+      if (isDivisible(dim, div[i])) {
+        ret[i] = idx;
+        ++set;
+        break;
+      }
+    }
+
+    if (set == ret.size())
+      break;
   }
 
-  return true;
+  if (!set)
+    return std::nullopt;
+
+  return ret;
 }
 
-static bool checkShapedDivisible(mlir::Type type, mlir::TypeRange div) {
+static std::optional<llvm::SmallVector<unsigned, 3>>
+checkShapedDivisible(mlir::Type type, mlir::TypeRange div) {
   if (auto buffer = mlir::dyn_cast<hc::hk::SymbolicallyShapedType>(type))
-    return checkShapeDivisible(buffer.getShape(), div);
+    return findDivisibleShape(buffer.getShape(), div);
 
-  return false;
+  return std::nullopt;
 }
 
 static mlir::LogicalResult
@@ -77,28 +98,32 @@ lowerScope(hc::hk::EnvironmentRegionOp region, mlir::TypeRange groupShape,
            mlir::TypeRange ids, hc::typing::SymbolicTypeBase subgroupSize) {
   mlir::OpBuilder builder(region.getContext());
 
-  auto grCount = groupShape.size();
-  auto distributeShapedType = [&](hc::hk::SymbolicallyShapedType shapedType)
+  auto distributeShapedType = [&](mlir::Type type,
+                                  mlir::ArrayRef<unsigned> distributeDims)
       -> hc::hk::SymbolicallyShapedType {
-    auto rank = shapedType.getShape().size();
-    llvm::SmallVector<mlir::Type> newShape(
-        shapedType.getShape().drop_back(grCount));
-    auto groupShapeRef = groupShape.take_back(rank);
-    for (auto &&[s, g] :
-         llvm::zip(shapedType.getShape().take_back(grCount), groupShapeRef)) {
-      auto symbolic = mlir::cast<hc::typing::SymbolicTypeBase>(s);
-      auto symbolicGr = mlir::cast<hc::typing::SymbolicTypeBase>(g);
-      newShape.emplace_back(symbolic.floorDiv(symbolicGr));
+    auto shapedType = mlir::cast<hc::hk::SymbolicallyShapedType>(type);
+    llvm::SmallVector<mlir::Type> newShape(shapedType.getShape());
+    for (auto &&[i, d] : llvm::enumerate(distributeDims)) {
+      if (d == UnsetIdx)
+        continue;
+
+      assert(d < newShape.size());
+      auto symbolic = mlir::cast<hc::typing::SymbolicTypeBase>(newShape[d]);
+      auto symbolicGr = mlir::cast<hc::typing::SymbolicTypeBase>(groupShape[i]);
+      newShape[d] = symbolic.floorDiv(symbolicGr);
     }
-    if (subgroupSize) {
-      auto elem = mlir::cast<hc::typing::SymbolicTypeBase>(newShape.back());
-      newShape.back() = elem * subgroupSize;
+
+    if (subgroupSize && distributeDims.back() != UnsetIdx) {
+      auto i = distributeDims.back();
+      auto elem = mlir::cast<hc::typing::SymbolicTypeBase>(newShape[i]);
+      newShape[i] = elem * subgroupSize;
     }
     return shapedType.clone(newShape);
   };
 
   mlir::IRMapping mapping;
-  auto getShaped = [&](mlir::Value val) -> mlir::Value {
+  auto getShaped = [&](mlir::Value val,
+                       mlir::ArrayRef<unsigned> distributeDims) -> mlir::Value {
     if (auto res = mapping.lookupOrNull(val))
       return res;
 
@@ -108,27 +133,30 @@ lowerScope(hc::hk::EnvironmentRegionOp region, mlir::TypeRange groupShape,
       return val;
     }
 
-    auto rank = shapedType.getShape().size();
+    llvm::SmallVector<mlir::Type> newShape(shapedType.getShape());
 
     mlir::Location loc = builder.getUnknownLoc();
-    llvm::SmallVector<mlir::Value> newIndices;
-    llvm::SmallVector<mlir::Type> newShape(
-        shapedType.getShape().drop_back(grCount));
-    if (rank > grCount) {
-      auto type = hc::typing::LiteralType::get(builder.getIndexAttr(0));
-      mlir::Value zero = builder.create<hc::hk::MaterializeExprOp>(loc, type);
-      newIndices.resize(rank - grCount,
-                        builder.create<hc::hk::MakeSliceOp>(loc, zero));
+    auto makeSlice = [&](mlir::Type type) -> mlir::Value {
+      mlir::Value idx = builder.create<hc::hk::MaterializeExprOp>(loc, type);
+      return builder.create<hc::hk::MakeSliceOp>(loc, idx);
+    };
+
+    auto zeroType = hc::typing::LiteralType::get(builder.getIndexAttr(0));
+    llvm::SmallVector<mlir::Value> newIndices(newShape.size(),
+                                              makeSlice(zeroType));
+    for (auto &&[i, d] : llvm::enumerate(distributeDims)) {
+      if (d == UnsetIdx)
+        continue;
+
+      assert(i < ids.size());
+      assert(d < newIndices.size());
+      auto ind = mlir::cast<hc::typing::SymbolicTypeBase>(ids[i]);
+      newIndices[d] = makeSlice(ind);
+
+      auto dim = mlir::cast<hc::typing::SymbolicTypeBase>(newShape[d]);
+      newShape[d] = dim - ind;
     }
 
-    for (auto &&[ind, s] : llvm::zip(
-             ids.take_back(rank), shapedType.getShape().take_back(grCount))) {
-      mlir::Value idx = builder.create<hc::hk::MaterializeExprOp>(loc, ind);
-      newIndices.emplace_back(builder.create<hc::hk::MakeSliceOp>(loc, idx));
-      auto newDim = mlir::cast<hc::typing::SymbolicTypeBase>(s) -
-                    mlir::cast<hc::typing::SymbolicTypeBase>(ind);
-      newShape.emplace_back(newDim);
-    }
     auto newShapedType = shapedType.clone(newShape);
 
     mlir::Value res =
@@ -156,16 +184,16 @@ lowerScope(hc::hk::EnvironmentRegionOp region, mlir::TypeRange groupShape,
     }
 
     if (auto load = mlir::dyn_cast<hc::hk::LoadOp>(op)) {
-      if (!checkShapedDivisible(load.getType(), groupShape)) {
+      auto div = checkShapedDivisible(load.getType(), groupShape);
+      if (!div) {
         load.emitError("load shape is not divisible by group size");
         return mlir::WalkResult::interrupt();
       }
 
-      auto newResType = distributeShapedType(
-          mlir::cast<hc::hk::SymbolicallyShapedType>(load.getType()));
+      auto newResType = distributeShapedType(load.getType(), *div);
 
       builder.setInsertionPoint(op);
-      getShaped(load.getSource()); // Populate mapper
+      getShaped(load.getSource(), *div); // Populate mapper
 
       mapping.map(load.getIndex(), genShapeArray(newResType));
       auto newOp = builder.clone(*op, mapping);
@@ -174,11 +202,21 @@ lowerScope(hc::hk::EnvironmentRegionOp region, mlir::TypeRange groupShape,
     }
 
     if (auto store = mlir::dyn_cast<hc::hk::StoreOp>(op)) {
-      if (!mapping.lookupOrNull(store.getSource()))
+      auto newSrc = mapping.lookupOrNull(store.getSource());
+      if (!newSrc)
+        return mlir::WalkResult::advance();
+
+      auto srcType = store.getSource().getType();
+      auto div = checkShapedDivisible(srcType, groupShape);
+      if (!div)
+        return mlir::WalkResult::advance();
+
+      auto newSrcType = distributeShapedType(srcType, *div);
+      if (newSrc.getType() != newSrcType)
         return mlir::WalkResult::advance();
 
       builder.setInsertionPoint(op);
-      getShaped(store.getTarget()); // Populate mapper
+      getShaped(store.getTarget(), *div); // Populate mapper
       builder.clone(*op, mapping);
       store->erase();
       return mlir::WalkResult::advance();
