@@ -180,11 +180,11 @@ def HKernel_SubViewOp : HKernel_OpBase<"subview", [Pure]> {
 def HKernel_LoadOp : HKernel_OpBase<"load", []> {
   let arguments = (ins
     Arg<AnyType, "", [MemRead]>:$source,
-    Variadic<AnyType>:$index
+    Variadic<AnyType>:$shape
   );
   let results = (outs AnyType:$result);
 
-  let assemblyFormat = "attr-dict $source `:` type($source) `[` $index `]` `:` type($index) `->` type($result)";
+  let assemblyFormat = "attr-dict $source `:` type($source) `[` $shape `]` `:` type($shape) `->` type($result)";
 }
 
 def HKernel_StoreOp : HKernel_OpBase<"store", []> {
