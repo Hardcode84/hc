@@ -195,7 +195,7 @@ lowerScope(hc::hk::EnvironmentRegionOp region, mlir::TypeRange groupShape,
       builder.setInsertionPoint(op);
       getShaped(load.getSource(), *div); // Populate mapper
 
-      mapping.map(load.getIndex(), genShapeArray(newResType));
+      mapping.map(load.getShape(), genShapeArray(newResType));
       auto newOp = builder.clone(*op, mapping);
       newOp->getResult(0).setType(newResType);
       return mlir::WalkResult::advance();
