@@ -7,9 +7,17 @@
 
 #include "hc/Transforms/Passes.hpp"
 
+static void populateOptPasses(mlir::PassManager &pm) {
+  pm.addPass(mlir::createCompositeFixedPointPass(
+      "OptPass", [](mlir::OpPassManager &p) {
+        p.addPass(mlir::createCanonicalizerPass());
+        p.addPass(mlir::createCSEPass());
+      }));
+}
+
 void hc::populateMiddleendPipeline(mlir::PassManager &pm) {
   pm.addPass(hc::createLowerWorkgroupScopePass());
-  pm.addPass(mlir::createCanonicalizerPass());
+  populateOptPasses(pm);
   pm.addPass(hc::createLowerSubgroupScopePass());
-  pm.addPass(mlir::createCanonicalizerPass());
+  populateOptPasses(pm);
 }
