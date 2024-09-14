@@ -8,6 +8,7 @@
 #include "Utils.hpp"
 
 #include "hc/Pipelines/FrontendPipeline.hpp"
+#include "hc/Pipelines/MiddleendPipeline.hpp"
 
 namespace py = pybind11;
 
@@ -28,6 +29,7 @@ void Dispatcher::populateImportPipeline(mlir::PassManager &pm) {
 
 void Dispatcher::populateFrontendPipeline(mlir::PassManager &pm) {
   hc::populateFrontendPipeline(pm);
+  hc::populateMiddleendPipeline(pm);
 }
 
 void Dispatcher::populateInvokePipeline(mlir::PassManager &pm) {
