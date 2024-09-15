@@ -19,6 +19,9 @@
 namespace hc {
 #define GEN_PASS_DEF_RESOLVEARGSPASS
 #include "hc/Transforms/Passes.h.inc"
+
+#define GEN_PASS_DEF_CONVERTHKERNELTYPESPASS
+#include "hc/Transforms/Passes.h.inc"
 } // namespace hc
 
 static hc::typing::SymbolicTypeBase foldSymbolic(mlir::Type type) {
@@ -444,6 +447,72 @@ struct ResolveArgsPass final
 
     // DCE
     (void)applyPatternsAndFoldGreedily(getOperation(), {});
+  }
+};
+} // namespace
+
+namespace {
+struct ConvertTypes final : mlir::ConversionPattern {
+
+  ConvertTypes(const mlir::TypeConverter &converter, mlir::MLIRContext *ctx,
+               mlir::PatternBenefit benefit = 1)
+      : mlir::ConversionPattern(converter, mlir::Pattern::MatchAnyOpTypeTag{},
+                                benefit, ctx) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::FailureOr<mlir::Operation *> newOp =
+        mlir::convertOpResultTypes(op, operands, *getTypeConverter(), rewriter);
+    if (failed(newOp))
+      return mlir::failure();
+
+    rewriter.replaceOp(op, (*newOp)->getResults());
+    return mlir::success();
+  }
+};
+
+struct ConvertHKernelTypesPass final
+    : public hc::impl::ConvertHKernelTypesPassBase<ConvertHKernelTypesPass> {
+
+  void runOnOperation() override {
+    auto *ctx = &getContext();
+    mlir::ConversionTarget target(*ctx);
+    mlir::TypeConverter converter;
+
+    populateTypeConverter(converter);
+
+    auto materialize = [](mlir::OpBuilder &builder, mlir::Type type,
+                          mlir::ValueRange inputs,
+                          mlir::Location loc) -> std::optional<mlir::Value> {
+      if (inputs.size() != 1)
+        return std::nullopt;
+
+      return doCast(builder, loc, inputs.front(), type)->getResult(0);
+    };
+    converter.addArgumentMaterialization(materialize);
+    converter.addSourceMaterialization(materialize);
+    converter.addTargetMaterialization(materialize);
+
+    mlir::RewritePatternSet patterns(ctx);
+
+    mlir::populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
+                                                              converter);
+
+    target.addDynamicallyLegalDialect<hc::hk::HKernelDialect>(
+        [&](mlir::Operation *op) -> bool { return converter.isLegal(op); });
+
+    target.addDynamicallyLegalOp<mlir::func::FuncOp>(
+        [&](mlir::func::FuncOp op) {
+          return converter.isSignatureLegal(op.getFunctionType()) &&
+                 converter.isLegal(&op.getBody());
+        });
+
+    patterns.insert<ConvertTypes>(converter, ctx);
+
+    if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
+                                                  std::move(patterns))))
+      signalPassFailure();
   }
 };
 } // namespace

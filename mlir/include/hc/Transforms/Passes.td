@@ -156,4 +156,17 @@ def ResolveArgsPass : Pass<"hc-resolve-args-pass"> {
   ];
 }
 
+def ConvertHKernelTypesPass : Pass<"hc-convert-hkernel-types-pass"> {
+  let summary = "TBD";
+  let description = [{
+    TBD
+  }];
+
+  let dependentDialects = [
+    "::hc::hk::HKernelDialect",
+    "::hc::typing::TypingDialect",
+    "::mlir::memref::MemRefDialect",
+  ];
+}
+
 #endif // _HC_TRANSFORMS_PASSES_TD_INCLUDED_
