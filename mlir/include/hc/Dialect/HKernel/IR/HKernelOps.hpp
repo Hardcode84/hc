@@ -10,7 +10,7 @@
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
 namespace mlir {
-class PatternRewriter;
+class RewriterBase;
 }
 
 #include "hc/Dialect/HKernel/IR/HKernelOpsTypeInterfaces.h.inc"

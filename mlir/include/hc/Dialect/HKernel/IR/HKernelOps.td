@@ -227,7 +227,7 @@ def EnvironmentRegionOp : HKernel_OpBase<"env_region", [
 
   let extraClassDeclaration = [{
     /// Inline op body into parent region and erase the op.
-    static void inlineIntoParent(::mlir::PatternRewriter &builder, EnvironmentRegionOp op);
+    static void inlineIntoParent(::mlir::RewriterBase &builder, EnvironmentRegionOp op);
   }];
 
   let builders = [

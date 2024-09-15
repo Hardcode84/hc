@@ -399,8 +399,8 @@ void hc::hk::EnvironmentRegionOp::getCanonicalizationPatterns(
                  CleanupRegionYieldArgs, MergeAdjacentRegions>(context);
 }
 
-void hc::hk::EnvironmentRegionOp::inlineIntoParent(
-    mlir::PatternRewriter &builder, EnvironmentRegionOp op) {
+void hc::hk::EnvironmentRegionOp::inlineIntoParent(mlir::RewriterBase &builder,
+                                                   EnvironmentRegionOp op) {
   mlir::Block *block = &op.getRegion().front();
   auto term = mlir::cast<EnvironmentRegionYieldOp>(block->getTerminator());
   auto args = llvm::to_vector(term.getResults());
