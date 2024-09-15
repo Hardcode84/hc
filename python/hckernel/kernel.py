@@ -72,7 +72,7 @@ def _get_typing_module():
     return get_typing_module()
 
 
-def _get_symbol_type(term):
+def _get_symbol_type(term, ceiling=False):
     match term:
         case sympy.Symbol():
             return typing.SymbolType.get(term.name)
@@ -84,13 +84,19 @@ def _get_symbol_type(term):
                 arg, p = rhs.args
                 assert p == -1, f"Only -1 power is supported, got {p}"
                 arg = _get_symbol_type(arg)
-                return lhs // arg
+                if ceiling:
+                    return lhs / arg
+                else:
+                    return lhs // arg
             else:
                 rhs = _get_symbol_type(rhs)
                 return lhs * rhs
 
         case sympy.floor():
             return _get_symbol_type(term.args[0])
+
+        case sympy.ceiling():
+            return _get_symbol_type(term.args[0], ceiling=True)
 
     assert False, f"Can't convert value {term} : {type(term)}"
 
@@ -113,10 +119,14 @@ def _get_global_attrs(work_shape, group_shape, subgroup_size, literals):
     elif not isinstance(group_shape, (list, tuple)):
         group_shape = (group_shape,)
 
+    ret["kernel.work_shape"] = _get_shape_attr(work_shape)
+
     group_id = tuple(_index_symbol_internal(f"GROUP_ID{i}") for i in range(n))
+    group_count = tuple(sympy.ceiling(w / g) for w, g in zip(work_shape, group_shape))
     work_offset = tuple(i * s for i, s in zip(group_id, group_shape))
 
     ret["kernel.group_shape"] = _get_shape_attr(group_shape)
+    ret["kernel.group_count"] = _get_shape_attr(group_count)
     ret["kernel.group_id"] = _get_shape_attr(group_id)
     ret["kernel.work_offset"] = _get_shape_attr(work_offset)
 

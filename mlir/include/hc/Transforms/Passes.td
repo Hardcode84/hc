@@ -141,4 +141,19 @@ def LowerSubgroupScopePass : Pass<"hc-lower-subgroup-scope-pass"> {
   ];
 }
 
+def ResolveArgsPass : Pass<"hc-resolve-args-pass"> {
+  let summary = "TBD";
+  let description = [{
+    TBD
+  }];
+
+  let dependentDialects = [
+    "::hc::hk::HKernelDialect",
+    "::hc::typing::TypingDialect",
+    "::mlir::affine::AffineDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::memref::MemRefDialect",
+  ];
+}
+
 #endif // _HC_TRANSFORMS_PASSES_TD_INCLUDED_

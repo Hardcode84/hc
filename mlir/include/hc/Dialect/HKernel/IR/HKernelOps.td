@@ -227,7 +227,7 @@ def EnvironmentRegionOp : HKernel_OpBase<"env_region", [
 
   let extraClassDeclaration = [{
     /// Inline op body into parent region and erase the op.
-    static void inlineIntoParent(::mlir::PatternRewriter &builder, EnvironmentRegionOp op);
+    static void inlineIntoParent(::mlir::RewriterBase &builder, EnvironmentRegionOp op);
   }];
 
   let builders = [
@@ -259,6 +259,19 @@ def EnvironmentRegionYieldOp : HKernel_OpBase<"env_region_yield", [
   let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 
   let assemblyFormat = "attr-dict ($results^ `:` type($results))?";
+}
+
+def HKernel_SuggestBlockSizeOp : HKernel_OpBase<"suggest_block_size", [Pure]> {
+  let arguments = (ins
+    Variadic<Index>:$work_size
+  );
+  let results = (outs Variadic<Index>:$results);
+
+  let assemblyFormat = "attr-dict $work_size `:` type($results)";
+
+    let builders = [
+      OpBuilder<(ins "::mlir::ValueRange":$work_size)>
+    ];
 }
 
 #endif // HKERNEL_OPS
