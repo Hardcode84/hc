@@ -428,6 +428,13 @@ void hc::hk::EnvironmentRegionOp::build(
   ensureTerminator(*bodyRegion, odsBuilder, odsState.location);
 }
 
+void hc::hk::SuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
+                                       ::mlir::OperationState &odsState,
+                                       mlir::ValueRange args) {
+  llvm::SmallVector<mlir::Type> types(args.size(), odsBuilder.getIndexType());
+  build(odsBuilder, odsState, types, args);
+}
+
 // TODO: Upstream changes in affine parser
 namespace {
 using namespace mlir;

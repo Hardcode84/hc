@@ -261,4 +261,17 @@ def EnvironmentRegionYieldOp : HKernel_OpBase<"env_region_yield", [
   let assemblyFormat = "attr-dict ($results^ `:` type($results))?";
 }
 
+def HKernel_SuggestBlockSizeOp : HKernel_OpBase<"suggest_block_size", [Pure]> {
+  let arguments = (ins
+    Variadic<Index>:$work_size
+  );
+  let results = (outs Variadic<Index>:$results);
+
+  let assemblyFormat = "attr-dict $work_size `:` type($results)";
+
+    let builders = [
+      OpBuilder<(ins "::mlir::ValueRange":$work_size)>
+    ];
+}
+
 #endif // HKERNEL_OPS
