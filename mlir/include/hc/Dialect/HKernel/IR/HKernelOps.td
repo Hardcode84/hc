@@ -269,9 +269,29 @@ def HKernel_SuggestBlockSizeOp : HKernel_OpBase<"suggest_block_size", [Pure]> {
 
   let assemblyFormat = "attr-dict $work_size `:` type($results)";
 
-    let builders = [
-      OpBuilder<(ins "::mlir::ValueRange":$work_size)>
-    ];
+  let builders = [
+    OpBuilder<(ins "::mlir::ValueRange":$work_size)>
+  ];
+}
+
+def HKernel_ResolveSliceOp : HKernel_OpBase<"resolve_slice", [
+  Pure, AttrSizedOperandSegments
+]> {
+  let arguments = (ins
+    Index:$src_size,
+    Optional<Index>:$lower,
+    Optional<Index>:$upper,
+    Optional<Index>:$step
+  );
+  let results = (outs
+    Index:$offset,
+    Index:$size,
+    Index:$stride
+  );
+
+  let assemblyFormat = [{
+    attr-dict `(` $lower `:` $upper `:` $step  `)` $src_size
+  }];
 }
 
 #endif // HKERNEL_OPS
