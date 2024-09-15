@@ -44,12 +44,12 @@ set(SOURCES_LIST
     lib/Transforms/ConvertPyASTToIR.cpp
     lib/Transforms/ConvertPyFuncToFunc.cpp
     lib/Transforms/DropTypeResolvers.cpp
+    lib/Transforms/LowerHKernel.cpp
     lib/Transforms/LowerScope.cpp
     lib/Transforms/ModuleLinker.cpp
     lib/Transforms/PyIRPromoteFuncsToStatic.cpp
     lib/Transforms/PyTypeInference.cpp
     lib/Transforms/ReconstructPySSA.cpp
-    lib/Transforms/ResolveSymbols.cpp
     lib/Transforms/SimplifyAST.cpp
   )
 set(HEADERS_LIST
