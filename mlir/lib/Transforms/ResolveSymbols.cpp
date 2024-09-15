@@ -56,6 +56,13 @@ static mlir::SmallVector<int64_t> convertShape(mlir::TypeRange symbolic) {
   return shape;
 }
 
+static mlir::StridedLayoutAttr getStridedLayout(mlir::MLIRContext *ctx,
+                                                size_t numDims) {
+  auto d = mlir::ShapedType::kDynamic;
+  llvm::SmallVector<int64_t> strides(numDims, d);
+  return mlir::StridedLayoutAttr::get(ctx, d, strides);
+}
+
 static mlir::Type convertElemType(const mlir::TypeConverter &converter,
                                   mlir::Type type) {
   // TODO: hack until we have proper sym replacement
@@ -69,6 +76,11 @@ static mlir::Type convertElemType(const mlir::TypeConverter &converter,
   return elemType;
 }
 
+static mlir::gpu::AddressSpaceAttr getWGAddrSpace(mlir::MLIRContext *ctx) {
+  return mlir::gpu::AddressSpaceAttr::get(
+      ctx, mlir::gpu::GPUDialect::getWorkgroupAddressSpace());
+}
+
 static void populateTypeConverter(mlir::TypeConverter &converter) {
   // Convert unknown types to itself
   converter.addConversion([](mlir::Type type) { return type; });
@@ -78,7 +90,27 @@ static void populateTypeConverter(mlir::TypeConverter &converter) {
     if (!elemType)
       return nullptr;
 
-    return mlir::MemRefType::get(convertShape(type.getShape()), elemType);
+    mlir::TypeRange shape = type.getShape();
+    auto layout = getStridedLayout(type.getContext(), shape.size());
+    return mlir::MemRefType::get(convertShape(shape), elemType, layout);
+  });
+
+  converter.addConversion([&](hc::hk::TensorType type) -> mlir::Type {
+    auto elemType = convertElemType(converter, type.getElementType());
+    if (!elemType)
+      return nullptr;
+
+    auto maskElemType = mlir::IntegerType::get(type.getContext(), 1);
+
+    mlir::TypeRange shape = type.getShape();
+    auto layout = getStridedLayout(type.getContext(), shape.size());
+    auto addrSpace = getWGAddrSpace(type.getContext());
+    auto convertedShape = convertShape(shape);
+    auto dataType =
+        mlir::MemRefType::get(convertedShape, elemType, layout, addrSpace);
+    auto maskType =
+        mlir::MemRefType::get(convertedShape, maskElemType, layout, addrSpace);
+    return mlir::TupleType::get(type.getContext(), {dataType, maskType});
   });
 
   converter.addConversion([](hc::typing::SymbolicTypeBase t) -> mlir::Type {
