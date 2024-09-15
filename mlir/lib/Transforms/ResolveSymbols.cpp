@@ -14,6 +14,7 @@
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Transforms/DialectConversion.h>
+#include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 
 namespace hc {
 #define GEN_PASS_DEF_RESOLVEARGSPASS
@@ -58,10 +59,12 @@ static void populateTypeConverter(mlir::TypeConverter &converter) {
 
   converter.addConversion([&](hc::hk::BufferType type) -> mlir::Type {
     auto elemType = converter.convertType(type.getElementType());
-    if (!elemType || !mlir::MemRefType::isValidElementType(elemType)) {
-      //      return nullptr; TODO
+    if (!elemType || !mlir::MemRefType::isValidElementType(elemType))
+      return nullptr;
+
+    // TODO: hack until we have proper sym replacement
+    if (mlir::isa<hc::typing::LiteralType>(type.getElementType()))
       elemType = mlir::Float32Type::get(type.getContext());
-    }
 
     return mlir::MemRefType::get(convertShape(type.getShape()), elemType);
   });
@@ -429,6 +432,9 @@ struct ResolveArgsPass final
 
           hc::hk::EnvironmentRegionOp::inlineIntoParent(builder, reg);
         });
+
+    // DCE
+    (void)applyPatternsAndFoldGreedily(getOperation(), {});
   }
 };
 } // namespace
