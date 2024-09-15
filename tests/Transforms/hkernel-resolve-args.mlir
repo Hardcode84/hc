@@ -40,12 +40,12 @@ module attributes {kernel.group_count = #typing.type_attr<!seq4> : !typing.value
 //   CHECK-DAG: ![[SYM3:.*]] = !typing<symbol "$LOCAL_ID0">
 //   CHECK-DAG: ![[EXPR:.*]] = !typing<expr (![[SYM1]], ![[SYM2]], ![[SYM3]]) -> s0 * s1 + s2>
 // CHECK-LABEL: func @test
-//  CHECK-SAME: (%[[ARG_ORIG:.*]]: memref<?x?xf16>)
+//  CHECK-SAME: (%[[ARG_ORIG:.*]]: memref<?x?xf16, strided<[?, ?], offset: ?>>)
 //   CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
 //   CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
-//       CHECK: %[[ARG:.*]] = builtin.unrealized_conversion_cast %[[ARG_ORIG]] : memref<?x?xf16> to !hkernel<buffer <"W" x "H"> x f16>
-//       CHECK: %[[DIM0:.*]] = memref.dim %[[ARG_ORIG]], %[[C0]] : memref<?x?xf16>
-//       CHECK: %[[DIM1:.*]] = memref.dim %[[ARG_ORIG]], %[[C1]] : memref<?x?xf16>
+//       CHECK: %[[ARG:.*]] = builtin.unrealized_conversion_cast %[[ARG_ORIG]] : memref<?x?xf16, strided<[?, ?], offset: ?>> to !hkernel<buffer <"W" x "H"> x f16>
+//       CHECK: %[[DIM0:.*]] = memref.dim %[[ARG_ORIG]], %[[C0]] : memref<?x?xf16, strided<[?, ?], offset: ?>>
+//       CHECK: %[[DIM1:.*]] = memref.dim %[[ARG_ORIG]], %[[C1]] : memref<?x?xf16, strided<[?, ?], offset: ?>>
 //       CHECK: %[[BLOCK:.*]]:2 = hkernel.suggest_block_size %[[DIM1]], %[[DIM0]] : index, index
 //       CHECK: %[[Y_BLOCK:.*]] = affine.apply #[[MAP0]]()[%[[BLOCK]]#1, %[[DIM0]]]
 //       CHECK: %[[X_BLOCK:.*]] = affine.apply #[[MAP0]]()[%[[BLOCK]]#0, %[[DIM1]]]

@@ -56,6 +56,13 @@ static mlir::SmallVector<int64_t> convertShape(mlir::TypeRange symbolic) {
   return shape;
 }
 
+static mlir::StridedLayoutAttr getStridedLayout(mlir::MLIRContext *ctx,
+                                                size_t numDims) {
+  auto d = mlir::ShapedType::kDynamic;
+  llvm::SmallVector<int64_t> strides(numDims, d);
+  return mlir::StridedLayoutAttr::get(ctx, d, strides);
+}
+
 static mlir::Type convertElemType(const mlir::TypeConverter &converter,
                                   mlir::Type type) {
   // TODO: hack until we have proper sym replacement
@@ -78,7 +85,9 @@ static void populateTypeConverter(mlir::TypeConverter &converter) {
     if (!elemType)
       return nullptr;
 
-    return mlir::MemRefType::get(convertShape(type.getShape()), elemType);
+    mlir::TypeRange shape = type.getShape();
+    auto layout = getStridedLayout(type.getContext(), shape.size());
+    return mlir::MemRefType::get(convertShape(shape), elemType, layout);
   });
 
   converter.addConversion([](hc::typing::SymbolicTypeBase t) -> mlir::Type {
