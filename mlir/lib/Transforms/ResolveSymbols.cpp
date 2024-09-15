@@ -90,6 +90,14 @@ static bool getSeq(mlir::Operation *op, mlir::StringRef name,
   return true;
 }
 
+static mlir::Type getTypeAttr(mlir::Operation *op, mlir::StringRef name) {
+  auto attr = op->getAttrOfType<hc::typing::TypeAttr>(name);
+  if (!attr)
+    return nullptr;
+
+  return attr.getTypeVal();
+}
+
 static mlir::Operation *doCast(mlir::OpBuilder &builder, mlir::Location loc,
                                mlir::Value src, mlir::Type newType) {
   return builder.create<mlir::UnrealizedConversionCastOp>(loc, newType, src);
@@ -127,37 +135,39 @@ static mlir::Value resolveSymbol(mlir::OpBuilder &builder, mlir::Location loc,
     return it->second;
 
   auto folded = foldSymbolic(type);
-  if (!folded)
-    return nullptr;
-
-  if (auto lit = mlir::dyn_cast<hc::typing::LiteralType>(folded)) {
-    auto attr = mlir::dyn_cast<mlir::IntegerAttr>(lit.getValue());
-    if (!attr)
-      return nullptr;
-
-    mlir::Value ret =
-        builder.create<mlir::arith::ConstantIndexOp>(loc, attr.getInt());
-    symbolsMap[type] = ret;
-    return ret;
-  }
-
-  if (auto expr = mlir::dyn_cast<hc::typing::ExprType>(folded)) {
-    llvm::SmallVector<mlir::OpFoldResult> args;
-    for (auto param : expr.getParams()) {
-      auto res = resolveSymbol(builder, loc, param, symbolsMap);
-      if (!res)
+  if (folded) {
+    if (auto lit = mlir::dyn_cast<hc::typing::LiteralType>(folded)) {
+      auto attr = mlir::dyn_cast<mlir::IntegerAttr>(lit.getValue());
+      if (!attr) {
+        mlir::emitError(builder.getUnknownLoc())
+            << "Invalid attr type: " << lit;
         return nullptr;
+      }
 
-      args.emplace_back(res);
+      mlir::Value ret =
+          builder.create<mlir::arith::ConstantIndexOp>(loc, attr.getInt());
+      symbolsMap[type] = ret;
+      return ret;
     }
-    mlir::Value ret = mlir::getValueOrCreateConstantIndexOp(
-        builder, loc,
-        mlir::affine::makeComposedFoldedAffineApply(builder, loc,
-                                                    expr.getExpr(), args));
-    symbolsMap[type] = ret;
-    return ret;
-  }
 
+    if (auto expr = mlir::dyn_cast<hc::typing::ExprType>(folded)) {
+      llvm::SmallVector<mlir::OpFoldResult> args;
+      for (auto param : expr.getParams()) {
+        auto res = resolveSymbol(builder, loc, param, symbolsMap);
+        if (!res)
+          return nullptr;
+
+        args.emplace_back(res);
+      }
+      mlir::Value ret = mlir::getValueOrCreateConstantIndexOp(
+          builder, loc,
+          mlir::affine::makeComposedFoldedAffineApply(builder, loc,
+                                                      expr.getExpr(), args));
+      symbolsMap[type] = ret;
+      return ret;
+    }
+  }
+  mlir::emitError(builder.getUnknownLoc()) << "Invalid expr: " << folded;
   return nullptr;
 }
 
@@ -173,7 +183,7 @@ createLauncOp(mlir::OpBuilder &builder, mlir::Location loc,
   auto getSuggestGroupSize = [&](unsigned id) -> mlir::Value {
     if (suggestedGroupSize.empty()) {
       llvm::SmallVector<mlir::Value, 3> workShapeVals;
-      for (auto w : workShape) {
+      for (auto w : llvm::reverse(workShape)) {
         mlir::Value res = resolveSymbol(builder, loc, w, symbolsMap);
         if (!res) {
           mlir::emitError(builder.getUnknownLoc())
@@ -299,7 +309,13 @@ struct ResolveArgsPass final
     if (rank < 1 || rank > 3 || groupShape.size() != rank ||
         groupShape.size() != rank || groupId.size() != rank ||
         localId.size() != rank) {
-      mod.emitError("No invalid ids rank");
+      mod.emitError("Invalid ids rank");
+      return signalPassFailure();
+    }
+
+    auto subgroupSize = getTypeAttr(mod, "kernel.subgroup_size");
+    if (!subgroupSize) {
+      mod.emitError("No subgroup size");
       return signalPassFailure();
     }
 
@@ -343,6 +359,10 @@ struct ResolveArgsPass final
         handleArgType(builder, arg.getLoc(), arg, oldType, symbolsMap);
       }
 
+      auto newFuncType = func.getFunctionType().clone(
+          mlir::ValueRange(func.getArguments()).getTypes(), {});
+      func.setFunctionType(newFuncType);
+
       mlir::gpu::LaunchOp launch =
           createLauncOp(builder, func.getLoc(), workShape, groupShape,
                         groupCount, groupId, localId, symbolsMap);
@@ -364,6 +384,13 @@ struct ResolveArgsPass final
       builder.setInsertionPoint(oldLaunchBody->getTerminator());
       builder.create<mlir::gpu::TerminatorOp>(termLoc);
       builder.eraseOp(oldLaunchBody->getTerminator());
+
+      // TODO: unhardcode
+      if (!symbolsMap.contains(subgroupSize)) {
+        builder.setInsertionPoint(launch);
+        symbolsMap[subgroupSize] = builder.create<mlir::arith::ConstantIndexOp>(
+            builder.getUnknownLoc(), 64);
+      }
 
       auto replaceMaterialize =
           [&](hc::hk::MaterializeExprOp mat) -> mlir::WalkResult {
