@@ -84,6 +84,22 @@ static void populateTypeConverter(mlir::TypeConverter &converter) {
   converter.addConversion([](hc::typing::SymbolicTypeBase t) -> mlir::Type {
     return mlir::IndexType::get(t.getContext());
   });
+
+  converter.addConversion([&](hc::hk::SliceType s) -> mlir::Type {
+    auto lower = converter.convertType(s.getLower());
+    if (!lower)
+      return nullptr;
+
+    auto upper = converter.convertType(s.getUpper());
+    if (!upper)
+      return nullptr;
+
+    auto step = converter.convertType(s.getStep());
+    if (!step)
+      return nullptr;
+
+    return hc::hk::SliceType::get(s.getContext(), lower, upper, step);
+  });
 }
 
 static bool getSeq(mlir::Operation *op, mlir::StringRef name,
@@ -506,6 +522,10 @@ struct ConvertHKernelTypesPass final
         [&](mlir::func::FuncOp op) {
           return converter.isSignatureLegal(op.getFunctionType()) &&
                  converter.isLegal(&op.getBody());
+        });
+    target.addDynamicallyLegalOp<mlir::func::ReturnOp>(
+        [&](mlir::func::ReturnOp op) {
+          return converter.isLegal(op.getOperandTypes());
         });
 
     patterns.insert<ConvertTypes>(converter, ctx);
