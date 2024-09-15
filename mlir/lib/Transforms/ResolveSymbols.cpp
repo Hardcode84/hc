@@ -11,6 +11,7 @@
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Transforms/DialectConversion.h>
@@ -130,7 +131,7 @@ static void populateTypeConverter(mlir::TypeConverter &converter) {
     if (!step)
       return nullptr;
 
-    return hc::hk::SliceType::get(s.getContext(), lower, upper, step);
+    return mlir::TupleType::get(s.getContext(), {lower, upper, step});
   });
 }
 
@@ -503,7 +504,7 @@ namespace {
 struct ConvertTypes final : mlir::ConversionPattern {
 
   ConvertTypes(const mlir::TypeConverter &converter, mlir::MLIRContext *ctx,
-               mlir::PatternBenefit benefit = 1)
+               mlir::PatternBenefit benefit = 0)
       : mlir::ConversionPattern(converter, mlir::Pattern::MatchAnyOpTypeTag{},
                                 benefit, ctx) {}
 
@@ -516,6 +517,37 @@ struct ConvertTypes final : mlir::ConversionPattern {
       return mlir::failure();
 
     rewriter.replaceOp(op, (*newOp)->getResults());
+    return mlir::success();
+  }
+};
+
+struct ConvertMakeSlice final
+    : public mlir::OpConversionPattern<hc::hk::MakeSliceOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::MakeSliceOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    const mlir::TypeConverter *converter = getTypeConverter();
+    auto resType = converter->convertType<mlir::TupleType>(op.getType());
+    if (!resType || resType.size() != 3)
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    auto loc = op.getLoc();
+    mlir::Value lower = adaptor.getLower();
+    if (!lower)
+      lower = rewriter.create<mlir::ub::PoisonOp>(loc, resType.getType(0));
+
+    mlir::Value upper = adaptor.getUpper();
+    if (!upper)
+      upper = rewriter.create<mlir::ub::PoisonOp>(loc, resType.getType(1));
+
+    mlir::Value step = adaptor.getUpper();
+    if (!step)
+      step = rewriter.create<mlir::ub::PoisonOp>(loc, resType.getType(2));
+
+    mlir::Value args[] = {lower, upper, step};
+    rewriter.replaceOpWithNewOp<hc::hk::MakeTupleOp>(op, resType, args);
     return mlir::success();
   }
 };
@@ -559,8 +591,9 @@ struct ConvertHKernelTypesPass final
         [&](mlir::func::ReturnOp op) {
           return converter.isLegal(op.getOperandTypes());
         });
+    target.addLegalDialect<mlir::ub::UBDialect>();
 
-    patterns.insert<ConvertTypes>(converter, ctx);
+    patterns.insert<ConvertTypes, ConvertMakeSlice>(converter, ctx);
 
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                   std::move(patterns))))

@@ -167,6 +167,7 @@ def ConvertHKernelTypesPass : Pass<"hc-convert-hkernel-types-pass"> {
     "::hc::typing::TypingDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::memref::MemRefDialect",
+    "::mlir::ub::UBDialect",
   ];
 }
 
