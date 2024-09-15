@@ -165,6 +165,7 @@ def ConvertHKernelTypesPass : Pass<"hc-convert-hkernel-types-pass"> {
   let dependentDialects = [
     "::hc::hk::HKernelDialect",
     "::hc::typing::TypingDialect",
+    "::mlir::gpu::GPUDialect",
     "::mlir::memref::MemRefDialect",
   ];
 }
