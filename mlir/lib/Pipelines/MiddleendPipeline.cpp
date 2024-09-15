@@ -21,6 +21,6 @@ void hc::populateMiddleendPipeline(mlir::PassManager &pm) {
   pm.addPass(hc::createLowerSubgroupScopePass());
   populateOptPasses(pm);
   pm.addPass(hc::createResolveArgsPass());
-  pm.addPass(hc::createConvertHKernelTypesPass());
+  pm.addPass(hc::createLowerHKernelOpsPass());
   populateOptPasses(pm);
 }

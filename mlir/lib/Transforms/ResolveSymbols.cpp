@@ -21,7 +21,7 @@ namespace hc {
 #define GEN_PASS_DEF_RESOLVEARGSPASS
 #include "hc/Transforms/Passes.h.inc"
 
-#define GEN_PASS_DEF_CONVERTHKERNELTYPESPASS
+#define GEN_PASS_DEF_LOWERHKERNELOPSPASS
 #include "hc/Transforms/Passes.h.inc"
 } // namespace hc
 
@@ -552,8 +552,8 @@ struct ConvertMakeSlice final
   }
 };
 
-struct ConvertHKernelTypesPass final
-    : public hc::impl::ConvertHKernelTypesPassBase<ConvertHKernelTypesPass> {
+struct LowerHKernelOpsPass final
+    : public hc::impl::LowerHKernelOpsPassBase<LowerHKernelOpsPass> {
 
   void runOnOperation() override {
     auto *ctx = &getContext();

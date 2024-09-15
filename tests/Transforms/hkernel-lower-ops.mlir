@@ -1,4 +1,4 @@
-// RUN: hc-opt -split-input-file %s --hc-convert-hkernel-types-pass | FileCheck %s
+// RUN: hc-opt -split-input-file %s --hc-lower-hkernel-ops-pass | FileCheck %s
 
 
 
