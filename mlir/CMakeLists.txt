@@ -49,6 +49,7 @@ set(SOURCES_LIST
     lib/Transforms/PyIRPromoteFuncsToStatic.cpp
     lib/Transforms/PyTypeInference.cpp
     lib/Transforms/ReconstructPySSA.cpp
+    lib/Transforms/ResolveSymbols.cpp
     lib/Transforms/SimplifyAST.cpp
   )
 set(HEADERS_LIST
@@ -72,10 +73,12 @@ add_library(${PROJECT_NAME} STATIC ${SOURCES_LIST} ${HEADERS_LIST})
 apply_llvm_compile_flags(${PROJECT_NAME})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
+    MLIRAffineDialect
     MLIRComplexDialect
     MLIRControlFlowDialect
     MLIRDialectUtils
     MLIRFuncDialect
+    MLIRGPUDialect
     MLIRIR
     MLIRTransformUtils
     MLIRTransforms

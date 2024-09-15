@@ -20,4 +20,6 @@ void hc::populateMiddleendPipeline(mlir::PassManager &pm) {
   populateOptPasses(pm);
   pm.addPass(hc::createLowerSubgroupScopePass());
   populateOptPasses(pm);
+  pm.addPass(hc::createResolveArgsPass());
+  populateOptPasses(pm);
 }
