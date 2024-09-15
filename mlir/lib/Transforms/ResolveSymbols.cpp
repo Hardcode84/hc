@@ -420,6 +420,15 @@ struct ResolveArgsPass final
             ->walk<mlir::WalkOrder::PostOrder>(visitor)
             .wasInterrupted())
       return signalPassFailure();
+
+    getOperation()->walk<mlir::WalkOrder::PostOrder>(
+        [&](hc::hk::EnvironmentRegionOp reg) {
+          if (!mlir::isa<hc::hk::WorkgroupScopeAttr, hc::hk::SubgroupScopeAttr,
+                         hc::hk::WorkitemScopeAttr>(reg.getEnvironmentAttr()))
+            return;
+
+          hc::hk::EnvironmentRegionOp::inlineIntoParent(builder, reg);
+        });
   }
 };
 } // namespace
