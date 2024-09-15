@@ -53,18 +53,27 @@ static mlir::SmallVector<int64_t> convertShape(mlir::TypeRange symbolic) {
   return shape;
 }
 
+static mlir::Type convertElemType(const mlir::TypeConverter &converter,
+                                  mlir::Type type) {
+  // TODO: hack until we have proper sym replacement
+  if (mlir::isa<hc::typing::LiteralType>(type))
+    return mlir::Float32Type::get(type.getContext());
+
+  auto elemType = converter.convertType(type);
+  if (!elemType || !mlir::MemRefType::isValidElementType(elemType))
+    return nullptr;
+
+  return elemType;
+}
+
 static void populateTypeConverter(mlir::TypeConverter &converter) {
   // Convert unknown types to itself
   converter.addConversion([](mlir::Type type) { return type; });
 
   converter.addConversion([&](hc::hk::BufferType type) -> mlir::Type {
-    auto elemType = converter.convertType(type.getElementType());
-    if (!elemType || !mlir::MemRefType::isValidElementType(elemType))
+    auto elemType = convertElemType(converter, type.getElementType());
+    if (!elemType)
       return nullptr;
-
-    // TODO: hack until we have proper sym replacement
-    if (mlir::isa<hc::typing::LiteralType>(type.getElementType()))
-      elemType = mlir::Float32Type::get(type.getContext());
 
     return mlir::MemRefType::get(convertShape(type.getShape()), elemType);
   });
