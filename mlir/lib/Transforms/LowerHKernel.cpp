@@ -552,6 +552,163 @@ struct ConvertMakeSlice final
   }
 };
 
+static bool checkIsMemref(mlir::Type type) {
+  auto check = [](mlir::Type t) { return mlir::isa<mlir::MemRefType>(t); };
+
+  if (auto tuple = mlir::dyn_cast<mlir::TupleType>(type))
+    return llvm::all_of(tuple.getTypes(), check);
+
+  return check(type);
+}
+
+static mlir::Value getDim(mlir::OpBuilder &builder, mlir::Location loc,
+                          mlir::Value src, int64_t dim) {
+  if (auto tuple = mlir::dyn_cast<mlir::TupleType>(src.getType())) {
+    if (tuple.size() == 0)
+      return nullptr;
+
+    mlir::Value id = builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    src =
+        builder.create<hc::hk::TupleExtractOp>(loc, tuple.getType(0), src, id);
+  }
+
+  if (mlir::isa<mlir::MemRefType>(src.getType()))
+    return builder.create<mlir::memref::DimOp>(loc, src, dim);
+
+  return nullptr;
+}
+
+static mlir::Value makeSubview(mlir::OpBuilder &builder, mlir::Location loc,
+                               mlir::Value src,
+                               mlir::ArrayRef<mlir::OpFoldResult> offsets,
+                               mlir::ArrayRef<mlir::OpFoldResult> sizes,
+                               mlir::ArrayRef<mlir::OpFoldResult> strides,
+                               mlir::Type resType) {
+  if (mlir::isa<mlir::MemRefType>(src.getType()) &&
+      mlir::isa<mlir::MemRefType>(resType)) {
+    auto srcType = mlir::cast<mlir::MemRefType>(src.getType());
+    auto dstType = mlir::cast<mlir::MemRefType>(resType);
+
+    mlir::Type subviewType;
+    if (srcType.getRank() == dstType.getRank()) {
+      subviewType = mlir::memref::SubViewOp::inferResultType(srcType, offsets,
+                                                             sizes, strides);
+    } else if (srcType.getRank() > dstType.getRank()) {
+      subviewType = mlir::memref::SubViewOp::inferRankReducedResultType(
+          dstType.getShape(), srcType, strides, sizes, strides);
+    } else {
+      return nullptr;
+    }
+    mlir::Value res = builder.create<mlir::memref::SubViewOp>(
+        loc, mlir::cast<mlir::MemRefType>(subviewType), src, strides, sizes,
+        strides);
+    if (res.getType() != resType)
+      res = builder.create<mlir::memref::CastOp>(loc, resType, res);
+
+    return res;
+  }
+  return nullptr;
+}
+
+static std::tuple<mlir::Value, mlir::Value, mlir::Value>
+createResolveSlice(mlir::OpBuilder &builder, mlir::Location loc,
+                   mlir::Value size, mlir::Value src) {
+  mlir::Type indexType = builder.getIndexType();
+  mlir::Value lower, upper, step;
+  if (mlir::isa<mlir::TupleType>(src.getType())) {
+    mlir::Value id0 = builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    mlir::Value id1 = builder.create<mlir::arith::ConstantIndexOp>(loc, 1);
+    mlir::Value id2 = builder.create<mlir::arith::ConstantIndexOp>(loc, 2);
+    lower = builder.create<hc::hk::TupleExtractOp>(loc, indexType, src, id0);
+    upper = builder.create<hc::hk::TupleExtractOp>(loc, indexType, src, id1);
+    step = builder.create<hc::hk::TupleExtractOp>(loc, indexType, src, id2);
+  } else {
+    lower = src;
+  }
+
+  auto op =
+      builder.create<hc::hk::ResolveSliceOp>(loc, size, lower, upper, step);
+  return {op.getOffset(), op.getSize(), op.getStride()};
+}
+
+struct ConvertSubview final
+    : public mlir::OpConversionPattern<hc::hk::SubViewOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::SubViewOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::Value src = adaptor.getSource();
+    if (!checkIsMemref(src.getType()))
+      return rewriter.notifyMatchFailure(op, "Invalid source type");
+
+    mlir::Type resType = getTypeConverter()->convertType(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Failed to convert result type");
+
+    mlir::Location loc = op.getLoc();
+    llvm::SmallVector<mlir::OpFoldResult> offsets;
+    llvm::SmallVector<mlir::OpFoldResult> sizes;
+    llvm::SmallVector<mlir::OpFoldResult> strides;
+    for (auto &&[i, origIdx, idx] :
+         llvm::enumerate(op.getIndex(), adaptor.getIndex())) {
+      mlir::Value dim = getDim(rewriter, loc, src, int64_t(i));
+      if (!dim)
+        return rewriter.notifyMatchFailure(op, "Failed to get dim");
+
+      if (!mlir::isa<hc::hk::SliceType>(origIdx.getType()) &&
+          !mlir::isa<mlir::IndexType>(idx.getType()))
+        return rewriter.notifyMatchFailure(op, "Invalid slice type");
+
+      auto &&[offset, stride, size] =
+          createResolveSlice(rewriter, loc, dim, idx);
+      offsets.emplace_back(offset);
+      sizes.emplace_back(size);
+      strides.emplace_back(stride);
+    }
+
+    mlir::TypeRange resTypes;
+    llvm::SmallVector<mlir::Value> buffers;
+    if (auto tuple = mlir::dyn_cast<mlir::TupleType>(src.getType())) {
+      auto resTuple = mlir::dyn_cast<mlir::TupleType>(resType);
+      if (!resTuple || resTuple.size() != tuple.size())
+        return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+      resTypes = resTuple.getTypes();
+      for (auto &&[i, type] : llvm::enumerate(tuple.getTypes())) {
+        mlir::Value id =
+            rewriter.create<mlir::arith::ConstantIndexOp>(loc, int64_t(i));
+        mlir::Value val =
+            rewriter.create<hc::hk::TupleExtractOp>(loc, type, src, id);
+        buffers.emplace_back(val);
+      }
+    } else {
+      resTypes = resType;
+      buffers.emplace_back(src);
+    }
+
+    llvm::SmallVector<mlir::Value> results;
+    for (auto &&[resType, buff] : llvm::zip_equal(resTypes, buffers)) {
+      mlir::Value res =
+          makeSubview(rewriter, loc, buff, offsets, sizes, strides, resType);
+      if (!res)
+        return rewriter.notifyMatchFailure(op, "Failed to create subview");
+
+      results.emplace_back(res);
+    }
+
+    assert(!results.empty());
+    mlir::Value res;
+    if (results.size() > 1) {
+      res = rewriter.create<hc::hk::MakeTupleOp>(loc, resType, results);
+    } else {
+      res = results.front();
+    }
+    rewriter.replaceOp(op, res);
+    return mlir::success();
+  }
+};
+
 struct LowerHKernelOpsPass final
     : public hc::impl::LowerHKernelOpsPassBase<LowerHKernelOpsPass> {
 
@@ -593,7 +750,8 @@ struct LowerHKernelOpsPass final
         });
     target.addLegalDialect<mlir::ub::UBDialect>();
 
-    patterns.insert<ConvertTypes, ConvertMakeSlice>(converter, ctx);
+    patterns.insert<ConvertTypes, ConvertMakeSlice, ConvertSubview>(converter,
+                                                                    ctx);
 
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                   std::move(patterns))))
