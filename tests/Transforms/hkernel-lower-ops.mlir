@@ -30,12 +30,14 @@ func.func @test(%arg1: !hkernel<buffer <"W"> x f16>, %arg2: !hkernel<slice !typi
   return %1 : !hkernel<buffer <"W1"> x f16>
 }
 
+//       CHECK: ![[SYM:.*]] = !typing<symbol "W">
 // CHECK-LABEL: func @test
 //  CHECK-SAME: (%[[ARG1:.*]]: memref<?xf16, strided<[?], offset: ?>>, %[[ARG2:.*]]: tuple<index, none, none>)
-//       CHECK:  %[[C0:.*]] = arith.constant 0 : index
-//       CHECK:  %[[DIM:.*]] = memref.dim %[[ARG1]], %[[C0]] : memref<?xf16, strided<[?], offset: ?>>
+//   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG:  %[[DIM:.*]] = hkernel.materialize_expr ![[SYM]]
+//   CHECK-DAG:  %[[DIM_IDX:.*]] = builtin.unrealized_conversion_cast %[[DIM]] : ![[SYM]] to index
 //       CHECK:  %[[LOWER:.*]] = hkernel.tuple_extract %[[ARG2]] : tuple<index, none, none>[%[[C0]]] -> index
-//       CHECK:  %[[OFFSET:.*]], %[[SIZE:.*]], %[[STRIDE:.*]] = hkernel.resolve_slice(%[[LOWER]] : : ) %[[DIM]]
+//       CHECK:  %[[OFFSET:.*]], %[[SIZE:.*]], %[[STRIDE:.*]] = hkernel.resolve_slice(%[[LOWER]] : : ) %[[DIM_IDX]]
 //       CHECK:  %[[SUBVIEW:.*]] = memref.subview %[[ARG1]][%[[OFFSET]]] [%[[SIZE]]] [%[[STRIDE]]] : memref<?xf16, strided<[?], offset: ?>> to memref<?xf16, strided<[?], offset: ?>>
 //       CHECK:  return %[[SUBVIEW]] : memref<?xf16, strided<[?], offset: ?>>
 
@@ -46,14 +48,15 @@ func.func @test(%arg1: !hkernel<tensor <"W"> x f16>, %arg2: !hkernel<slice !typi
   return %1 : !hkernel<tensor <"W1"> x f16>
 }
 
+//       CHECK: ![[SYM:.*]] = !typing<symbol "W">
 // CHECK-LABEL: func @test
 //  CHECK-SAME: (%[[ARG1:.*]]:  tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>, %[[ARG2:.*]]: tuple<index, none, none>)
 //   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
 //   CHECK-DAG:  %[[C1:.*]] = arith.constant 1 : index
-//       CHECK:  %[[MEM1:.*]] = hkernel.tuple_extract %[[ARG1]] : tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>[%[[C0]]] -> memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>
-//       CHECK:  %[[DIM:.*]] = memref.dim %[[MEM1]], %[[C0]] : memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>
+//   CHECK-DAG:  %[[DIM:.*]] = hkernel.materialize_expr ![[SYM]]
+//   CHECK-DAG:  %[[DIM_IDX:.*]] = builtin.unrealized_conversion_cast %[[DIM]] : ![[SYM]] to index
 //       CHECK:  %[[LOWER:.*]] = hkernel.tuple_extract %[[ARG2]] : tuple<index, none, none>[%[[C0]]] -> index
-//       CHECK:  %[[OFFSET:.*]], %[[SIZE:.*]], %[[STRIDE:.*]] = hkernel.resolve_slice(%[[LOWER]] : : ) %[[DIM]]
+//       CHECK:  %[[OFFSET:.*]], %[[SIZE:.*]], %[[STRIDE:.*]] = hkernel.resolve_slice(%[[LOWER]] : : ) %[[DIM_IDX]]
 //       CHECK:  %[[MEM1:.*]] = hkernel.tuple_extract %[[ARG1]] : tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>[%[[C0]]] -> memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>
 //       CHECK:  %[[MEM2:.*]] = hkernel.tuple_extract %[[ARG1]] : tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>[%[[C1]]] -> memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>
 //       CHECK:  %[[SUBVIEW1:.*]] = memref.subview %[[MEM1]][%[[OFFSET]]] [%[[SIZE]]] [%[[STRIDE]]] : memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>> to memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>

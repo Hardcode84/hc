@@ -565,23 +565,6 @@ static bool checkIsMemref(mlir::Type type) {
   return check(type);
 }
 
-static mlir::Value getDim(mlir::OpBuilder &builder, mlir::Location loc,
-                          mlir::Value src, int64_t dim) {
-  if (auto tuple = mlir::dyn_cast<mlir::TupleType>(src.getType())) {
-    if (tuple.size() == 0)
-      return nullptr;
-
-    mlir::Value id = builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
-    src =
-        builder.create<hc::hk::TupleExtractOp>(loc, tuple.getType(0), src, id);
-  }
-
-  if (mlir::isa<mlir::MemRefType>(src.getType()))
-    return builder.create<mlir::memref::DimOp>(loc, src, dim);
-
-  return nullptr;
-}
-
 static mlir::Value makeSubview(mlir::OpBuilder &builder, mlir::Location loc,
                                mlir::Value src,
                                mlir::ArrayRef<mlir::OpFoldResult> offsets,
@@ -652,7 +635,18 @@ struct ConvertSubview final
     if (!checkIsMemref(src.getType()))
       return rewriter.notifyMatchFailure(op, "Invalid source type");
 
-    mlir::Type resType = getTypeConverter()->convertType(op.getType());
+    auto srcSymbolic = mlir::dyn_cast<hc::hk::SymbolicallyShapedType>(
+        op.getSource().getType());
+    if (!srcSymbolic)
+      return rewriter.notifyMatchFailure(op,
+                                         "Failed to get source symbolic shape");
+
+    mlir::TypeRange srcSymbolicShape = srcSymbolic.getShape();
+
+    const mlir::TypeConverter *converter = getTypeConverter();
+    assert(converter);
+
+    mlir::Type resType = converter->convertType(op.getType());
     if (!resType)
       return rewriter.notifyMatchFailure(op, "Failed to convert result type");
 
@@ -662,9 +656,15 @@ struct ConvertSubview final
     llvm::SmallVector<mlir::OpFoldResult> strides;
     for (auto &&[i, origIdx, idx] :
          llvm::enumerate(op.getIndex(), adaptor.getIndex())) {
-      mlir::Value dim = getDim(rewriter, loc, src, int64_t(i));
-      if (!dim)
-        return rewriter.notifyMatchFailure(op, "Failed to get dim");
+      auto symbolcDim =
+          mlir::dyn_cast<hc::typing::SymbolicTypeBase>(srcSymbolicShape[i]);
+      if (!symbolcDim)
+        return rewriter.notifyMatchFailure(op, "Failed to materialize dim");
+
+      mlir::Value dim =
+          rewriter.create<hc::hk::MaterializeExprOp>(loc, symbolcDim);
+      dim = converter->materializeTargetConversion(
+          rewriter, loc, rewriter.getIndexType(), dim);
 
       if (!mlir::isa<hc::hk::SliceType>(origIdx.getType()) &&
           !mlir::isa<mlir::IndexType>(idx.getType()))
@@ -763,6 +763,7 @@ struct LowerHKernelOpsPass final
         [&](mlir::func::ReturnOp op) {
           return converter.isLegal(op.getOperandTypes());
         });
+    target.addLegalOp<hc::hk::MaterializeExprOp>();
     target.addLegalDialect<mlir::ub::UBDialect, mlir::arith::ArithDialect,
                            mlir::memref::MemRefDialect>();
 
