@@ -340,31 +340,31 @@ struct ResolveArgsPass final
     }
 
     mlir::TypeRange workShape;
-    if (!getSeq(mod, "kernel.work_shape", workShape)) {
+    if (!getSeq(mod, hc::hk::getKernelWorkShapeAttrName(), workShape)) {
       mod.emitError("No work shape attr");
       return signalPassFailure();
     }
 
     mlir::TypeRange groupShape;
-    if (!getSeq(mod, "kernel.group_shape", groupShape)) {
+    if (!getSeq(mod, hc::hk::getKernelGroupShapeAttrName(), groupShape)) {
       mod.emitError("No group shape attr");
       return signalPassFailure();
     }
 
     mlir::TypeRange groupCount;
-    if (!getSeq(mod, "kernel.group_count", groupCount)) {
+    if (!getSeq(mod, hc::hk::getKernelGroupCountAttrName(), groupCount)) {
       mod.emitError("No group vount attr");
       return signalPassFailure();
     }
 
     mlir::TypeRange groupId;
-    if (!getSeq(mod, "kernel.group_id", groupId)) {
+    if (!getSeq(mod, hc::hk::getKernelGroupIdAttrName(), groupId)) {
       mod.emitError("No group id attr");
       return signalPassFailure();
     }
 
     mlir::TypeRange localId;
-    if (!getSeq(mod, "kernel.local_id", localId)) {
+    if (!getSeq(mod, hc::hk::getKernelLocalIdAttrName(), localId)) {
       mod.emitError("No local id attr");
       return signalPassFailure();
     }
@@ -377,7 +377,8 @@ struct ResolveArgsPass final
       return signalPassFailure();
     }
 
-    auto subgroupSize = getTypeAttr(mod, "kernel.subgroup_size");
+    auto subgroupSize =
+        getTypeAttr(mod, hc::hk::getKernelSubgroupSizeAttrName());
     if (!subgroupSize) {
       mod.emitError("No subgroup size");
       return signalPassFailure();
@@ -390,8 +391,11 @@ struct ResolveArgsPass final
 
     mlir::DominanceInfo dom;
     mlir::IRRewriter builder(&getContext());
+
+    auto entrypointAttrName =
+        builder.getStringAttr(hc::hk::getKernelEntryPointAttrName());
     auto visitor = [&](mlir::func::FuncOp func) -> mlir::WalkResult {
-      if (func.isDeclaration())
+      if (func.isDeclaration() || !func->hasAttr(entrypointAttrName))
         return mlir::WalkResult::skip();
 
       if (!func.getResultTypes().empty()) {
@@ -648,7 +652,18 @@ struct ConvertSubview final
     if (!checkIsMemref(src.getType()))
       return rewriter.notifyMatchFailure(op, "Invalid source type");
 
-    mlir::Type resType = getTypeConverter()->convertType(op.getType());
+    auto srcSymbolic = mlir::dyn_cast<hc::hk::SymbolicallyShapedType>(
+        op.getSource().getType());
+    if (!srcSymbolic)
+      return rewriter.notifyMatchFailure(op,
+                                         "Failed to get source symbolic shape");
+
+    mlir::TypeRange srcSymbolicShape = srcSymbolic.getShape();
+
+    const mlir::TypeConverter *converter = getTypeConverter();
+    assert(converter);
+
+    mlir::Type resType = converter->convertType(op.getType());
     if (!resType)
       return rewriter.notifyMatchFailure(op, "Failed to convert result type");
 
@@ -658,13 +673,21 @@ struct ConvertSubview final
     llvm::SmallVector<mlir::OpFoldResult> strides;
     for (auto &&[i, origIdx, idx] :
          llvm::enumerate(op.getIndex(), adaptor.getIndex())) {
-      mlir::Value dim = getDim(rewriter, loc, src, int64_t(i));
-      if (!dim)
-        return rewriter.notifyMatchFailure(op, "Failed to get dim");
-
       if (!mlir::isa<hc::hk::SliceType>(origIdx.getType()) &&
           !mlir::isa<mlir::IndexType>(idx.getType()))
         return rewriter.notifyMatchFailure(op, "Invalid slice type");
+
+      mlir::Value dim;
+      if (auto symbolcDim = mlir::dyn_cast<hc::typing::SymbolicTypeBase>(
+              srcSymbolicShape[i])) {
+        dim = rewriter.create<hc::hk::MaterializeExprOp>(loc, symbolcDim);
+        dim = converter->materializeTargetConversion(
+            rewriter, loc, rewriter.getIndexType(), dim);
+      } else {
+        dim = getDim(rewriter, loc, src, int64_t(i));
+        if (!dim)
+          return rewriter.notifyMatchFailure(op, "Failed to get dim");
+      }
 
       auto &&[offset, size, stride] =
           createResolveSlice(rewriter, loc, dim, idx);
@@ -745,8 +768,13 @@ struct LowerHKernelOpsPass final
     target.addDynamicallyLegalDialect<hc::hk::HKernelDialect>(
         [&](mlir::Operation *op) -> bool { return converter.isLegal(op); });
 
+    auto entrypointAttrName = mlir::StringAttr::get(
+        &getContext(), hc::hk::getKernelEntryPointAttrName());
     target.addDynamicallyLegalOp<mlir::func::FuncOp>(
         [&](mlir::func::FuncOp op) {
+          if (op->hasAttr(entrypointAttrName))
+            return true;
+
           return converter.isSignatureLegal(op.getFunctionType()) &&
                  converter.isLegal(&op.getBody());
         });
@@ -754,6 +782,7 @@ struct LowerHKernelOpsPass final
         [&](mlir::func::ReturnOp op) {
           return converter.isLegal(op.getOperandTypes());
         });
+    target.addLegalOp<hc::hk::MaterializeExprOp>();
     target.addLegalDialect<mlir::ub::UBDialect, mlir::arith::ArithDialect,
                            mlir::memref::MemRefDialect>();
 

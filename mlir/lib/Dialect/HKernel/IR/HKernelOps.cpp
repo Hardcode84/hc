@@ -950,3 +950,31 @@ static void printSymbolicShape(mlir::AsmPrinter &printer,
 #include "hc/Dialect/HKernel/IR/HKernelOpsTypes.cpp.inc"
 
 #include "hc/Dialect/HKernel/IR/HKernelOpsEnums.cpp.inc"
+
+llvm::StringRef hc::hk::getKernelEntryPointAttrName() {
+  return "kernel.entrypoint";
+}
+
+llvm::StringRef hc::hk::getKernelWorkShapeAttrName() {
+  return "kernel.work_shape";
+}
+
+llvm::StringRef hc::hk::getKernelGroupShapeAttrName() {
+  return "kernel.group_shape";
+}
+
+llvm::StringRef hc::hk::getKernelGroupCountAttrName() {
+  return "kernel.group_count";
+}
+
+llvm::StringRef hc::hk::getKernelGroupIdAttrName() { return "kernel.group_id"; }
+
+llvm::StringRef hc::hk::getKernelLocalIdAttrName() { return "kernel.local_id"; }
+
+llvm::StringRef hc::hk::getKernelSubgroupSizeAttrName() {
+  return "kernel.subgroup_size";
+}
+
+llvm::StringRef hc::hk::getKernelSubgroupIdAttrName() {
+  return "kernel.subgroup_id";
+}

@@ -26,3 +26,14 @@ class RewriterBase;
 
 #define GET_OP_CLASSES
 #include "hc/Dialect/HKernel/IR/HKernelOps.h.inc"
+
+namespace hc::hk {
+llvm::StringRef getKernelEntryPointAttrName();
+llvm::StringRef getKernelWorkShapeAttrName();
+llvm::StringRef getKernelGroupShapeAttrName();
+llvm::StringRef getKernelGroupCountAttrName();
+llvm::StringRef getKernelGroupIdAttrName();
+llvm::StringRef getKernelLocalIdAttrName();
+llvm::StringRef getKernelSubgroupSizeAttrName();
+llvm::StringRef getKernelSubgroupIdAttrName();
+} // namespace hc::hk
