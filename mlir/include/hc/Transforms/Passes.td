@@ -156,7 +156,7 @@ def ResolveArgsPass : Pass<"hc-resolve-args-pass"> {
   ];
 }
 
-def ConvertHKernelTypesPass : Pass<"hc-convert-hkernel-types-pass"> {
+def LowerHKernelOpsPass : Pass<"hc-lower-hkernel-ops-pass"> {
   let summary = "TBD";
   let description = [{
     TBD
@@ -167,6 +167,7 @@ def ConvertHKernelTypesPass : Pass<"hc-convert-hkernel-types-pass"> {
     "::hc::typing::TypingDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::memref::MemRefDialect",
+    "::mlir::ub::UBDialect",
   ];
 }
 
