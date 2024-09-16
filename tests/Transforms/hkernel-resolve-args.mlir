@@ -22,7 +22,7 @@
 !seq4 = !typing<sequence !expr, !expr1>
 !seq5 = !typing<sequence !expr3, !expr4>
 module attributes {kernel.group_count = #typing.type_attr<!seq4> : !typing.value, kernel.group_id = #typing.type_attr<!seq> : !typing.value, kernel.group_shape = #typing.type_attr<!seq1> : !typing.value, kernel.local_id = #typing.type_attr<!seq2> : !typing.value, kernel.subgroup_id = #typing.type_attr<!expr2> : !typing.value, kernel.subgroup_size = #typing.type_attr<!sym8> : !typing.value, kernel.work_offset = #typing.type_attr<!seq5> : !typing.value, kernel.work_shape = #typing.type_attr<!seq3> : !typing.value} {
-  func.func @test(%arg1: !hkernel<buffer <"W" x "H"> x f16>) {
+  func.func @test(%arg1: !hkernel<buffer <"W" x "H"> x f16>) attributes {kernel.entrypoint} {
     %1 = hkernel.materialize_expr !expr6
     hkernel.env_region #hkernel.workitem_scope {
       "test.test1"(%arg1) : (!hkernel<buffer <"W" x "H"> x f16>) -> ()

@@ -390,8 +390,11 @@ struct ResolveArgsPass final
 
     mlir::DominanceInfo dom;
     mlir::IRRewriter builder(&getContext());
+
+    auto entrypointAttrName =
+        builder.getStringAttr(hc::hk::getKernelEntryPointAttrName());
     auto visitor = [&](mlir::func::FuncOp func) -> mlir::WalkResult {
-      if (func.isDeclaration())
+      if (func.isDeclaration() || !func->hasAttr(entrypointAttrName))
         return mlir::WalkResult::skip();
 
       if (!func.getResultTypes().empty()) {
@@ -745,8 +748,13 @@ struct LowerHKernelOpsPass final
     target.addDynamicallyLegalDialect<hc::hk::HKernelDialect>(
         [&](mlir::Operation *op) -> bool { return converter.isLegal(op); });
 
+    auto entrypointAttrName = mlir::StringAttr::get(
+        &getContext(), hc::hk::getKernelEntryPointAttrName());
     target.addDynamicallyLegalOp<mlir::func::FuncOp>(
         [&](mlir::func::FuncOp op) {
+          if (op->hasAttr(entrypointAttrName))
+            return true;
+
           return converter.isSignatureLegal(op.getFunctionType()) &&
                  converter.isLegal(&op.getBody());
         });

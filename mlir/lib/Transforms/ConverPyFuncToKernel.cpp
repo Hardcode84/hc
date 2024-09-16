@@ -31,6 +31,8 @@ struct ConverPyFuncToKernelFuncPass final
     mlir::IRRewriter builder(&getContext());
     builder.setInsertionPointToStart(op.getBody());
 
+    auto entrypointAttrName =
+        builder.getStringAttr(hc::hk::getKernelEntryPointAttrName());
     for (auto pyModule :
          llvm::make_early_inc_range(op.getOps<hc::py_ir::PyModuleOp>())) {
       auto term = mlir::cast<hc::py_ir::PyModuleEndOp>(
@@ -75,6 +77,7 @@ struct ConverPyFuncToKernelFuncPass final
       auto loc = pyFunc.getLoc();
       auto newFunc =
           builder.create<mlir::func::FuncOp>(loc, pyFunc.getName(), funcType);
+      newFunc->setAttr(entrypointAttrName, builder.getUnitAttr());
 
       llvm::SmallVector<mlir::Type> types;
       llvm::SmallVector<mlir::Location> locs;

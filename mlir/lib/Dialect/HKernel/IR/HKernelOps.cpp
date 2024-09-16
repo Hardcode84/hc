@@ -950,3 +950,7 @@ static void printSymbolicShape(mlir::AsmPrinter &printer,
 #include "hc/Dialect/HKernel/IR/HKernelOpsTypes.cpp.inc"
 
 #include "hc/Dialect/HKernel/IR/HKernelOpsEnums.cpp.inc"
+
+llvm::StringRef hc::hk::getKernelEntryPointAttrName() {
+  return "kernel.entrypoint";
+}
