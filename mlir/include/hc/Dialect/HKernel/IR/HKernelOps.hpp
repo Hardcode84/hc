@@ -29,4 +29,11 @@ class RewriterBase;
 
 namespace hc::hk {
 llvm::StringRef getKernelEntryPointAttrName();
-}
+llvm::StringRef getKernelWorkShapeAttrName();
+llvm::StringRef getKernelGroupShapeAttrName();
+llvm::StringRef getKernelGroupCountAttrName();
+llvm::StringRef getKernelGroupIdAttrName();
+llvm::StringRef getKernelLocalIdAttrName();
+llvm::StringRef getKernelSubgroupSizeAttrName();
+llvm::StringRef getKernelSubgroupIdAttrName();
+} // namespace hc::hk

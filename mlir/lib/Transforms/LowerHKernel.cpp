@@ -340,31 +340,31 @@ struct ResolveArgsPass final
     }
 
     mlir::TypeRange workShape;
-    if (!getSeq(mod, "kernel.work_shape", workShape)) {
+    if (!getSeq(mod, hc::hk::getKernelWorkShapeAttrName(), workShape)) {
       mod.emitError("No work shape attr");
       return signalPassFailure();
     }
 
     mlir::TypeRange groupShape;
-    if (!getSeq(mod, "kernel.group_shape", groupShape)) {
+    if (!getSeq(mod, hc::hk::getKernelGroupShapeAttrName(), groupShape)) {
       mod.emitError("No group shape attr");
       return signalPassFailure();
     }
 
     mlir::TypeRange groupCount;
-    if (!getSeq(mod, "kernel.group_count", groupCount)) {
+    if (!getSeq(mod, hc::hk::getKernelGroupCountAttrName(), groupCount)) {
       mod.emitError("No group vount attr");
       return signalPassFailure();
     }
 
     mlir::TypeRange groupId;
-    if (!getSeq(mod, "kernel.group_id", groupId)) {
+    if (!getSeq(mod, hc::hk::getKernelGroupIdAttrName(), groupId)) {
       mod.emitError("No group id attr");
       return signalPassFailure();
     }
 
     mlir::TypeRange localId;
-    if (!getSeq(mod, "kernel.local_id", localId)) {
+    if (!getSeq(mod, hc::hk::getKernelLocalIdAttrName(), localId)) {
       mod.emitError("No local id attr");
       return signalPassFailure();
     }
@@ -377,7 +377,8 @@ struct ResolveArgsPass final
       return signalPassFailure();
     }
 
-    auto subgroupSize = getTypeAttr(mod, "kernel.subgroup_size");
+    auto subgroupSize =
+        getTypeAttr(mod, hc::hk::getKernelSubgroupSizeAttrName());
     if (!subgroupSize) {
       mod.emitError("No subgroup size");
       return signalPassFailure();

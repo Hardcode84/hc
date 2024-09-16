@@ -235,25 +235,26 @@ static mlir::LogicalResult lowerWGScope(hc::hk::EnvironmentRegionOp region) {
   if (!mod)
     return region.emitError("No parent module");
 
-  auto groupShape =
-      getTypeAttr<hc::typing::SequenceType>(mod, "kernel.group_shape");
+  auto groupShape = getTypeAttr<hc::typing::SequenceType>(
+      mod, hc::hk::getKernelGroupShapeAttrName());
   if (!groupShape)
     return region->emitError("Group shape is not defined");
 
-  auto localId = getTypeAttr<hc::typing::SequenceType>(mod, "kernel.local_id");
+  auto localId = getTypeAttr<hc::typing::SequenceType>(
+      mod, hc::hk::getKernelLocalIdAttrName());
   if (!localId)
     return region->emitError("Local ID is not defined");
 
   if (groupShape.size() != localId.size())
     return region->emitError("Invalid group shape");
 
-  auto subgroupId =
-      getTypeAttr<hc::typing::SymbolicTypeBase>(mod, "kernel.subgroup_id");
+  auto subgroupId = getTypeAttr<hc::typing::SymbolicTypeBase>(
+      mod, hc::hk::getKernelSubgroupIdAttrName());
   if (!subgroupId)
     return region->emitError("Subgroup ID is not defined");
 
-  auto subgroupSize =
-      getTypeAttr<hc::typing::SymbolicTypeBase>(mod, "kernel.subgroup_size");
+  auto subgroupSize = getTypeAttr<hc::typing::SymbolicTypeBase>(
+      mod, hc::hk::getKernelSubgroupSizeAttrName());
   if (!subgroupSize)
     return region->emitError("Subgroup size is not defined");
 
@@ -274,12 +275,13 @@ static mlir::LogicalResult lowerSGScope(hc::hk::EnvironmentRegionOp region) {
   if (!mod)
     return region.emitError("No parent module");
 
-  auto localId = getTypeAttr<hc::typing::SequenceType>(mod, "kernel.local_id");
+  auto localId = getTypeAttr<hc::typing::SequenceType>(
+      mod, hc::hk::getKernelLocalIdAttrName());
   if (!localId)
     return region->emitError("Local ID is not defined");
 
-  auto subgroupSize =
-      getTypeAttr<hc::typing::SymbolicTypeBase>(mod, "kernel.subgroup_size");
+  auto subgroupSize = getTypeAttr<hc::typing::SymbolicTypeBase>(
+      mod, hc::hk::getKernelSubgroupSizeAttrName());
   if (!subgroupSize)
     return region->emitError("Subgroup size is not defined");
 
