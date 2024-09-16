@@ -595,12 +595,12 @@ static mlir::Value makeSubview(mlir::OpBuilder &builder, mlir::Location loc,
                                                              sizes, strides);
     } else if (srcType.getRank() > dstType.getRank()) {
       subviewType = mlir::memref::SubViewOp::inferRankReducedResultType(
-          dstType.getShape(), srcType, strides, sizes, strides);
+          dstType.getShape(), srcType, offsets, sizes, strides);
     } else {
       return nullptr;
     }
     mlir::Value res = builder.create<mlir::memref::SubViewOp>(
-        loc, mlir::cast<mlir::MemRefType>(subviewType), src, strides, sizes,
+        loc, mlir::cast<mlir::MemRefType>(subviewType), src, offsets, sizes,
         strides);
     if (res.getType() != resType)
       res = builder.create<mlir::memref::CastOp>(loc, resType, res);
@@ -613,15 +613,21 @@ static mlir::Value makeSubview(mlir::OpBuilder &builder, mlir::Location loc,
 static std::tuple<mlir::Value, mlir::Value, mlir::Value>
 createResolveSlice(mlir::OpBuilder &builder, mlir::Location loc,
                    mlir::Value size, mlir::Value src) {
-  mlir::Type indexType = builder.getIndexType();
   mlir::Value lower, upper, step;
-  if (mlir::isa<mlir::TupleType>(src.getType())) {
+  if (auto tuple = mlir::dyn_cast<mlir::TupleType>(src.getType())) {
     mlir::Value id0 = builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
     mlir::Value id1 = builder.create<mlir::arith::ConstantIndexOp>(loc, 1);
     mlir::Value id2 = builder.create<mlir::arith::ConstantIndexOp>(loc, 2);
-    lower = builder.create<hc::hk::TupleExtractOp>(loc, indexType, src, id0);
-    upper = builder.create<hc::hk::TupleExtractOp>(loc, indexType, src, id1);
-    step = builder.create<hc::hk::TupleExtractOp>(loc, indexType, src, id2);
+
+    if (!mlir::isa<mlir::NoneType>(tuple.getType(0)))
+      lower = builder.create<hc::hk::TupleExtractOp>(loc, tuple.getType(0), src,
+                                                     id0);
+    if (!mlir::isa<mlir::NoneType>(tuple.getType(1)))
+      upper = builder.create<hc::hk::TupleExtractOp>(loc, tuple.getType(1), src,
+                                                     id1);
+    if (!mlir::isa<mlir::NoneType>(tuple.getType(2)))
+      step = builder.create<hc::hk::TupleExtractOp>(loc, tuple.getType(2), src,
+                                                    id2);
   } else {
     lower = src;
   }
@@ -660,7 +666,7 @@ struct ConvertSubview final
           !mlir::isa<mlir::IndexType>(idx.getType()))
         return rewriter.notifyMatchFailure(op, "Invalid slice type");
 
-      auto &&[offset, stride, size] =
+      auto &&[offset, size, stride] =
           createResolveSlice(rewriter, loc, dim, idx);
       offsets.emplace_back(offset);
       sizes.emplace_back(size);
@@ -748,7 +754,8 @@ struct LowerHKernelOpsPass final
         [&](mlir::func::ReturnOp op) {
           return converter.isLegal(op.getOperandTypes());
         });
-    target.addLegalDialect<mlir::ub::UBDialect>();
+    target.addLegalDialect<mlir::ub::UBDialect, mlir::arith::ArithDialect,
+                           mlir::memref::MemRefDialect>();
 
     patterns.insert<ConvertTypes, ConvertMakeSlice, ConvertSubview>(converter,
                                                                     ctx);

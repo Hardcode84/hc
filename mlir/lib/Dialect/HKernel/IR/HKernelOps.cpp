@@ -435,6 +435,15 @@ void hc::hk::SuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
   build(odsBuilder, odsState, types, args);
 }
 
+void hc::hk::ResolveSliceOp::build(::mlir::OpBuilder &odsBuilder,
+                                   ::mlir::OperationState &odsState,
+                                   mlir::Value src_size, mlir::Value lower,
+                                   mlir::Value upper, mlir::Value step) {
+  auto indexType = odsBuilder.getIndexType();
+  build(odsBuilder, odsState, indexType, indexType, indexType, src_size, lower,
+        upper, step);
+}
+
 // TODO: Upstream changes in affine parser
 namespace {
 using namespace mlir;

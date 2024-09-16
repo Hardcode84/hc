@@ -292,6 +292,15 @@ def HKernel_ResolveSliceOp : HKernel_OpBase<"resolve_slice", [
   let assemblyFormat = [{
     attr-dict `(` $lower `:` $upper `:` $step  `)` $src_size
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "::mlir::Value":$src_size,
+      CArg<"::mlir::Value", "nullptr">:$lower,
+      CArg<"::mlir::Value", "nullptr">:$upper,
+      CArg<"::mlir::Value", "nullptr">:$step
+    )>
+  ];
 }
 
 #endif // HKERNEL_OPS
