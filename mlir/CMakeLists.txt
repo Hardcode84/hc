@@ -80,8 +80,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     MLIRFuncDialect
     MLIRGPUDialect
     MLIRIR
+    MLIRSCFDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRVectorDialect
     )
 
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
