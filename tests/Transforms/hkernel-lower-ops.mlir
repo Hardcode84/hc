@@ -89,7 +89,7 @@ func.func @test(%arg1: !hkernel<buffer <"W"> x f16>, %arg2: !typing<symbol "H">)
 //       CHECK:  scf.parallel (%[[I:.*]]) = (%[[C0]]) to (%[[EXPR_VAL1]]) step (%[[C1]]) {
 //       CHECK:    %[[M1:.*]] = arith.cmpi slt, %[[I]], %[[EXPR_VAL2]] : index
 //       CHECK:    %[[M2:.*]] = vector.splat %[[M1]] : vector<1xi1>
-//       CHECK:    %[[R:.*]] = vector.maskedload %arg0[%[[I]]], %7, %0 : memref<?xf16, strided<[?], offset: ?>>, vector<1xi1>, vector<1xf16> into vector<1xf16>
+//       CHECK:    %[[R:.*]] = vector.maskedload %[[ARG1]][%[[I]]], %[[M2]], %[[P]] : memref<?xf16, strided<[?], offset: ?>>, vector<1xi1>, vector<1xf16> into vector<1xf16>
 //       CHECK:    vector.store %[[R]], %[[ALLOC1]][%[[I]]] : memref<?xf16, #gpu.address_space<workgroup>>, vector<1xf16>
 //       CHECK:    vector.store %[[M2]], %[[ALLOC2]][%[[I]]] : memref<?xi1, #gpu.address_space<workgroup>>, vector<1xi1>
 //       CHECK:    scf.reduce
