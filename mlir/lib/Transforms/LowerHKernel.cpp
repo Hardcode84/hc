@@ -5,15 +5,15 @@
 #include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
 #include "hc/Dialect/Typing/IR/TypingOps.hpp"
 
-#include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/Dialect/Vector/IR/VectorOps.h>
 #include <mlir/Dialect/Affine/IR/AffineOps.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Arith/Utils/Utils.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
+#include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/UB/IR/UBOps.h>
+#include <mlir/Dialect/Vector/IR/VectorOps.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Transforms/DialectConversion.h>
@@ -740,16 +740,19 @@ struct ConvertSubview final
   }
 };
 
-template<typename T>
-static llvm::SmallVector<mlir::TypedValue<T>> unpackTuple(mlir::OpBuilder& builder, mlir::Location loc, mlir::Value src) {
+template <typename T>
+static llvm::SmallVector<mlir::TypedValue<T>>
+unpackTuple(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value src) {
   llvm::SmallVector<mlir::TypedValue<T>> ret;
   if (auto tuple = mlir::dyn_cast<mlir::TupleType>(src.getType())) {
     for (auto &&[i, type] : llvm::enumerate(tuple.getTypes())) {
       if (!mlir::isa<T>(type))
         return {};
 
-      mlir::Value idx = builder.create<mlir::arith::ConstantIndexOp>(loc, int64_t(i));
-      mlir::Value val = builder.create<hc::hk::TupleExtractOp>(loc, type, src, idx);
+      mlir::Value idx =
+          builder.create<mlir::arith::ConstantIndexOp>(loc, int64_t(i));
+      mlir::Value val =
+          builder.create<hc::hk::TupleExtractOp>(loc, type, src, idx);
       ret.emplace_back(mlir::cast<mlir::TypedValue<T>>(val));
     }
   } else if (mlir::isa<T>(src.getType())) {
@@ -758,18 +761,21 @@ static llvm::SmallVector<mlir::TypedValue<T>> unpackTuple(mlir::OpBuilder& build
   return ret;
 }
 
-static mlir::Value shapedCast(mlir::OpBuilder& builder, mlir::Location loc, mlir::Value src, mlir::Type dstType) {
+static mlir::Value shapedCast(mlir::OpBuilder &builder, mlir::Location loc,
+                              mlir::Value src, mlir::Type dstType) {
   auto srcType = src.getType();
   if (srcType == dstType)
     return src;
 
-  if (mlir::isa<mlir::MemRefType>(srcType) && mlir::isa<mlir::MemRefType>(dstType))
+  if (mlir::isa<mlir::MemRefType>(srcType) &&
+      mlir::isa<mlir::MemRefType>(dstType))
     return builder.create<mlir::memref::CastOp>(loc, dstType, src);
 
   return nullptr;
 }
 
-static mlir::Value packTuple(mlir::OpBuilder& builder, mlir::Location loc, mlir::ValueRange args, mlir::Type type) {
+static mlir::Value packTuple(mlir::OpBuilder &builder, mlir::Location loc,
+                             mlir::ValueRange args, mlir::Type type) {
   assert(!args.empty());
   if (args.size() == 1)
     return shapedCast(builder, loc, args.front(), type);
@@ -789,7 +795,10 @@ static mlir::Value packTuple(mlir::OpBuilder& builder, mlir::Location loc, mlir:
   return builder.create<hc::hk::MakeTupleOp>(loc, tuple, vals);
 }
 
-static llvm::SmallVector<mlir::Value> createAlloc(mlir::OpBuilder& builder, mlir::Location loc, mlir::Type resType, mlir::ValueRange shape) {
+static llvm::SmallVector<mlir::Value> createAlloc(mlir::OpBuilder &builder,
+                                                  mlir::Location loc,
+                                                  mlir::Type resType,
+                                                  mlir::ValueRange shape) {
   llvm::SmallVector<mlir::MemRefType> types;
   if (auto tuple = mlir::dyn_cast<mlir::TupleType>(resType)) {
     for (auto t : tuple.getTypes()) {
@@ -815,8 +824,11 @@ static llvm::SmallVector<mlir::Value> createAlloc(mlir::OpBuilder& builder, mlir
 
       args.emplace_back(shape[i]);
     }
-    auto allocType = mlir::MemRefType::get(type.getShape(), type.getElementType(), mlir::MemRefLayoutAttrInterface{}, type.getMemorySpace());
-    mlir::Value mem = builder.create<mlir::memref::AllocOp>(loc, allocType, args);
+    auto allocType = mlir::MemRefType::get(
+        type.getShape(), type.getElementType(),
+        mlir::MemRefLayoutAttrInterface{}, type.getMemorySpace());
+    mlir::Value mem =
+        builder.create<mlir::memref::AllocOp>(loc, allocType, args);
     if (mem.getType() != type)
       mem = builder.create<mlir::memref::CastOp>(loc, type, mem);
 
@@ -825,18 +837,19 @@ static llvm::SmallVector<mlir::Value> createAlloc(mlir::OpBuilder& builder, mlir
   return ret;
 }
 
-struct ConvertLoad final
-    : public mlir::OpConversionPattern<hc::hk::LoadOp> {
+struct ConvertLoad final : public mlir::OpConversionPattern<hc::hk::LoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
   matchAndRewrite(hc::hk::LoadOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto origSrcType = mlir::dyn_cast<hc::hk::SymbolicallyShapedType>(op.getSource().getType());
+    auto origSrcType = mlir::dyn_cast<hc::hk::SymbolicallyShapedType>(
+        op.getSource().getType());
     if (!origSrcType)
       return rewriter.notifyMatchFailure(op, "Invalid source type");
 
-    auto origResultType = mlir::dyn_cast<hc::hk::SymbolicallyShapedType>(op.getType());
+    auto origResultType =
+        mlir::dyn_cast<hc::hk::SymbolicallyShapedType>(op.getType());
     if (!origResultType)
       return rewriter.notifyMatchFailure(op, "Invalid result type");
 
@@ -848,8 +861,7 @@ struct ConvertLoad final
       return rewriter.notifyMatchFailure(op, "Failed to convert result type");
 
     auto rank = origResultType.getShape().size();
-    if (rank < 1 ||
-        origSrcType.getShape().size() != rank ||
+    if (rank < 1 || origSrcType.getShape().size() != rank ||
         adaptor.getShape().size() != rank)
       return rewriter.notifyMatchFailure(op, "Rank mismatch");
 
@@ -857,11 +869,13 @@ struct ConvertLoad final
 
     mlir::Location loc = op.getLoc();
     llvm::SmallVector<mlir::Value> srcShape;
-    for (auto &&[i,  symElem] : llvm::enumerate(origSrcType.getShape())) {
+    for (auto &&[i, symElem] : llvm::enumerate(origSrcType.getShape())) {
       mlir::Value dim;
-      if (auto symbolcDim = mlir::dyn_cast<hc::typing::SymbolicTypeBase>(symElem)) {
+      if (auto symbolcDim =
+              mlir::dyn_cast<hc::typing::SymbolicTypeBase>(symElem)) {
         dim = rewriter.create<hc::hk::MaterializeExprOp>(loc, symbolcDim);
-        dim = converter->materializeTargetConversion(rewriter, loc, rewriter.getIndexType(), dim);
+        dim = converter->materializeTargetConversion(
+            rewriter, loc, rewriter.getIndexType(), dim);
       } else {
         dim = getDim(rewriter, loc, src, int64_t(i));
       }
@@ -873,11 +887,14 @@ struct ConvertLoad final
     }
 
     llvm::SmallVector<mlir::Value> dstShape;
-    for (auto &&[symElem, elem] : llvm::zip_equal(origResultType.getShape(), adaptor.getShape())) {
+    for (auto &&[symElem, elem] :
+         llvm::zip_equal(origResultType.getShape(), adaptor.getShape())) {
       mlir::Value dim;
-      if (auto symbolcDim = mlir::dyn_cast<hc::typing::SymbolicTypeBase>(symElem)) {
+      if (auto symbolcDim =
+              mlir::dyn_cast<hc::typing::SymbolicTypeBase>(symElem)) {
         dim = rewriter.create<hc::hk::MaterializeExprOp>(loc, symbolcDim);
-        dim = converter->materializeTargetConversion(rewriter, loc, rewriter.getIndexType(), dim);
+        dim = converter->materializeTargetConversion(
+            rewriter, loc, rewriter.getIndexType(), dim);
       } else {
         dim = elem;
       }
@@ -898,10 +915,12 @@ struct ConvertLoad final
 
     mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
     mlir::Value one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
-    auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::ValueRange indices, mlir::ValueRange) {
+    auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
+                           mlir::ValueRange indices, mlir::ValueRange) {
       mlir::Value cond;
       for (auto &&[srcDim, index] : llvm::zip_equal(srcShape, indices)) {
-        mlir::Value lt = builder.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::slt, index, srcDim);
+        mlir::Value lt = builder.create<mlir::arith::CmpIOp>(
+            loc, mlir::arith::CmpIPredicate::slt, index, srcDim);
         if (!cond) {
           cond = lt;
         } else {
@@ -909,23 +928,29 @@ struct ConvertLoad final
         }
       }
       auto maskType = mlir::VectorType::get(1, builder.getI1Type());
-      mlir::Value mask = builder.create<mlir::vector::SplatOp>(loc, maskType, cond);
+      mlir::Value mask =
+          builder.create<mlir::vector::SplatOp>(loc, maskType, cond);
       if (unpackedSrc.size() >= 2) {
-        mlir::Value f = builder.create<mlir::arith::ConstantIntOp>(loc, /*value*/ 0, /*width*/ 1);
-        mlir::Value passthru = builder.create<mlir::vector::SplatOp>(loc, maskType, f);
-        mask = builder.create<mlir::vector::MaskedLoadOp>(loc, maskType, unpackedSrc[1], indices, mask, passthru);
+        mlir::Value f = builder.create<mlir::arith::ConstantIntOp>(
+            loc, /*value*/ 0, /*width*/ 1);
+        mlir::Value passthru =
+            builder.create<mlir::vector::SplatOp>(loc, maskType, f);
+        mask = builder.create<mlir::vector::MaskedLoadOp>(
+            loc, maskType, unpackedSrc[1], indices, mask, passthru);
       }
 
       auto src = unpackedSrc.front();
       auto vecType = mlir::VectorType::get(1, src.getType().getElementType());
       mlir::Value passthru = builder.create<mlir::ub::PoisonOp>(loc, vecType);
-      mlir::Value res = builder.create<mlir::vector::MaskedLoadOp>(loc, vecType, src, indices, mask, passthru);
+      mlir::Value res = builder.create<mlir::vector::MaskedLoadOp>(
+          loc, vecType, src, indices, mask, passthru);
       builder.create<mlir::vector::StoreOp>(loc, res, alloc[0], indices);
       builder.create<mlir::vector::StoreOp>(loc, mask, alloc[1], indices);
     };
     llvm::SmallVector<mlir::Value> lowerBounds(rank, zero);
     llvm::SmallVector<mlir::Value> steps(rank, one);
-    rewriter.create<mlir::scf::ParallelOp>(loc, lowerBounds, dstShape, steps, std::nullopt, bodyBuilder);
+    rewriter.create<mlir::scf::ParallelOp>(loc, lowerBounds, dstShape, steps,
+                                           std::nullopt, bodyBuilder);
 
     auto res = packTuple(rewriter, loc, alloc, newResultType);
     if (!res)
@@ -963,7 +988,8 @@ struct LowerHKernelOpsPass final
     mlir::populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
                                                               converter);
 
-    target.addDynamicallyLegalDialect<hc::hk::HKernelDialect, mlir::scf::SCFDialect>(
+    target.addDynamicallyLegalDialect<hc::hk::HKernelDialect,
+                                      mlir::scf::SCFDialect>(
         [&](mlir::Operation *op) -> bool { return converter.isLegal(op); });
 
     auto entrypointAttrName = mlir::StringAttr::get(
@@ -982,10 +1008,12 @@ struct LowerHKernelOpsPass final
         });
     target.addLegalOp<hc::hk::MaterializeExprOp>();
     target.addLegalDialect<mlir::ub::UBDialect, mlir::arith::ArithDialect,
-                           mlir::memref::MemRefDialect, mlir::vector::VectorDialect>();
+                           mlir::memref::MemRefDialect,
+                           mlir::vector::VectorDialect>();
 
-    patterns.insert<ConvertTypes, ConvertMakeSlice, ConvertSubview, ConvertLoad>(converter,
-                                                                    ctx);
+    patterns
+        .insert<ConvertTypes, ConvertMakeSlice, ConvertSubview, ConvertLoad>(
+            converter, ctx);
 
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                   std::move(patterns))))
