@@ -167,7 +167,9 @@ def LowerHKernelOpsPass : Pass<"hc-lower-hkernel-ops-pass"> {
     "::hc::typing::TypingDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::memref::MemRefDialect",
+    "::mlir::scf::SCFDialect",
     "::mlir::ub::UBDialect",
+    "::mlir::vector::VectorDialect",
   ];
 }
 
