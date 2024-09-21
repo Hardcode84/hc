@@ -50,7 +50,7 @@ func.func @test(%arg1: !hkernel<tensor <"W"> x f16>, %arg2: !hkernel<slice !typi
 
 //       CHECK: ![[SYM:.*]] = !typing<symbol "W">
 // CHECK-LABEL: func @test
-//  CHECK-SAME: (%[[ARG1:.*]]:  tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>, %[[ARG2:.*]]: tuple<index, none, none>)
+//  CHECK-SAME: (%[[ARG1:.*]]: tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>, %[[ARG2:.*]]: tuple<index, none, none>)
 //   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
 //   CHECK-DAG:  %[[C1:.*]] = arith.constant 1 : index
 //   CHECK-DAG:  %[[DIM:.*]] = hkernel.materialize_expr ![[SYM]]
@@ -63,3 +63,38 @@ func.func @test(%arg1: !hkernel<tensor <"W"> x f16>, %arg2: !hkernel<slice !typi
 //       CHECK:  %[[SUBVIEW2:.*]] = memref.subview %[[MEM2]][%[[OFFSET]]] [%[[SIZE]]] [%[[STRIDE]]] : memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>> to memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>
 //       CHECK:  %[[RET:.*]] = hkernel.make_tuple %[[SUBVIEW1]], %[[SUBVIEW2]] : memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>> -> tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>
 //       CHECK:  return %[[RET]] :  tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>
+
+// -----
+
+func.func @test(%arg1: !hkernel<buffer <"W"> x f16>, %arg2: !typing<symbol "H">) -> !hkernel<tensor <"H"> x f16> {
+  %1 = hkernel.load %arg1 : !hkernel<buffer <"W"> x f16>[%arg2] : !typing<symbol "H"> -> !hkernel<tensor <"H"> x f16>
+  return %1 : !hkernel<tensor <"H"> x f16>
+}
+
+//   CHECK-DAG: ![[SYM1:.*]] = !typing<symbol "H">
+//   CHECK-DAG: ![[SYM2:.*]] = !typing<symbol "W">
+// CHECK-LABEL: func @test
+//  CHECK-SAME: (%[[ARG1:.*]]: memref<?xf16, strided<[?], offset: ?>>, %[[ARG2:.*]]: index)
+//   CHECK-DAG:  %[[P:.*]] = ub.poison : vector<1xf16>
+//   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG:  %[[C1:.*]] = arith.constant 1 : index
+//   CHECK-DAG:  %[[EXPR1:.*]] = hkernel.materialize_expr ![[SYM1]]
+//   CHECK-DAG:  %[[EXPR2:.*]] = hkernel.materialize_expr ![[SYM2]]
+//   CHECK-DAG:  %[[EXPR_VAL1:.*]] = builtin.unrealized_conversion_cast %[[EXPR1]] : ![[SYM1]] to index
+//   CHECK-DAG:  %[[EXPR_VAL2:.*]] = builtin.unrealized_conversion_cast %[[EXPR2]] : ![[SYM2]] to index
+//       CHECK:  %[[ALLOC1:.*]] = memref.alloc(%[[EXPR_VAL1]]) : memref<?xf16, #gpu.address_space<workgroup>>
+//       CHECK:  %[[CAST1:.*]] = memref.cast %[[ALLOC1]] : memref<?xf16, #gpu.address_space<workgroup>> to memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>
+//       CHECK:  %[[ALLOC2:.*]] = memref.alloc(%[[EXPR_VAL1]]) : memref<?xi1, #gpu.address_space<workgroup>>
+//       CHECK:  %[[CAST2:.*]] = memref.cast %[[ALLOC2]] : memref<?xi1, #gpu.address_space<workgroup>> to memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>
+//       CHECK:  scf.parallel (%[[I:.*]]) = (%[[C0]]) to (%[[EXPR_VAL1]]) step (%[[C1]]) {
+//       CHECK:    %[[M1:.*]] = arith.cmpi slt, %[[I]], %[[EXPR_VAL2]] : index
+//       CHECK:    %[[M2:.*]] = vector.splat %[[M1]] : vector<1xi1>
+//       CHECK:    %[[R:.*]] = vector.maskedload %arg0[%[[I]]], %7, %0 : memref<?xf16, strided<[?], offset: ?>>, vector<1xi1>, vector<1xf16> into vector<1xf16>
+//       CHECK:    vector.store %[[R]], %[[ALLOC1]][%[[I]]] : memref<?xf16, #gpu.address_space<workgroup>>, vector<1xf16>
+//       CHECK:    vector.store %[[M2]], %[[ALLOC2]][%[[I]]] : memref<?xi1, #gpu.address_space<workgroup>>, vector<1xi1>
+//       CHECK:    scf.reduce
+//       CHECK:  }
+//       CHECK:  %[[RES:.*]] = hkernel.make_tuple %[[CAST1]], %[[CAST2]] :
+//  CHECK-SAME:    memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>> ->
+//  CHECK-SAME:    tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>
+//       CHECK:  return %[[RES]] : tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>
