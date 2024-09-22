@@ -98,3 +98,27 @@ func.func @test(%arg1: !hkernel<buffer <"W"> x f16>, %arg2: !typing<symbol "H">)
 //  CHECK-SAME:    memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>> ->
 //  CHECK-SAME:    tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>
 //       CHECK:  return %[[RES]] : tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>
+
+// -----
+
+func.func @test(%arg1: !hkernel<buffer <"W"> x f16>, %arg2: !hkernel<tensor <"H"> x f16>) {
+  hkernel.store %arg1 : !hkernel<buffer <"W"> x f16> = %arg2 : !hkernel<tensor <"H"> x f16>
+  return
+}
+
+//       CHECK: ![[SYM:.*]] = !typing<symbol "H">
+// CHECK-LABEL: func @test
+//  CHECK-SAME: (%[[ARG1:.*]]: memref<?xf16, strided<[?], offset: ?>>, %[[ARG2:.*]]: tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>)
+//   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG:  %[[C1:.*]] = arith.constant 1 : index
+//   CHECK-DAG:  %[[EXPR:.*]] = hkernel.materialize_expr ![[SYM]]
+//       CHECK:  %[[MEM1:.*]] = hkernel.tuple_extract %[[ARG2]] : tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>[%[[C0]]] -> memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>
+//       CHECK:  %[[MASK1:.*]] = hkernel.tuple_extract %[[ARG2]] : tuple<memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>>[%[[C1]]] -> memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>
+//       CHECK:  %[[SIZE:.*]] = builtin.unrealized_conversion_cast %[[EXPR]] : ![[SYM]] to index
+//       CHECK:  scf.parallel (%[[I:.*]]) = (%[[C0]]) to (%[[SIZE]]) step (%[[C1]]) {
+//       CHECK:    %[[M:.*]] = vector.load %[[MASK1]][%[[I]]] : memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, vector<1xi1>
+//       CHECK:    %[[R:.*]] = vector.load %[[MEM1]][%[[I]]] : memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>, vector<1xf16>
+//       CHECK:    vector.maskedstore %[[ARG1]][%[[I]]], %[[M]], %[[R]] : memref<?xf16, strided<[?], offset: ?>>, vector<1xi1>, vector<1xf16>
+//       CHECK:    scf.reduce
+//       CHECK:  }
+//       CHECK:  return
