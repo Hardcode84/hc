@@ -963,6 +963,93 @@ struct ConvertLoad final : public mlir::OpConversionPattern<hc::hk::LoadOp> {
   }
 };
 
+struct ConvertStore final : public mlir::OpConversionPattern<hc::hk::StoreOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::StoreOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto origSrcType = mlir::dyn_cast<hc::hk::SymbolicallyShapedType>(
+        op.getSource().getType());
+    if (!origSrcType)
+      return rewriter.notifyMatchFailure(op, "Invalid source type");
+
+    auto origDstType = mlir::dyn_cast<hc::hk::SymbolicallyShapedType>(
+        op.getTarget().getType());
+    if (!origDstType)
+      return rewriter.notifyMatchFailure(op, "Invalid target type");
+
+    if (origSrcType.getShape().size() != origDstType.getShape().size())
+      return rewriter.notifyMatchFailure(op, "Shape mismatch");
+
+    mlir::Location loc = op.getLoc();
+    auto unpackedSrc =
+        unpackTuple<mlir::ShapedType>(rewriter, loc, adaptor.getSource());
+    if (unpackedSrc.empty())
+      return rewriter.notifyMatchFailure(op, "Failed to unpack source");
+
+    auto unpackedDst =
+        unpackTuple<mlir::ShapedType>(rewriter, loc, adaptor.getTarget());
+    if (unpackedDst.empty())
+      return rewriter.notifyMatchFailure(op, "Failed to unpack target");
+
+    const mlir::TypeConverter *converter = getTypeConverter();
+    assert(converter);
+
+    llvm::SmallVector<mlir::Value> srcShape;
+    for (auto &&[i, symElem] : llvm::enumerate(origSrcType.getShape())) {
+      mlir::Value dim;
+      if (auto symbolcDim =
+              mlir::dyn_cast<hc::typing::SymbolicTypeBase>(symElem)) {
+        dim = rewriter.create<hc::hk::MaterializeExprOp>(loc, symbolcDim);
+        dim = converter->materializeTargetConversion(
+            rewriter, loc, rewriter.getIndexType(), dim);
+      } else {
+        dim = getDim(rewriter, loc, unpackedSrc.front(), int64_t(i));
+      }
+
+      if (!dim)
+        return rewriter.notifyMatchFailure(op, "Failed to get dim");
+
+      srcShape.emplace_back(dim);
+    }
+
+    mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    mlir::Value one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+    auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
+                           mlir::ValueRange indices, mlir::ValueRange) {
+      auto maskType = mlir::VectorType::get(1, builder.getI1Type());
+      mlir::Value mask;
+      if (unpackedSrc.size() > 1) {
+        mask = builder.create<mlir::vector::LoadOp>(loc, maskType,
+                                                    unpackedSrc[1], indices);
+      } else {
+        mask = builder.create<mlir::arith::ConstantIntOp>(loc, 1, 1);
+        mask = builder.create<mlir::vector::SplatOp>(loc, maskType, mask);
+      }
+
+      auto src = unpackedSrc.front();
+      auto vecType = mlir::VectorType::get(1, src.getType().getElementType());
+      mlir::Value val =
+          builder.create<mlir::vector::LoadOp>(loc, vecType, src, indices);
+
+      auto dst = unpackedDst.front();
+      builder.create<mlir::vector::MaskedStoreOp>(loc, dst, indices, mask, val);
+      if (unpackedDst.size() > 1)
+        builder.create<mlir::vector::MaskedStoreOp>(loc, unpackedDst[1],
+                                                    indices, mask, mask);
+    };
+
+    auto rank = srcShape.size();
+    llvm::SmallVector<mlir::Value> lowerBounds(rank, zero);
+    llvm::SmallVector<mlir::Value> steps(rank, one);
+    rewriter.create<mlir::scf::ParallelOp>(loc, lowerBounds, srcShape, steps,
+                                           std::nullopt, bodyBuilder);
+    rewriter.eraseOp(op);
+    return mlir::success();
+  }
+};
+
 struct LowerHKernelOpsPass final
     : public hc::impl::LowerHKernelOpsPassBase<LowerHKernelOpsPass> {
 
@@ -1013,9 +1100,8 @@ struct LowerHKernelOpsPass final
                            mlir::memref::MemRefDialect,
                            mlir::vector::VectorDialect>();
 
-    patterns
-        .insert<ConvertTypes, ConvertMakeSlice, ConvertSubview, ConvertLoad>(
-            converter, ctx);
+    patterns.insert<ConvertTypes, ConvertMakeSlice, ConvertSubview, ConvertLoad,
+                    ConvertStore>(converter, ctx);
 
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                   std::move(patterns))))
