@@ -525,7 +525,7 @@ struct ConverPyIRToKernelPass final
 
     auto materialize = [](mlir::OpBuilder &builder, mlir::Type type,
                           mlir::ValueRange inputs,
-                          mlir::Location loc) -> std::optional<mlir::Value> {
+                          mlir::Location loc) -> mlir::Value {
       auto cast =
           builder.create<mlir::UnrealizedConversionCastOp>(loc, type, inputs);
       return cast.getResult(0);
