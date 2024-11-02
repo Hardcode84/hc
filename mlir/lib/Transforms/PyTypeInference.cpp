@@ -324,7 +324,8 @@ public:
           resolver.getBody()->getTerminator());
       for (auto &&[termArg, resultLattice] :
            llvm::zip_equal(term.getArgs(), results)) {
-        auto termLattice = getOrCreateFor<TypeValueLattice>(op, termArg);
+        auto termLattice =
+            getOrCreateFor<TypeValueLattice>(getProgramPointAfter(op), termArg);
         if (!termLattice)
           continue;
 

@@ -1062,9 +1062,9 @@ struct LowerHKernelOpsPass final
 
     auto materialize = [](mlir::OpBuilder &builder, mlir::Type type,
                           mlir::ValueRange inputs,
-                          mlir::Location loc) -> std::optional<mlir::Value> {
+                          mlir::Location loc) -> mlir::Value {
       if (inputs.size() != 1)
-        return std::nullopt;
+        return {};
 
       return doCast(builder, loc, inputs.front(), type)->getResult(0);
     };
