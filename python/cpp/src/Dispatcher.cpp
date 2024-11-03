@@ -31,9 +31,8 @@ void Dispatcher::populateImportPipeline(mlir::PassManager &pm) {
 
 void Dispatcher::populateFrontendPipeline(mlir::PassManager &pm) {
   hc::populateFrontendPipeline(pm);
-  hc::populateMiddleendPipeline(pm);
 }
 
 void Dispatcher::populateInvokePipeline(mlir::PassManager &pm) {
-  reportError("TODO: compile");
+  hc::populateMiddleendPipeline(pm);
 }

@@ -231,6 +231,8 @@ void DispatcherBase::invokeFunc(const py::args &args,
     OpRef newMod = mod->clone();
     runPipeline(context, newMod.get(),
                 [this](mlir::PassManager &pm) { populateInvokePipeline(pm); });
+    newMod.get()->dump();
+    reportError("TODO: compile");
 
     // TODO: codegen
     it = funcsCache.insert({key, nullptr}).first;
