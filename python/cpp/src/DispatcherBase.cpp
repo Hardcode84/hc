@@ -225,7 +225,7 @@ mlir::Operation *DispatcherBase::runFrontend() {
 void DispatcherBase::invokeFunc(const py::args &args,
                                 const py::kwargs &kwargs) {
   llvm::SmallVector<PyObject *, 16> funcArgs;
-  mlir::Type key = processArgs(args, kwargs, funcArgs);
+  const void *key = processArgs(args, kwargs, funcArgs).getAsOpaquePointer();
   auto it = funcsCache.find(key);
   if (it == funcsCache.end()) {
     OpRef newMod = mod->clone();
