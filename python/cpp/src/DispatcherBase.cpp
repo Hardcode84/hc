@@ -13,6 +13,7 @@
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Support/LogicalResult.h>
 
+#include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
 #include "hc/Dialect/PyIR/IR/PyIROps.hpp"
 #include "hc/Dialect/Typing/IR/TypingOps.hpp"
 #include "hc/Transforms/ModuleLinker.hpp"
@@ -27,7 +28,9 @@ namespace py = pybind11;
 
 DispatcherBase::DispatcherBase(py::capsule ctx, py::object getDesc)
     : context(*ctx.get_pointer<Context>()), contextRef(std::move(ctx)),
-      getFuncDesc(std::move(getDesc)) {}
+      getFuncDesc(std::move(getDesc)),
+      argsHandlerBuilder(
+          std::make_unique<ArgsHandlerBuilder>(context.context)) {}
 
 DispatcherBase::~DispatcherBase() {}
 
@@ -225,17 +228,19 @@ mlir::Operation *DispatcherBase::runFrontend() {
 void DispatcherBase::invokeFunc(const py::args &args,
                                 const py::kwargs &kwargs) {
   llvm::SmallVector<PyObject *, 16> funcArgs;
-  const void *key = processArgs(args, kwargs, funcArgs);
-  auto it = funcsCache.find(key);
+  mlir::Attribute key = processArgs(args, kwargs, funcArgs);
+  const void *keyPtr = key.getAsOpaquePointer();
+  auto it = funcsCache.find(keyPtr);
   if (it == funcsCache.end()) {
     OpRef newMod = mod->clone();
+    newMod->setAttr(hc::hk::getKernelMetadataAttrName(), key);
     runPipeline(context, newMod.get(),
                 [this](mlir::PassManager &pm) { populateInvokePipeline(pm); });
     newMod.get()->dump();
     reportError("TODO: compile");
 
     // TODO: codegen
-    it = funcsCache.insert({key, nullptr}).first;
+    it = funcsCache.insert({keyPtr, nullptr}).first;
   }
 
   auto func = it->second;
@@ -244,11 +249,32 @@ void DispatcherBase::invokeFunc(const py::args &args,
     reportError(exc.message);
 }
 
-using HandlerT = std::function<void(mlir::MLIRContext &, pybind11::handle,
-                                    llvm::SmallVectorImpl<mlir::Type> &,
-                                    llvm::SmallVectorImpl<PyObject *> &)>;
+using HandlerT =
+    std::function<void(mlir::MLIRContext &, pybind11::handle,
+                       llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &,
+                       llvm::SmallVectorImpl<PyObject *> &)>;
 
-static const constexpr int64_t kDynamic = mlir::ShapedType::kDynamic;
+template <typename T> static std::string toStr(T &&val) {
+  std::string ret;
+  llvm::raw_string_ostream os(ret);
+  os << val;
+  os.flush();
+  return ret;
+}
+
+static void updateRetMap(llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret,
+                         mlir::Type key, mlir::Type val) {
+  auto it = ret.find(key);
+  if (it == ret.end()) {
+    ret.insert({key, val});
+    return;
+  }
+
+  auto oldVal = it->second;
+  if (oldVal != val)
+    reportError(llvm::Twine("Metadata conflict for ") + toStr(key) + ": " +
+                toStr(oldVal) + " and " + toStr(val));
+}
 
 static bool issubclass(py::handle cls, py::handle parent) {
   const auto result = PyObject_IsSubclass(cls.ptr(), parent.ptr());
@@ -257,24 +283,60 @@ static bool issubclass(py::handle cls, py::handle parent) {
   return result != 0;
 }
 
-namespace {
+template <unsigned Width, bool Signed>
+static mlir::Type getIntType(mlir::MLIRContext *ctx) {
+  return mlir::IntegerType::get(ctx, Width,
+                                Signed ? mlir::IntegerType::Signed
+                                       : mlir::IntegerType::Unsigned);
+}
 
-struct ArgsHandlerBuilder {
-  ArgsHandlerBuilder() {
+template <unsigned Width>
+static mlir::Type getFloatType(mlir::MLIRContext *ctx) {
+  switch (Width) {
+  case 16:
+    return mlir::FloatType::getF16(ctx);
+  case 32:
+    return mlir::FloatType::getF32(ctx);
+  case 64:
+    return mlir::FloatType::getF64(ctx);
+  }
+  llvm_unreachable("Invalid float width");
+}
+
+static void reportWrongDtype(py::handle dt) {
+  reportError(llvm::Twine("Invalid dtype: ") + py::str(dt).cast<std::string>());
+};
+
+struct DispatcherBase::ArgsHandlerBuilder {
+  ArgsHandlerBuilder(mlir::MLIRContext &c) : ctx(c) {
     auto mod = py::module::import("hckernel.kernel_api");
     symbolType = mod.attr("Symbol");
+    typenameType = mod.attr("Typename");
     bufferType = mod.attr("Buffer");
+
+    auto np = py::module::import("numpy");
+    for (auto &&[src, dst] : llvm::zip_equal(NumpyDTypes, numpyDTypes)) {
+      auto &&[name, func] = src;
+
+      dst = std::pair(np.attr(name.data()), func(&ctx));
+    }
   }
 
   HandlerT getArgHandler(py::handle arg) {
+    auto getSym = [&](py::handle a) -> mlir::Type {
+      return hc::typing::SymbolType::get(&ctx,
+                                         a.attr("name").cast<std::string>());
+    };
+
     if (py::isinstance(arg, symbolType)) {
-      return [](mlir::MLIRContext &ctx, py::handle obj,
-                llvm::SmallVectorImpl<mlir::Type> &ret,
-                llvm::SmallVectorImpl<PyObject *> &args) {
+      auto sym = getSym(arg);
+      return [sym](mlir::MLIRContext &ctx, py::handle obj,
+                   llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret,
+                   llvm::SmallVectorImpl<PyObject *> &args) {
         if (py::isinstance<py::int_>(obj)) {
-          ret.emplace_back(mlir::IntegerType::get(&ctx, 64));
+          updateRetMap(ret, sym, mlir::IntegerType::get(&ctx, 64));
         } else if (py::isinstance<py::float_>(obj)) {
-          ret.emplace_back(mlir::Float64Type::get(&ctx));
+          updateRetMap(ret, sym, mlir::Float64Type::get(&ctx));
         } else {
           reportError(llvm::Twine("Unsupported type: ") +
                       py::str(obj).cast<std::string>());
@@ -291,7 +353,7 @@ struct ArgsHandlerBuilder {
 
       return [handlersCopy = std::move(handlers)](
                  mlir::MLIRContext &ctx, py::handle obj,
-                 llvm::SmallVectorImpl<mlir::Type> &ret,
+                 llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret,
                  llvm::SmallVectorImpl<PyObject *> &args) {
         for (auto &&[h, elem] : llvm::zip_equal(handlersCopy, obj))
           h(ctx, elem, ret, args);
@@ -299,41 +361,62 @@ struct ArgsHandlerBuilder {
     }
     if (issubclass(arg, bufferType)) {
       auto shape = arg.attr("shape");
-      llvm::SmallVector<int64_t> srcShape(py::len(shape));
+      auto dtype = arg.attr("dtype");
+      llvm::SmallVector<mlir::Type> srcShape(py::len(shape));
       for (auto &&[i, s] : llvm::enumerate(shape)) {
         if (py::isinstance<py::int_>(s)) {
-          srcShape[i] = s.cast<int64_t>();
+          // Nothing
         } else if (py::isinstance(s, symbolType)) {
-          srcShape[i] = kDynamic;
+          // srcShape[i] = getSym(s);
+          // TODO: Handle literals
         } else {
           reportError(llvm::Twine("Unsupported dim type: ") +
                       py::str(s).cast<std::string>());
         }
       }
 
-      return [argShape = std::move(srcShape)](
-                 mlir::MLIRContext &ctx, py::handle obj,
-                 llvm::SmallVectorImpl<mlir::Type> &ret,
-                 llvm::SmallVectorImpl<PyObject *> &args) {
+      mlir::Type dtypeSym;
+      if (py::isinstance(dtype, typenameType)) {
+        dtypeSym = getSym(dtype);
+      } else {
+        dtypeSym = translateDtype(dtype);
+      }
+
+      if (!dtypeSym)
+        reportWrongDtype(dtype);
+
+      return [this, argShape = std::move(srcShape),
+              dtypeSym](mlir::MLIRContext &ctx, py::handle obj,
+                        llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret,
+                        llvm::SmallVectorImpl<PyObject *> &args) {
         auto arrInterface = obj.attr("__array_interface__").cast<py::dict>();
         auto shape = arrInterface["shape"].cast<py::tuple>();
         if (argShape.size() != shape.size())
           reportError("Invalid buffer rank: " + llvm::Twine(argShape.size()) +
                       " vs " + llvm::Twine(shape.size()));
 
-        llvm::SmallVector<int64_t> resShape(argShape.size());
-        for (auto &&[i, s] : llvm::enumerate(argShape)) {
-          if (s == kDynamic) {
-            resShape[i] = kDynamic;
-          } else {
-            resShape[i] = s;
-          }
-        }
+        // TODO: Handle literals
+        //        for (auto &&[i, s] : llvm::enumerate(argShape)) {
+        //          if (s == kDynamic) {
+        //            resShape[i] = kDynamic;
+        //          } else {
+        //            resShape[i] = s;
+        //          }
+        //        }
 
-        // TODO: dtype
+        auto dtypeObj = obj.attr("dtype");
+        auto dtype = translateDtype(dtypeObj);
+        if (!dtype)
+          reportWrongDtype(dtypeObj);
+
+        if (mlir::isa<hc::typing::SymbolType>(dtypeSym)) {
+          updateRetMap(ret, dtypeSym, dtype);
+        } else {
+          if (dtypeSym != dtype)
+            reportError(llvm::Twine("dtype mismatch: ") + toStr(dtypeSym) +
+                        " vs " + toStr(dtype));
+        }
         // TODO: layout
-        auto dtype = mlir::Float64Type::get(&ctx);
-        ret.emplace_back(mlir::MemRefType::get(resShape, dtype));
         args.emplace_back(obj.ptr());
       };
     }
@@ -343,23 +426,44 @@ struct ArgsHandlerBuilder {
   }
 
 private:
+  using fptr_t = mlir::Type (*)(mlir::MLIRContext *);
+  constexpr static const std::pair<llvm::StringRef, fptr_t> NumpyDTypes[] = {
+      {"int8", &getIntType<8, true>},   {"uint8", &getIntType<8, false>},
+      {"int16", &getIntType<16, true>}, {"uint16", &getIntType<16, false>},
+      {"int32", &getIntType<32, true>}, {"uint32", &getIntType<32, false>},
+      {"int64", &getIntType<64, true>}, {"uint64", &getIntType<64, false>},
+      {"float16", &getFloatType<16>},   {"float32", &getFloatType<32>},
+      {"float64", &getFloatType<64>},
+  };
+
+  mlir::MLIRContext &ctx;
   py::object symbolType;
+  py::object typenameType;
   py::object bufferType;
+  std::array<std::pair<py::object, mlir::Type>, std::size(NumpyDTypes)>
+      numpyDTypes;
+
+  mlir::Type translateDtype(py::handle obj) const {
+    for (auto &&[dtype, type] : numpyDTypes) {
+      if (obj.equal(dtype))
+        return type;
+    }
+    return nullptr;
+  }
 };
-} // namespace
+
 void DispatcherBase::populateArgsHandlers(pybind11::handle args) {
-  ArgsHandlerBuilder builder;
   auto &ctx = context.context;
   assert(argsHandlers.empty());
   argsHandlers.reserve(py::len(args));
   for (auto [name, elem] : args.cast<py::dict>()) {
     auto nameAttr = mlir::StringAttr::get(&ctx, name.cast<std::string>());
-    auto handler = builder.getArgHandler(elem);
+    auto handler = argsHandlerBuilder->getArgHandler(elem);
     argsHandlers.emplace_back(ArgDesc{nameAttr.getValue(), std::move(handler)});
   }
 }
 
-const void *
+mlir::Attribute
 DispatcherBase::processArgs(const pybind11::args &args,
                             const pybind11::kwargs &kwargs,
                             llvm::SmallVectorImpl<PyObject *> &retArgs) const {
@@ -376,31 +480,31 @@ DispatcherBase::processArgs(const pybind11::args &args,
     return nullptr;
   };
 
-  llvm::SmallVector<mlir::Type> types;
-  types.reserve(argsHandlers.size());
+  llvm::SmallMapVector<mlir::Type, mlir::Type, 8> metadata;
 
   auto &ctx = context.context;
   size_t idx = 0;
   for (auto &arg : argsHandlers) {
     auto name = arg.name;
     if (auto kwarg = getKWArg(name)) {
-      arg.handler(ctx, kwarg, types, retArgs);
+      arg.handler(ctx, kwarg, metadata, retArgs);
       continue;
     }
     if (idx >= srcNumArgs)
       reportError("Insufficient args");
 
     auto srcArg = args[idx++];
-    arg.handler(context.context, srcArg, types, retArgs);
+    arg.handler(context.context, srcArg, metadata, retArgs);
   }
 
-  if (types.empty())
-    return nullptr;
+  llvm::SmallVector<mlir::Attribute> array;
+  array.reserve(metadata.size() * 2);
+  for (auto &[key, val] : metadata) {
+    array.emplace_back(hc::typing::TypeAttr::get(key));
+    array.emplace_back(hc::typing::TypeAttr::get(val));
+  }
 
-  if (types.size() == 1)
-    return types.front().getAsOpaquePointer();
-
-  return mlir::TupleType::get(&ctx).getAsOpaquePointer();
+  return mlir::ArrayAttr::get(&ctx, array);
 }
 
 DispatcherBase::OpRef DispatcherBase::importFuncForLinking(

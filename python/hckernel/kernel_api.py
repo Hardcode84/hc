@@ -18,7 +18,7 @@ import functools
 import operator
 
 from .indexing import sym
-from .typename import typename
+from .typename import Typename, typename
 from .symbol_registry import register_symbol as _reg_symbol_impl
 
 

@@ -980,3 +980,7 @@ llvm::StringRef hc::hk::getKernelSubgroupSizeAttrName() {
 llvm::StringRef hc::hk::getKernelSubgroupIdAttrName() {
   return "kernel.subgroup_id";
 }
+
+llvm::StringRef hc::hk::getKernelMetadataAttrName() {
+  return "kernel.metadata";
+}
