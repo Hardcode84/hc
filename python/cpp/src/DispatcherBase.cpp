@@ -262,7 +262,7 @@ static HandlerT getArgHandler(py::handle arg) {
       } else if (py::isinstance<py::float_>(obj)) {
         ret.emplace_back(mlir::Float64Type::get(&ctx));
       } else {
-        reportError(llvm::Twine("Unsupported type") +
+        reportError(llvm::Twine("Unsupported type: ") +
                     py::str(obj).cast<std::string>());
       }
       args.emplace_back(obj.ptr());
