@@ -35,7 +35,9 @@ def _is_literal(val):
 
 def _process_annotation(ann):
     def istypingtype(a, typ):
-        return typing.get_origin(ann) == typ or isinstance(ann, typ)
+        return (
+            issubclass(a, typ) or typing.get_origin(ann) == typ or isinstance(ann, typ)
+        )
 
     def get_typing_args(ann):
         if isinstance(ann, (types.GenericAlias, typing._GenericAlias)):
@@ -55,16 +57,16 @@ def _process_annotation(ann):
         return
 
     if isinstance(ann, Symbol):
-        return "sym"
+        return ann
 
     if isinstance(ann, Typename):
-        return "typename"
+        return ann
 
     elif istypingtype(ann, tuple):
         return tuple(_process_annotation(e) for e in get_typing_args(ann))
 
     elif istypingtype(ann, Buffer):
-        return [_process_annotation(e) for e in get_typing_args(ann)]
+        return ann
 
     else:
         assert False, f"Unsupported annotation: {type(ann)} {ann}"
