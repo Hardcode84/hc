@@ -59,7 +59,7 @@ private:
   llvm::SmallDenseMap<const void *, FuncT> funcsCache;
 
   void populateArgsHandlers(pybind11::handle args);
-  mlir::Type processArgs(const pybind11::args &args,
+  const void* processArgs(const pybind11::args &args,
                          const pybind11::kwargs &kwargs,
                          llvm::SmallVectorImpl<PyObject *> &retArgs) const;
 

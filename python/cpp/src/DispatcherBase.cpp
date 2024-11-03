@@ -225,7 +225,7 @@ mlir::Operation *DispatcherBase::runFrontend() {
 void DispatcherBase::invokeFunc(const py::args &args,
                                 const py::kwargs &kwargs) {
   llvm::SmallVector<PyObject *, 16> funcArgs;
-  const void *key = processArgs(args, kwargs, funcArgs).getAsOpaquePointer();
+  const void *key = processArgs(args, kwargs, funcArgs);
   auto it = funcsCache.find(key);
   if (it == funcsCache.end()) {
     OpRef newMod = mod->clone();
@@ -344,7 +344,7 @@ void DispatcherBase::populateArgsHandlers(pybind11::handle args) {
   }
 }
 
-mlir::Type
+const void *
 DispatcherBase::processArgs(const pybind11::args &args,
                             const pybind11::kwargs &kwargs,
                             llvm::SmallVectorImpl<PyObject *> &retArgs) const {
@@ -383,9 +383,9 @@ DispatcherBase::processArgs(const pybind11::args &args,
     return nullptr;
 
   if (types.size() == 1)
-    return types.front();
+    return types.front().getAsOpaquePointer();
 
-  return mlir::TupleType::get(&ctx);
+  return mlir::TupleType::get(&ctx).getAsOpaquePointer();
 }
 
 DispatcherBase::OpRef DispatcherBase::importFuncForLinking(
