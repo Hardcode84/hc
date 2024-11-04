@@ -45,6 +45,7 @@ set(SOURCES_LIST
     lib/Transforms/ConverPyFuncToKernel.cpp
     lib/Transforms/ConvertPyASTToIR.cpp
     lib/Transforms/ConvertPyFuncToFunc.cpp
+    lib/Transforms/DecomposeHKOps.cpp
     lib/Transforms/DropTypeResolvers.cpp
     lib/Transforms/LowerHKernel.cpp
     lib/Transforms/LowerScope.cpp
@@ -76,6 +77,7 @@ apply_llvm_compile_flags(${PROJECT_NAME})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     MLIRAffineDialect
+    MLIRAffineToStandard
     MLIRComplexDialect
     MLIRControlFlowDialect
     MLIRDialectUtils

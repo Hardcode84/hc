@@ -4,6 +4,9 @@
 
 #include "hc/Pipelines/MiddleendPipeline.hpp"
 
+#include <mlir/Conversion/AffineToStandard/AffineToStandard.h>
+#include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Transforms/Passes.h>
 
@@ -24,5 +27,10 @@ void hc::populateMiddleendPipeline(mlir::PassManager &pm) {
   populateOptPasses(pm);
   pm.addPass(hc::createLowerHKernelOpsPass());
   pm.addPass(hc::createResolveArgsPass());
+
+  auto &func = pm.nest<mlir::func::FuncOp>();
+  func.addPass(hc::createDecomposeHKernelOpsPass());
+  func.addPass(mlir::createLowerAffinePass());
+
   populateOptPasses(pm);
 }

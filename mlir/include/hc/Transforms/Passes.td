@@ -175,4 +175,17 @@ def LowerHKernelOpsPass : Pass<"hc-lower-hkernel-ops-pass"> {
   ];
 }
 
+def DecomposeHKernelOpsPass : Pass<"hc-decompose-hkernel-ops-pass"> {
+  let summary = "TBD";
+  let description = [{
+    TBD
+  }];
+
+  let dependentDialects = [
+    "::hc::hk::HKernelDialect",
+    "::mlir::arith::ArithDialect",
+  ];
+}
+
+
 #endif // _HC_TRANSFORMS_PASSES_TD_INCLUDED_
