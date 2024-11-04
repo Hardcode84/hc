@@ -138,42 +138,56 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
   auto dimsStr = getStr("dims");
   auto dtypeStr = getStr("dtype");
   auto nameStr = getStr("name");
-  converter.addConversion([=](hc::typing::IdentType type)
-                              -> std::optional<mlir::Type> {
-    if (type.getName() != bufferStr)
-      return std::nullopt;
 
-    auto dims = type.getParam<hc::typing::SequenceType>(dimsStr);
-    if (!dims)
-      return std::nullopt;
-
-    auto dtype = type.getParam(dtypeStr);
-    if (auto ident = mlir::dyn_cast_if_present<hc::typing::IdentType>(dtype))
-      dtype = ident.getParam(nameStr);
-
+  auto getDtype = [=](hc::typing::IdentType type) -> std::optional<mlir::Type> {
+    mlir::Type dtype = type.getParam(dtypeStr);
     if (!dtype)
       return std::nullopt;
 
-    return hc::hk::BufferType::get(type.getContext(), dims.getParams(), dtype);
-  });
-  converter.addConversion([=](hc::typing::IdentType type)
-                              -> std::optional<mlir::Type> {
-    if (type.getName() != tensorStr)
-      return std::nullopt;
-
-    auto dims = type.getParam<hc::typing::SequenceType>(dimsStr);
-    if (!dims)
-      return std::nullopt;
-
-    auto dtype = type.getParam(dtypeStr);
-    if (auto ident = mlir::dyn_cast_if_present<hc::typing::IdentType>(dtype))
+    if (auto ident = mlir::dyn_cast<hc::typing::IdentType>(dtype))
       dtype = ident.getParam(nameStr);
 
-    if (!dtype)
-      return std::nullopt;
+    if (auto literal = mlir::dyn_cast<hc::typing::LiteralType>(dtype)) {
+      if (auto strAttr = mlir::dyn_cast<mlir::StringAttr>(literal.getValue())) {
+        dtype =
+            hc::typing::SymbolType::get(dtype.getContext(), strAttr.getValue());
+      }
+    }
+    return dtype;
+  };
 
-    return hc::hk::TensorType::get(type.getContext(), dims.getParams(), dtype);
-  });
+  converter.addConversion(
+      [=](hc::typing::IdentType type) -> std::optional<mlir::Type> {
+        if (type.getName() != bufferStr)
+          return std::nullopt;
+
+        auto dims = type.getParam<hc::typing::SequenceType>(dimsStr);
+        if (!dims)
+          return std::nullopt;
+
+        auto dtype = getDtype(type);
+        if (!dtype)
+          return std::nullopt;
+
+        return hc::hk::BufferType::get(type.getContext(), dims.getParams(),
+                                       *dtype);
+      });
+  converter.addConversion(
+      [=](hc::typing::IdentType type) -> std::optional<mlir::Type> {
+        if (type.getName() != tensorStr)
+          return std::nullopt;
+
+        auto dims = type.getParam<hc::typing::SequenceType>(dimsStr);
+        if (!dims)
+          return std::nullopt;
+
+        auto dtype = getDtype(type);
+        if (!dtype)
+          return std::nullopt;
+
+        return hc::hk::TensorType::get(type.getContext(), dims.getParams(),
+                                       *dtype);
+      });
 
   auto tupleStr = getStr("Tuple");
   auto elementsStr = getStr("elements");
