@@ -47,6 +47,7 @@ set(SOURCES_LIST
     lib/Transforms/ConvertPyFuncToFunc.cpp
     lib/Transforms/DecomposeHKOps.cpp
     lib/Transforms/DropTypeResolvers.cpp
+    lib/Transforms/LegalizeBoolMemrefs.cpp
     lib/Transforms/LowerHKernel.cpp
     lib/Transforms/LowerScope.cpp
     lib/Transforms/ModuleLinker.cpp
