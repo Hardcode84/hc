@@ -393,27 +393,24 @@ struct ResolveArgsPass final
       return signalPassFailure();
     }
 
-    auto metadata = mod->getAttrOfType<mlir::ArrayAttr>(
-        hc::hk::getKernelMetadataAttrName());
-    if (!metadata) {
-      mod.emitError("No metadata");
-      return signalPassFailure();
-    }
-
-    if (metadata.size() % 2 != 0) {
-      mod.emitError("Invalid metadata size");
-      return signalPassFailure();
-    }
-
     llvm::SmallDenseMap<mlir::Type, mlir::Type> metadataMap;
-    for (auto i : llvm::seq<size_t>(0, metadata.size() / 2)) {
-      auto keyAttr = mlir::dyn_cast<hc::typing::TypeAttr>(metadata[i * 2]);
-      auto valAttr = mlir::dyn_cast<hc::typing::TypeAttr>(metadata[i * 2 + 1]);
-      if (!keyAttr || !valAttr) {
-        mod.emitError("Invalid metadata");
+    if (auto metadata = mod->getAttrOfType<mlir::ArrayAttr>(
+            hc::hk::getKernelMetadataAttrName())) {
+      if (metadata.size() % 2 != 0) {
+        mod.emitError("Invalid metadata size");
         return signalPassFailure();
       }
-      metadataMap.insert({keyAttr.getTypeVal(), valAttr.getTypeVal()});
+
+      for (auto i : llvm::seq<size_t>(0, metadata.size() / 2)) {
+        auto keyAttr = mlir::dyn_cast<hc::typing::TypeAttr>(metadata[i * 2]);
+        auto valAttr =
+            mlir::dyn_cast<hc::typing::TypeAttr>(metadata[i * 2 + 1]);
+        if (!keyAttr || !valAttr) {
+          mod.emitError("Invalid metadata");
+          return signalPassFailure();
+        }
+        metadataMap.insert({keyAttr.getTypeVal(), valAttr.getTypeVal()});
+      }
     }
 
     mlir::TypeConverter converter;
@@ -1100,27 +1097,24 @@ struct LowerHKernelOpsPass final
 
     mlir::ConversionTarget target(*ctx);
 
-    auto metadata = mod->getAttrOfType<mlir::ArrayAttr>(
-        hc::hk::getKernelMetadataAttrName());
-    if (!metadata) {
-      mod.emitError("No metadata");
-      return signalPassFailure();
-    }
-
-    if (metadata.size() % 2 != 0) {
-      mod.emitError("Invalid metadata size");
-      return signalPassFailure();
-    }
-
     llvm::SmallDenseMap<mlir::Type, mlir::Type> metadataMap;
-    for (auto i : llvm::seq<size_t>(0, metadata.size() / 2)) {
-      auto keyAttr = mlir::dyn_cast<hc::typing::TypeAttr>(metadata[i * 2]);
-      auto valAttr = mlir::dyn_cast<hc::typing::TypeAttr>(metadata[i * 2 + 1]);
-      if (!keyAttr || !valAttr) {
-        mod.emitError("Invalid metadata");
+    if (auto metadata = mod->getAttrOfType<mlir::ArrayAttr>(
+            hc::hk::getKernelMetadataAttrName())) {
+      if (metadata.size() % 2 != 0) {
+        mod.emitError("Invalid metadata size");
         return signalPassFailure();
       }
-      metadataMap.insert({keyAttr.getTypeVal(), valAttr.getTypeVal()});
+
+      for (auto i : llvm::seq<size_t>(0, metadata.size() / 2)) {
+        auto keyAttr = mlir::dyn_cast<hc::typing::TypeAttr>(metadata[i * 2]);
+        auto valAttr =
+            mlir::dyn_cast<hc::typing::TypeAttr>(metadata[i * 2 + 1]);
+        if (!keyAttr || !valAttr) {
+          mod.emitError("Invalid metadata");
+          return signalPassFailure();
+        }
+        metadataMap.insert({keyAttr.getTypeVal(), valAttr.getTypeVal()});
+      }
     }
 
     mlir::TypeConverter converter;
