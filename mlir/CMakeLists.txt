@@ -45,6 +45,7 @@ set(SOURCES_LIST
     lib/Transforms/ConverPyFuncToKernel.cpp
     lib/Transforms/ConvertPyASTToIR.cpp
     lib/Transforms/ConvertPyFuncToFunc.cpp
+    lib/Transforms/DecomposeHKOps.cpp
     lib/Transforms/DropTypeResolvers.cpp
     lib/Transforms/LowerHKernel.cpp
     lib/Transforms/LowerScope.cpp

@@ -1,7 +1,6 @@
 // RUN: hc-opt -split-input-file %s --hc-lower-hkernel-ops-pass --canonicalize | FileCheck %s
 
 
-
 func.func @test(%arg1: !hkernel<tensor <"W" x "H"> x f16>) -> !hkernel<tensor <"W" x "H"> x f16> {
   return %arg1 : !hkernel<tensor <"W" x "H"> x f16>
 }
