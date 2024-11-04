@@ -85,6 +85,30 @@ struct ConvertVecStore final
   }
 };
 
+struct ConvertVecLoad final
+    : public mlir::OpConversionPattern<mlir::vector::LoadOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::vector::LoadOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    if (!isI1Memref(op.getBase().getType()))
+      return rewriter.notifyMatchFailure(op, "Not a i1 memref");
+
+    mlir::Value base = adaptor.getBase();
+    auto newElemType =
+        mlir::cast<mlir::MemRefType>(base.getType()).getElementType();
+    auto oldVecType = mlir::cast<mlir::VectorType>(op.getType());
+    auto newVecType = oldVecType.clone(newElemType);
+
+    mlir::Location loc = op.getLoc();
+    mlir::Value result = rewriter.create<mlir::vector::LoadOp>(
+        loc, newVecType, base, adaptor.getIndices(), adaptor.getNontemporal());
+    result = rewriter.create<mlir::arith::TruncIOp>(loc, oldVecType, result);
+    rewriter.replaceOp(op, result);
+    return mlir::success();
+  }
+};
 } // namespace
 
 static void populateTypeConverter(mlir::MLIRContext *ctx,
@@ -129,7 +153,8 @@ struct LegalizeBoolMemrefsPass final
 
     mlir::populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
                                                               converter);
-    patterns.insert<ConvertTypes, ConvertVecStore>(converter, ctx);
+    patterns.insert<ConvertTypes, ConvertVecStore, ConvertVecLoad>(converter,
+                                                                   ctx);
 
     target.addDynamicallyLegalOp<mlir::func::FuncOp>(
         [&](mlir::func::FuncOp op) {
