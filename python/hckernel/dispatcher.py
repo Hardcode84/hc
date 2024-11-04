@@ -36,7 +36,7 @@ def _is_literal(val):
 def _process_annotation(ann):
     def istypingtype(a, typ):
         return (
-            issubclass(a, typ) or typing.get_origin(ann) == typ or isinstance(ann, typ)
+            typing.get_origin(ann) == typ or isinstance(ann, typ) or issubclass(a, typ)
         )
 
     def get_typing_args(ann):

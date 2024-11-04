@@ -40,7 +40,10 @@ def _add_sub(subs, sym, val):
 
 def _visit_arg_annotation(idx, ann, prev_handler):
     def istypingtype(a, typ):
-        return typing.get_origin(ann) == typ or isinstance(ann, typ)
+        print(a, typ)
+        return (
+            typing.get_origin(ann) == typ or isinstance(ann, typ) or issubclass(a, typ)
+        )
 
     def get_typing_args(ann):
         if isinstance(ann, (types.GenericAlias, typing._GenericAlias)):
@@ -78,9 +81,8 @@ def _visit_arg_annotation(idx, ann, prev_handler):
 
         def handler(subs, args):
             val = args[idx]
-            ann_args = typing.get_args(ann)[0]
-            shape = ann_args[:-1]
-            dtype = ann_args[-1]
+            shape = ann.shape
+            dtype = ann.dtype
             assert len(val.shape) == len(shape)
             for s, v in zip(shape, val.shape):
                 if not isinstance(s, Symbol):
