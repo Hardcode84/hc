@@ -35,16 +35,18 @@ protected:
 
 private:
   using OpRef = mlir::OwningOpRef<mlir::Operation *>;
+  struct ArgsHandlerBuilder;
 
   Context &context;
   pybind11::object contextRef; // to keep context alive
   pybind11::object getFuncDesc;
   OpRef mod;
+  std::unique_ptr<ArgsHandlerBuilder> argsHandlerBuilder;
 
   struct ArgDesc {
     llvm::StringRef name;
     std::function<void(mlir::MLIRContext &, pybind11::handle,
-                       llvm::SmallVectorImpl<mlir::Type> &,
+                       llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &,
                        llvm::SmallVectorImpl<PyObject *> &)>
         handler;
   };
@@ -56,12 +58,12 @@ private:
 
   using FuncT = int (*)(ExceptionDesc *exc, PyObject *args[]);
 
-  llvm::DenseMap<mlir::Type, FuncT> funcsCache;
+  llvm::SmallDenseMap<const void *, FuncT> funcsCache;
 
   void populateArgsHandlers(pybind11::handle args);
-  mlir::Type processArgs(const pybind11::args &args,
-                         const pybind11::kwargs &kwargs,
-                         llvm::SmallVectorImpl<PyObject *> &retArgs) const;
+  mlir::Attribute processArgs(const pybind11::args &args,
+                              const pybind11::kwargs &kwargs,
+                              llvm::SmallVectorImpl<PyObject *> &retArgs) const;
 
   void linkModules(mlir::Operation *rootModule,
                    const pybind11::dict &currentDeps);

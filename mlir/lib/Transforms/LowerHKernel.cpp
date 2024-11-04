@@ -87,9 +87,6 @@ static mlir::gpu::AddressSpaceAttr getWGAddrSpace(mlir::MLIRContext *ctx) {
 }
 
 static void populateTypeConverter(mlir::TypeConverter &converter) {
-  // Convert unknown types to itself
-  converter.addConversion([](mlir::Type type) { return type; });
-
   converter.addConversion([&](hc::hk::BufferType type) -> mlir::Type {
     auto elemType = convertElemType(converter, type.getElementType());
     if (!elemType)
@@ -332,6 +329,14 @@ template <typename T> T getParentOrSelf(mlir::Operation *op) {
   return op->getParentOfType<T>();
 }
 
+static mlir::Type makeSignless(mlir::Type type) {
+  auto intType = mlir::dyn_cast<mlir::IntegerType>(type);
+  if (!intType || intType.isSignless())
+    return type;
+
+  return mlir::IntegerType::get(type.getContext(), intType.getWidth());
+}
+
 namespace {
 struct ResolveArgsPass final
     : public hc::impl::ResolveArgsPassBase<ResolveArgsPass> {
@@ -388,8 +393,37 @@ struct ResolveArgsPass final
       return signalPassFailure();
     }
 
+    llvm::SmallDenseMap<mlir::Type, mlir::Type> metadataMap;
+    if (auto metadata = mod->getAttrOfType<mlir::ArrayAttr>(
+            hc::hk::getKernelMetadataAttrName())) {
+      if (metadata.size() % 2 != 0) {
+        mod.emitError("Invalid metadata size");
+        return signalPassFailure();
+      }
+
+      for (auto i : llvm::seq<size_t>(0, metadata.size() / 2)) {
+        auto keyAttr = mlir::dyn_cast<hc::typing::TypeAttr>(metadata[i * 2]);
+        auto valAttr =
+            mlir::dyn_cast<hc::typing::TypeAttr>(metadata[i * 2 + 1]);
+        if (!keyAttr || !valAttr) {
+          mod.emitError("Invalid metadata");
+          return signalPassFailure();
+        }
+        metadataMap.insert({keyAttr.getTypeVal(), valAttr.getTypeVal()});
+      }
+    }
+
     mlir::TypeConverter converter;
+    // Convert unknown types to itself
+    converter.addConversion([](mlir::Type type) { return type; });
     populateTypeConverter(converter);
+    converter.addConversion([&](mlir::Type type) -> std::optional<mlir::Type> {
+      auto it = metadataMap.find(type);
+      if (it != metadataMap.end())
+        return makeSignless(it->second);
+
+      return std::nullopt;
+    });
 
     SymbolsMapType symbolsMap;
 
@@ -1055,10 +1089,46 @@ struct LowerHKernelOpsPass final
 
   void runOnOperation() override {
     auto *ctx = &getContext();
+    auto mod = getParentOrSelf<mlir::ModuleOp>(getOperation());
+    if (!mod) {
+      getOperation()->emitError("No parent module");
+      return signalPassFailure();
+    }
+
     mlir::ConversionTarget target(*ctx);
+
+    llvm::SmallDenseMap<mlir::Type, mlir::Type> metadataMap;
+    if (auto metadata = mod->getAttrOfType<mlir::ArrayAttr>(
+            hc::hk::getKernelMetadataAttrName())) {
+      if (metadata.size() % 2 != 0) {
+        mod.emitError("Invalid metadata size");
+        return signalPassFailure();
+      }
+
+      for (auto i : llvm::seq<size_t>(0, metadata.size() / 2)) {
+        auto keyAttr = mlir::dyn_cast<hc::typing::TypeAttr>(metadata[i * 2]);
+        auto valAttr =
+            mlir::dyn_cast<hc::typing::TypeAttr>(metadata[i * 2 + 1]);
+        if (!keyAttr || !valAttr) {
+          mod.emitError("Invalid metadata");
+          return signalPassFailure();
+        }
+        metadataMap.insert({keyAttr.getTypeVal(), valAttr.getTypeVal()});
+      }
+    }
+
     mlir::TypeConverter converter;
 
+    // Convert unknown types to itself
+    converter.addConversion([](mlir::Type type) { return type; });
     populateTypeConverter(converter);
+    converter.addConversion([&](mlir::Type type) -> std::optional<mlir::Type> {
+      auto it = metadataMap.find(type);
+      if (it != metadataMap.end())
+        return makeSignless(it->second);
+
+      return std::nullopt;
+    });
 
     auto materialize = [](mlir::OpBuilder &builder, mlir::Type type,
                           mlir::ValueRange inputs,

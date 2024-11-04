@@ -18,7 +18,7 @@ import functools
 import operator
 
 from .indexing import sym
-from .typename import typename
+from .typename import Typename, typename
 from .symbol_registry import register_symbol as _reg_symbol_impl
 
 
@@ -432,8 +432,17 @@ class CurrentGroup:
         return _masked_array(np.full(shape, fill_value=init, dtype=dtype), mask=True)
 
 
-class Buffer(typing.Generic[typing.ParamSpec("Args")]):
-    pass
+class Buffer(type):
+    def __class_getitem__(cls, shape_and_dtype):
+        assert len(shape_and_dtype) > 0, "Invalid shape and dtype"
+        init_shape = shape_and_dtype[:-1]
+        init_dtype = shape_and_dtype[-1]
+
+        class SubType(cls):
+            shape = init_shape
+            dtype = init_dtype
+
+        return SubType
 
 
 def atomic_ref(a):

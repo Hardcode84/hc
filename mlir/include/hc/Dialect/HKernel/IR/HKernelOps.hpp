@@ -38,4 +38,6 @@ llvm::StringRef getKernelGroupIdAttrName();
 llvm::StringRef getKernelLocalIdAttrName();
 llvm::StringRef getKernelSubgroupSizeAttrName();
 llvm::StringRef getKernelSubgroupIdAttrName();
+
+llvm::StringRef getKernelMetadataAttrName();
 } // namespace hc::hk
