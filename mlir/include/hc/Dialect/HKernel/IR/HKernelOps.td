@@ -327,11 +327,11 @@ def HKernel_PtrType : HKernel_Type<"Ptr", "ptr", [], "::mlir::Type"> {
 
 def HKernel_PtrAllocaOp : HKernel_OpBase<"ptr_alloca", [Pure]> {
   let arguments = (ins
-    Index:$size
+    AnySignlessIntegerOrIndex:$size
   );
   let results = (outs HKernel_PtrType:$result);
 
-  let assemblyFormat = "attr-dict $size `:` type($result)";
+  let assemblyFormat = "attr-dict $size `:` type($size) `,` qualified(type($result))";
 }
 
 

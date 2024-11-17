@@ -51,6 +51,45 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
 }
 
 namespace {
+struct ConvertAlloca final : mlir::OpConversionPattern<mlir::memref::AllocaOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::AllocaOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::MemRefType memrefType = op.getType();
+    if (!memrefType.getLayout().isIdentity())
+      return rewriter.notifyMatchFailure(
+          op, "Only identity layout is supported for alloca");
+
+    auto resultType =
+        getTypeConverter()->convertType<mlir::TupleType>(memrefType);
+    if (!resultType)
+      return rewriter.notifyMatchFailure(op, "Unable to convert result type");
+
+    mlir::ValueRange dynSizes = adaptor.getDynamicSizes();
+    mlir::Location loc = op.getLoc();
+    mlir::Value size = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+    for (auto s : memrefType.getShape()) {
+      mlir::Value dim;
+      if (mlir::ShapedType::isDynamic(s)) {
+        dim = dynSizes.front();
+        dynSizes = dynSizes.drop_front();
+      } else {
+        dim = rewriter.create<mlir::arith::ConstantIndexOp>(loc, s);
+      }
+      size = rewriter.create<mlir::arith::MulIOp>(loc, size, dim);
+    }
+    mlir::Value ptr =
+        rewriter.create<hc::hk::PtrAllocaOp>(loc, resultType.getType(0), size);
+    llvm::SmallVector<mlir::Value> results;
+    results.emplace_back(ptr);
+    llvm::append_range(results, adaptor.getDynamicSizes());
+    rewriter.replaceOpWithNewOp<hc::hk::MakeTupleOp>(op, resultType, results);
+    return mlir::success();
+  }
+};
+
 struct ConvertReturn final : mlir::OpConversionPattern<mlir::func::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -93,6 +132,8 @@ struct DecomposeMemrefsPass final
     mlir::populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
                                                               converter);
     patterns.insert<ConvertReturn>(converter, ctx);
+
+    patterns.insert<ConvertAlloca>(converter, ctx);
 
     target.addDynamicallyLegalOp<mlir::func::FuncOp>(
         [&](mlir::func::FuncOp op) {
