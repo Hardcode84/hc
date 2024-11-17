@@ -305,4 +305,34 @@ def HKernel_ResolveSliceOp : HKernel_OpBase<"resolve_slice", [
   ];
 }
 
+// Ptr stuff, TODO: upstream
+
+def HKernel_PtrType : HKernel_Type<"Ptr", "ptr", [], "::mlir::Type"> {
+  let summary = "Typed pointer type";
+  let parameters = (ins
+      "::mlir::Type":$pointerType,
+      OptionalParameter<"::mlir::Attribute">:$memorySpace
+    );
+  let assemblyFormat = "`<` $pointerType ( `,` $memorySpace^ )? `>`";
+  let builders = [
+    TypeBuilderWithInferredContext<(ins
+        CArg<"::mlir::Type">:$type,
+        CArg<"::mlir::Attribute", "nullptr">:$memorySpace
+      ),
+    [{
+      return $_get(type.getContext(), type, memorySpace);
+    }]>
+  ];
+}
+
+def HKernel_PtrAllocaOp : HKernel_OpBase<"ptr_alloca", [Pure]> {
+  let arguments = (ins
+    Index:$size
+  );
+  let results = (outs HKernel_PtrType:$result);
+
+  let assemblyFormat = "attr-dict $size `:` type($result)";
+}
+
+
 #endif // HKERNEL_OPS
