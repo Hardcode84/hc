@@ -45,3 +45,15 @@ func.func @test() -> memref<10xf32> {
   %0 = memref.alloca() : memref<10xf32>
   return %0 : memref<10xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:  (%[[ARG:.*]]: index)
+//       CHECK:  %[[P:.*]] = hkernel.ptr_alloca %[[ARG]] : index, !hkernel.ptr<f32>
+//       CHECK:  %[[R:.*]] = hkernel.make_tuple %[[P]], %[[ARG]] : !hkernel.ptr<f32>, index -> tuple<!hkernel.ptr<f32>, index>
+//       CHECK:  return %[[R]] : tuple<!hkernel.ptr<f32>, index>
+func.func @test(%arg: index) -> memref<?xf32> {
+  %0 = memref.alloca(%arg) : memref<?xf32>
+  return %0 : memref<?xf32>
+}
