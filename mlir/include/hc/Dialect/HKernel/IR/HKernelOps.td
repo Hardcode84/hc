@@ -334,5 +334,15 @@ def HKernel_PtrAllocaOp : HKernel_OpBase<"ptr_alloca", [Pure]> {
   let assemblyFormat = "attr-dict $size `:` type($size) `,` qualified(type($result))";
 }
 
+def HKernel_PtrAddOp : HKernel_OpBase<"ptr_add", [Pure, AllTypesMatch<["base", "result"]>]> {
+  let arguments = (ins
+    HKernel_PtrType:$base,
+    AnySignlessIntegerOrIndex:$offset
+  );
+  let results = (outs HKernel_PtrType:$result);
+
+  let assemblyFormat = "attr-dict $base `:` qualified(type($base)) `,` $offset `:` type($offset)";
+}
+
 
 #endif // HKERNEL_OPS
