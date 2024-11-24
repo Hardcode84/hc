@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "hc/Transforms/Passes.hpp"
+#include "hc/Utils.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
@@ -151,16 +152,10 @@ struct LegalizeBoolMemrefsPass final
 
     mlir::RewritePatternSet patterns(ctx);
 
-    mlir::populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
-                                                              converter);
+    hc::populateFuncPatternsAndTypeConversion(patterns, target, converter);
+
     patterns.insert<ConvertTypes, ConvertVecStore, ConvertVecLoad>(converter,
                                                                    ctx);
-
-    target.addDynamicallyLegalOp<mlir::func::FuncOp>(
-        [&](mlir::func::FuncOp op) {
-          return converter.isSignatureLegal(op.getFunctionType()) &&
-                 converter.isLegal(&op.getBody());
-        });
 
     target.markUnknownOpDynamicallyLegal(
         [&](mlir::Operation *op) -> bool { return converter.isLegal(op); });

@@ -5,6 +5,7 @@
 #include "hc/Transforms/Passes.hpp"
 
 #include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
+#include "hc/Utils.hpp"
 
 #include <mlir/Dialect/Affine/IR/AffineOps.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
@@ -479,18 +480,6 @@ struct ConvertMaskedVecStore final
   }
 };
 
-struct ConvertReturn final : mlir::OpConversionPattern<mlir::func::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::func::ReturnOp op, OpAdaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op,
-                                                      adaptor.getOperands());
-    return mlir::success();
-  }
-};
-
 struct DecomposeMemrefsPass final
     : public hc::impl::DecomposeMemrefsPassBase<DecomposeMemrefsPass> {
 
@@ -518,19 +507,11 @@ struct DecomposeMemrefsPass final
 
     mlir::RewritePatternSet patterns(ctx);
 
-    mlir::populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
-                                                              converter);
-    patterns.insert<ConvertReturn>(converter, ctx);
+    hc::populateFuncPatternsAndTypeConversion(patterns, target, converter);
 
     patterns.insert<ConvertAlloca, ConvertSubview, ConvertLoad, ConvertStore,
                     ConvertVecLoad, ConvertVecStore, ConvertMaskedVecLoad,
                     ConvertMaskedVecStore>(converter, ctx);
-
-    target.addDynamicallyLegalOp<mlir::func::FuncOp>(
-        [&](mlir::func::FuncOp op) {
-          return converter.isSignatureLegal(op.getFunctionType()) &&
-                 converter.isLegal(&op.getBody());
-        });
 
     target.markUnknownOpDynamicallyLegal(
         [&](mlir::Operation *op) -> bool { return converter.isLegal(op); });

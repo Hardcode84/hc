@@ -8,6 +8,12 @@
 
 #include <llvm/ADT/ScopeExit.h>
 
+namespace mlir {
+class ConversionTarget;
+class RewritePatternSet;
+class TypeConverter;
+} // namespace mlir
+
 namespace hc {
 template <typename T, typename H, typename F>
 inline auto scopedDiagHandler(T &ctx, H &&diag_handler, F &&func) {
@@ -17,4 +23,8 @@ inline auto scopedDiagHandler(T &ctx, H &&diag_handler, F &&func) {
       llvm::make_scope_exit([&]() { diagEngine.eraseHandler(diagId); });
   return func();
 }
+
+void populateFuncPatternsAndTypeConversion(mlir::RewritePatternSet &patterns,
+                                           mlir::ConversionTarget &target,
+                                           mlir::TypeConverter &converter);
 } // namespace hc
