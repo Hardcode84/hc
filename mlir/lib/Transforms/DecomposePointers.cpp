@@ -31,8 +31,27 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
       });
 }
 
+static mlir::Value doCast(mlir::OpBuilder &builder, mlir::Location loc,
+                          mlir::Value src, mlir::Type dstType) {
+  mlir::Type srcType = src.getType();
+  if (srcType == dstType)
+    return src;
+
+  assert(srcType.isIntOrIndex());
+  assert(dstType.isIntOrIndex());
+  if (mlir::isa<mlir::IndexType>(srcType) ||
+      mlir::isa<mlir::IndexType>(dstType))
+    return builder.create<mlir::arith::IndexCastOp>(loc, dstType, src);
+
+  if (dstType.getIntOrFloatBitWidth() < srcType.getIntOrFloatBitWidth()) {
+    return builder.create<mlir::arith::TruncIOp>(loc, dstType, src);
+  } else {
+    return builder.create<mlir::arith::ExtSIOp>(loc, dstType, src);
+  }
+}
+
 namespace {
-struct ConvertAlloca final : mlir::OpConversionPattern<hc::hk::PtrAllocaOp> {
+struct ConvertPtrAlloca final : mlir::OpConversionPattern<hc::hk::PtrAllocaOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
@@ -52,6 +71,38 @@ struct ConvertAlloca final : mlir::OpConversionPattern<hc::hk::PtrAllocaOp> {
     mlir::Value offset = rewriter.create<mlir::arith::ConstantOp>(
         loc, offType, rewriter.getIntegerAttr(offType, 0));
     mlir::Value args[] = {newPtr, offset};
+    rewriter.replaceOpWithNewOp<hc::hk::MakeTupleOp>(op, resType, args);
+    return mlir::success();
+  }
+};
+
+struct ConvertPtrAdd final : mlir::OpConversionPattern<hc::hk::PtrAddOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::PtrAddOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto resType =
+        getTypeConverter()->convertType<mlir::TupleType>(op.getType());
+    if (!resType || resType.size() != 2 ||
+        !mlir::isa<hc::hk::PtrType>(resType.getType(0)))
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    auto ptrType = mlir::cast<hc::hk::PtrType>(resType.getType(0));
+    auto offType = resType.getType(1);
+    mlir::Location loc = op.getLoc();
+    mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    mlir::Value one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+    mlir::Value ptr = rewriter.create<hc::hk::TupleExtractOp>(
+        loc, ptrType, adaptor.getBase(), zero);
+    mlir::Value srcOffset = rewriter.create<hc::hk::TupleExtractOp>(
+        loc, offType, adaptor.getBase(), one);
+    mlir::Value dstOffset = doCast(rewriter, loc, adaptor.getOffset(), offType);
+    auto ovfFlags = mlir::arith::IntegerOverflowFlags::nsw |
+                    mlir::arith::IntegerOverflowFlags::nuw;
+    mlir::Value offset = rewriter.create<mlir::arith::AddIOp>(
+        loc, srcOffset, dstOffset, ovfFlags);
+    mlir::Value args[] = {ptr, offset};
     rewriter.replaceOpWithNewOp<hc::hk::MakeTupleOp>(op, resType, args);
     return mlir::success();
   }
@@ -112,7 +163,7 @@ struct DecomposePointersPass final
                                                               converter);
     patterns.insert<ConvertReturn>(converter, ctx);
 
-    patterns.insert<ConvertAlloca>(converter, ctx);
+    patterns.insert<ConvertPtrAlloca, ConvertPtrAdd>(converter, ctx);
 
     target.addDynamicallyLegalOp<mlir::func::FuncOp>(
         [&](mlir::func::FuncOp op) {
