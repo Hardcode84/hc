@@ -169,3 +169,32 @@ func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index, %arg3: vecto
   vector.store %arg3, %arg0[%arg1, %arg2] : memref<5x7xf32>, vector<2xf32>
   return
 }
+
+// -----
+
+//       CHECK: #[[MAP:.*]] = affine_map<()[s0, s1] -> (s0 * 7 + s1)>
+// CHECK-LABEL: func @test
+//  CHECK-SAME:  (%[[ARG0:.*]]: tuple<!hkernel.ptr<f32>>, %[[ARG1:.*]]: index, %[[ARG2:.*]]: index, %[[ARG3:.*]]: vector<2xi1>, %[[ARG4:.*]]: vector<2xf32>)
+//   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
+//       CHECK:  %[[OFFSET:.*]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[ARG2]]]
+//       CHECK:  %[[PTR:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>>[%[[C0]]] -> !hkernel.ptr<f32>
+//       CHECK:  %[[RES:.*]] = hkernel.ptr_load %[[PTR]] : !hkernel.ptr<f32>[%[[OFFSET]] : index] mask %[[ARG3]] : vector<2xi1>, %[[ARG4]] : vector<2xf32> : vector<2xf32>
+//       CHECK:  return %[[RES]] : vector<2xf32>
+func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index, %mask: vector<2xi1>, %passthru: vector<2xf32>) -> vector<2xf32> {
+  %1 = vector.maskedload %arg0[%arg1, %arg2], %mask, %passthru : memref<5x7xf32>, vector<2xi1>, vector<2xf32> into vector<2xf32>
+  return %1 : vector<2xf32>
+}
+
+// -----
+
+//       CHECK: #[[MAP:.*]] = affine_map<()[s0, s1] -> (s0 * 7 + s1)>
+// CHECK-LABEL: func @test
+//  CHECK-SAME:  (%[[ARG0:.*]]: tuple<!hkernel.ptr<f32>>, %[[ARG1:.*]]: index, %[[ARG2:.*]]: index, %[[ARG3:.*]]: vector<2xf32>, %[[ARG4:.*]]: vector<2xi1>)
+//   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
+//       CHECK:  %[[OFFSET:.*]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[ARG2]]]
+//       CHECK:  %[[PTR:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>>[%[[C0]]] -> !hkernel.ptr<f32>
+//       CHECK:  hkernel.ptr_store %[[ARG3]] : vector<2xf32> %[[PTR]] : !hkernel.ptr<f32>[%[[OFFSET]] : index] mask %[[ARG4]] : vector<2xi1>
+func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index, %arg3: vector<2xf32>, %mask: vector<2xi1>)  {
+  vector.maskedstore %arg0[%arg1, %arg2], %mask, %arg3 : memref<5x7xf32>, vector<2xi1>, vector<2xf32>
+  return
+}
