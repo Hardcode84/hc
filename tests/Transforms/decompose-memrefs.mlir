@@ -120,7 +120,7 @@ func.func @test(%arg0: memref<?x?xf32, strided<[?, ?], offset: ?>>, %arg1: index
 //   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
 //       CHECK:  %[[OFFSET:.*]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[ARG2]]]
 //       CHECK:  %[[PTR:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>>[%[[C0]]] -> !hkernel.ptr<f32>
-//       CHECK:  %[[RES:.*]] = hkernel.ptr_load %[[PTR]] : !hkernel.ptr<f32>[%0 : index] : f32
+//       CHECK:  %[[RES:.*]] = hkernel.ptr_load %[[PTR]] : !hkernel.ptr<f32>[%[[OFFSET]] : index] : f32
 //       CHECK:  return %[[RES]] : f32
 func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index) -> f32 {
   %1 = memref.load %arg0[%arg1, %arg2] : memref<5x7xf32>
@@ -135,7 +135,7 @@ func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index) -> f32 {
 //   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
 //       CHECK:  %[[OFFSET:.*]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[ARG2]]]
 //       CHECK:  %[[PTR:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>>[%[[C0]]] -> !hkernel.ptr<f32>
-//       CHECK:  hkernel.ptr_store %[[ARG3]] : f32 %[[PTR]] : !hkernel.ptr<f32>[%0 : index]
+//       CHECK:  hkernel.ptr_store %[[ARG3]] : f32 %[[PTR]] : !hkernel.ptr<f32>[%[[OFFSET]] : index]
 func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index, %arg3: f32)  {
   memref.store %arg3, %arg0[%arg1, %arg2] : memref<5x7xf32>
   return
@@ -149,7 +149,7 @@ func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index, %arg3: f32) 
 //   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
 //       CHECK:  %[[OFFSET:.*]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[ARG2]]]
 //       CHECK:  %[[PTR:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>>[%[[C0]]] -> !hkernel.ptr<f32>
-//       CHECK:  %[[RES:.*]] = hkernel.ptr_load %[[PTR]] : !hkernel.ptr<f32>[%0 : index] : vector<2xf32>
+//       CHECK:  %[[RES:.*]] = hkernel.ptr_load %[[PTR]] : !hkernel.ptr<f32>[%[[OFFSET]] : index] : vector<2xf32>
 //       CHECK:  return %[[RES]] : vector<2xf32>
 func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index) -> vector<2xf32> {
   %1 = vector.load %arg0[%arg1, %arg2] : memref<5x7xf32>, vector<2xf32>
@@ -164,7 +164,7 @@ func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index) -> vector<2x
 //   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
 //       CHECK:  %[[OFFSET:.*]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[ARG2]]]
 //       CHECK:  %[[PTR:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>>[%[[C0]]] -> !hkernel.ptr<f32>
-//       CHECK:  hkernel.ptr_store %[[ARG3]] : vector<2xf32> %[[PTR]] : !hkernel.ptr<f32>[%0 : index]
+//       CHECK:  hkernel.ptr_store %[[ARG3]] : vector<2xf32> %[[PTR]] : !hkernel.ptr<f32>[%[[OFFSET]] : index]
 func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index, %arg3: vector<2xf32>)  {
   vector.store %arg3, %arg0[%arg1, %arg2] : memref<5x7xf32>, vector<2xf32>
   return
