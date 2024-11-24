@@ -308,20 +308,38 @@ def HKernel_ResolveSliceOp : HKernel_OpBase<"resolve_slice", [
 
 // Ptr stuff, TODO: upstream
 
-def HKernel_PtrType : HKernel_Type<"Ptr", "ptr", [], "::mlir::Type"> {
-  let summary = "Typed pointer type";
+def HKernel_LogicalPtrAttr : HKernel_Attr<"LogicalPtr", "logical_ptr"> {
+  let summary = "Logical pointer attribute";
   let parameters = (ins
-      "::mlir::Type":$pointerType,
-      OptionalParameter<"::mlir::Attribute">:$memorySpace
+      "::mlir::Type":$offset_type,
+      OptionalParameter<"::mlir::Attribute">:$memory_space
     );
-  let assemblyFormat = "`<` $pointerType ( `,` $memorySpace^ )? `>`";
+  let assemblyFormat = "`<` $offset_type ( `,` $memory_space^ )? `>`";
   let builders = [
     TypeBuilderWithInferredContext<(ins
         CArg<"::mlir::Type">:$type,
-        CArg<"::mlir::Attribute", "nullptr">:$memorySpace
+        CArg<"::mlir::Attribute", "nullptr">:$memory_space
       ),
     [{
-      return $_get(type.getContext(), type, memorySpace);
+      return $_get(type.getContext(), type, memory_space);
+    }]>
+  ];
+}
+
+def HKernel_PtrType : HKernel_Type<"Ptr", "ptr", [], "::mlir::Type"> {
+  let summary = "Typed pointer type";
+  let parameters = (ins
+      "::mlir::Type":$pointer_type,
+      OptionalParameter<"::mlir::Attribute">:$memory_space
+    );
+  let assemblyFormat = "`<` $pointer_type ( `,` $memory_space^ )? `>`";
+  let builders = [
+    TypeBuilderWithInferredContext<(ins
+        CArg<"::mlir::Type">:$type,
+        CArg<"::mlir::Attribute", "nullptr">:$memory_space
+      ),
+    [{
+      return $_get(type.getContext(), type, memory_space);
     }]>
   ];
 }
