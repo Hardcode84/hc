@@ -10,6 +10,7 @@
 #include <mlir/IR/OpImplementation.h>
 #include <mlir/Interfaces/ControlFlowInterfaces.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
+#include <mlir/Interfaces/ViewLikeInterface.h>
 
 namespace mlir {
 class RewriterBase;
