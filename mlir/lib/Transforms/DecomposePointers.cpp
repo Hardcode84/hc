@@ -32,6 +32,31 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
 }
 
 namespace {
+struct ConvertAlloca final : mlir::OpConversionPattern<hc::hk::PtrAllocaOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::PtrAllocaOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto resType =
+        getTypeConverter()->convertType<mlir::TupleType>(op.getType());
+    if (!resType || resType.size() != 2 ||
+        !mlir::isa<hc::hk::PtrType>(resType.getType(0)))
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    auto ptrType = mlir::cast<hc::hk::PtrType>(resType.getType(0));
+    auto offType = resType.getType(1);
+    mlir::Location loc = op.getLoc();
+    mlir::Value newPtr =
+        rewriter.create<hc::hk::PtrAllocaOp>(loc, ptrType, adaptor.getSize());
+    mlir::Value offset = rewriter.create<mlir::arith::ConstantOp>(
+        loc, offType, rewriter.getIntegerAttr(offType, 0));
+    mlir::Value args[] = {newPtr, offset};
+    rewriter.replaceOpWithNewOp<hc::hk::MakeTupleOp>(op, resType, args);
+    return mlir::success();
+  }
+};
+
 struct ConvertReturn final : mlir::OpConversionPattern<mlir::func::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -86,6 +111,8 @@ struct DecomposePointersPass final
     mlir::populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
                                                               converter);
     patterns.insert<ConvertReturn>(converter, ctx);
+
+    patterns.insert<ConvertAlloca>(converter, ctx);
 
     target.addDynamicallyLegalOp<mlir::func::FuncOp>(
         [&](mlir::func::FuncOp op) {
