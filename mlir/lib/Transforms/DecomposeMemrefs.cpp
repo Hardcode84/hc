@@ -243,7 +243,7 @@ struct ConvertLoad final : mlir::OpConversionPattern<mlir::memref::LoadOp> {
     mlir::Value base = adaptor.getMemref();
     auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
-      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+      return rewriter.notifyMatchFailure(op, "Invalid memref type");
 
     auto resultType = getTypeConverter()->convertType(op.getResult().getType());
     if (!resultType)
@@ -286,7 +286,7 @@ struct ConvertStore final : mlir::OpConversionPattern<mlir::memref::StoreOp> {
     mlir::Value base = adaptor.getMemref();
     auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
-      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+      return rewriter.notifyMatchFailure(op, "Invalid memref type");
 
     mlir::Location loc = op.getLoc();
     llvm::SmallVector<mlir::OpFoldResult> strides;
@@ -324,7 +324,7 @@ struct ConvertVecLoad final : mlir::OpConversionPattern<mlir::vector::LoadOp> {
     mlir::Value base = adaptor.getBase();
     auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
-      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+      return rewriter.notifyMatchFailure(op, "Invalid memref type");
 
     auto resultType = getTypeConverter()->convertType(op.getResult().getType());
     if (!resultType)
@@ -368,7 +368,7 @@ struct ConvertVecStore final
     mlir::Value base = adaptor.getBase();
     auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
-      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+      return rewriter.notifyMatchFailure(op, "Invalid memref type");
 
     mlir::Location loc = op.getLoc();
     llvm::SmallVector<mlir::OpFoldResult> strides;
@@ -407,7 +407,7 @@ struct ConvertMaskedVecLoad final
     mlir::Value base = adaptor.getBase();
     auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
-      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+      return rewriter.notifyMatchFailure(op, "Invalid memref type");
 
     auto resultType = getTypeConverter()->convertType(op.getResult().getType());
     if (!resultType)
@@ -451,7 +451,7 @@ struct ConvertMaskedVecStore final
     mlir::Value base = adaptor.getBase();
     auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
-      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+      return rewriter.notifyMatchFailure(op, "Invalid memref type");
 
     mlir::Location loc = op.getLoc();
     llvm::SmallVector<mlir::OpFoldResult> strides;
