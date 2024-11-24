@@ -5,6 +5,7 @@
 #include "hc/Transforms/Passes.hpp"
 
 #include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
+#include "hc/Utils.hpp"
 
 #include <mlir/Dialect/Affine/IR/AffineOps.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
@@ -243,7 +244,7 @@ struct ConvertLoad final : mlir::OpConversionPattern<mlir::memref::LoadOp> {
     mlir::Value base = adaptor.getMemref();
     auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
-      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+      return rewriter.notifyMatchFailure(op, "Invalid memref type");
 
     auto resultType = getTypeConverter()->convertType(op.getResult().getType());
     if (!resultType)
@@ -286,7 +287,7 @@ struct ConvertStore final : mlir::OpConversionPattern<mlir::memref::StoreOp> {
     mlir::Value base = adaptor.getMemref();
     auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
-      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+      return rewriter.notifyMatchFailure(op, "Invalid memref type");
 
     mlir::Location loc = op.getLoc();
     llvm::SmallVector<mlir::OpFoldResult> strides;
@@ -324,7 +325,7 @@ struct ConvertVecLoad final : mlir::OpConversionPattern<mlir::vector::LoadOp> {
     mlir::Value base = adaptor.getBase();
     auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
-      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+      return rewriter.notifyMatchFailure(op, "Invalid memref type");
 
     auto resultType = getTypeConverter()->convertType(op.getResult().getType());
     if (!resultType)
@@ -368,7 +369,7 @@ struct ConvertVecStore final
     mlir::Value base = adaptor.getBase();
     auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
-      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+      return rewriter.notifyMatchFailure(op, "Invalid memref type");
 
     mlir::Location loc = op.getLoc();
     llvm::SmallVector<mlir::OpFoldResult> strides;
@@ -407,7 +408,7 @@ struct ConvertMaskedVecLoad final
     mlir::Value base = adaptor.getBase();
     auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
-      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+      return rewriter.notifyMatchFailure(op, "Invalid memref type");
 
     auto resultType = getTypeConverter()->convertType(op.getResult().getType());
     if (!resultType)
@@ -451,7 +452,7 @@ struct ConvertMaskedVecStore final
     mlir::Value base = adaptor.getBase();
     auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
-      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+      return rewriter.notifyMatchFailure(op, "Invalid memref type");
 
     mlir::Location loc = op.getLoc();
     llvm::SmallVector<mlir::OpFoldResult> strides;
@@ -475,18 +476,6 @@ struct ConvertMaskedVecStore final
         rewriter.create<hc::hk::TupleExtractOp>(loc, ptrType, base, zero);
     rewriter.replaceOpWithNewOp<hc::hk::PtrStoreOp>(
         op, adaptor.getValueToStore(), ptr, finalOffsetVal, adaptor.getMask());
-    return mlir::success();
-  }
-};
-
-struct ConvertReturn final : mlir::OpConversionPattern<mlir::func::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::func::ReturnOp op, OpAdaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op,
-                                                      adaptor.getOperands());
     return mlir::success();
   }
 };
@@ -518,19 +507,11 @@ struct DecomposeMemrefsPass final
 
     mlir::RewritePatternSet patterns(ctx);
 
-    mlir::populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
-                                                              converter);
-    patterns.insert<ConvertReturn>(converter, ctx);
+    hc::populateFuncPatternsAndTypeConversion(patterns, target, converter);
 
     patterns.insert<ConvertAlloca, ConvertSubview, ConvertLoad, ConvertStore,
                     ConvertVecLoad, ConvertVecStore, ConvertMaskedVecLoad,
                     ConvertMaskedVecStore>(converter, ctx);
-
-    target.addDynamicallyLegalOp<mlir::func::FuncOp>(
-        [&](mlir::func::FuncOp op) {
-          return converter.isSignatureLegal(op.getFunctionType()) &&
-                 converter.isLegal(&op.getBody());
-        });
 
     target.markUnknownOpDynamicallyLegal(
         [&](mlir::Operation *op) -> bool { return converter.isLegal(op); });

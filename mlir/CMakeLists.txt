@@ -57,6 +57,7 @@ set(SOURCES_LIST
     lib/Transforms/PyTypeInference.cpp
     lib/Transforms/ReconstructPySSA.cpp
     lib/Transforms/SimplifyAST.cpp
+    lib/Transforms/Utils.cpp
   )
 set(HEADERS_LIST
     include/hc/Dialect/HKernel/IR/HKernelOps.hpp

@@ -7,6 +7,7 @@
 #include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
 #include "hc/Dialect/PyIR/IR/PyIROps.hpp"
 #include "hc/Dialect/Typing/IR/TypingOps.hpp"
+#include "hc/Utils.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
@@ -550,14 +551,8 @@ struct ConverPyIRToKernelPass final
 
     mlir::RewritePatternSet patterns(ctx);
 
-    mlir::populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
-                                                              converter);
+    hc::populateFuncPatternsAndTypeConversion(patterns, target, converter);
 
-    target.addDynamicallyLegalOp<mlir::func::FuncOp>(
-        [&](mlir::func::FuncOp op) {
-          return converter.isSignatureLegal(op.getFunctionType()) &&
-                 converter.isLegal(&op.getBody());
-        });
     target.addIllegalOp<hc::py_ir::TuplePackOp, hc::py_ir::TuplePackOp>();
     target.addLegalDialect<mlir::arith::ArithDialect, hc::hk::HKernelDialect>();
 
