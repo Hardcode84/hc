@@ -12,6 +12,7 @@
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/Utils/IndexingUtils.h>
+#include <mlir/Dialect/Vector/IR/VectorOps.h>
 #include <mlir/Transforms/DialectConversion.h>
 
 namespace hc {
@@ -239,8 +240,8 @@ struct ConvertLoad final : mlir::OpConversionPattern<mlir::memref::LoadOp> {
   matchAndRewrite(mlir::memref::LoadOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::MemRefType memrefType = op.getMemRefType();
-    auto tupleType =
-        mlir::dyn_cast<mlir::TupleType>(adaptor.getMemref().getType());
+    mlir::Value base = adaptor.getMemref();
+    auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
       return rewriter.notifyMatchFailure(op, "Invalid emref type");
 
@@ -250,8 +251,8 @@ struct ConvertLoad final : mlir::OpConversionPattern<mlir::memref::LoadOp> {
 
     mlir::Location loc = op.getLoc();
     llvm::SmallVector<mlir::OpFoldResult> strides;
-    if (mlir::failed(materializeStrides(rewriter, loc, memrefType,
-                                        adaptor.getMemref(), strides)))
+    if (mlir::failed(
+            materializeStrides(rewriter, loc, memrefType, base, strides)))
       return rewriter.notifyMatchFailure(op, "Unable to materialize strides");
 
     auto mixedOffsets = mlir::getAsOpFoldResult(adaptor.getIndices());
@@ -266,8 +267,8 @@ struct ConvertLoad final : mlir::OpConversionPattern<mlir::memref::LoadOp> {
 
     mlir::Type ptrType = tupleType.getType(0);
     mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
-    mlir::Value ptr = rewriter.create<hc::hk::TupleExtractOp>(
-        loc, ptrType, adaptor.getMemref(), zero);
+    mlir::Value ptr =
+        rewriter.create<hc::hk::TupleExtractOp>(loc, ptrType, base, zero);
     rewriter.replaceOpWithNewOp<hc::hk::PtrLoadOp>(
         op, resultType, ptr, finalOffsetVal, /*mask*/ nullptr,
         /*pass_thru*/ nullptr);
@@ -282,15 +283,15 @@ struct ConvertStore final : mlir::OpConversionPattern<mlir::memref::StoreOp> {
   matchAndRewrite(mlir::memref::StoreOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::MemRefType memrefType = op.getMemRefType();
-    auto tupleType =
-        mlir::dyn_cast<mlir::TupleType>(adaptor.getMemref().getType());
+    mlir::Value base = adaptor.getMemref();
+    auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
     if (!tupleType)
       return rewriter.notifyMatchFailure(op, "Invalid emref type");
 
     mlir::Location loc = op.getLoc();
     llvm::SmallVector<mlir::OpFoldResult> strides;
-    if (mlir::failed(materializeStrides(rewriter, loc, memrefType,
-                                        adaptor.getMemref(), strides)))
+    if (mlir::failed(
+            materializeStrides(rewriter, loc, memrefType, base, strides)))
       return rewriter.notifyMatchFailure(op, "Unable to materialize strides");
 
     auto mixedOffsets = mlir::getAsOpFoldResult(adaptor.getIndices());
@@ -305,10 +306,92 @@ struct ConvertStore final : mlir::OpConversionPattern<mlir::memref::StoreOp> {
 
     mlir::Type ptrType = tupleType.getType(0);
     mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
-    mlir::Value ptr = rewriter.create<hc::hk::TupleExtractOp>(
-        loc, ptrType, adaptor.getMemref(), zero);
+    mlir::Value ptr =
+        rewriter.create<hc::hk::TupleExtractOp>(loc, ptrType, base, zero);
     rewriter.replaceOpWithNewOp<hc::hk::PtrStoreOp>(
         op, adaptor.getValue(), ptr, finalOffsetVal, /*mask*/ nullptr);
+    return mlir::success();
+  }
+};
+
+struct ConvertVecLoad final : mlir::OpConversionPattern<mlir::vector::LoadOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::vector::LoadOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::MemRefType memrefType = op.getMemRefType();
+    mlir::Value base = adaptor.getBase();
+    auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
+    if (!tupleType)
+      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+
+    auto resultType = getTypeConverter()->convertType(op.getResult().getType());
+    if (!resultType)
+      return rewriter.notifyMatchFailure(op, "Unable to convert result type");
+
+    mlir::Location loc = op.getLoc();
+    llvm::SmallVector<mlir::OpFoldResult> strides;
+    if (mlir::failed(
+            materializeStrides(rewriter, loc, memrefType, base, strides)))
+      return rewriter.notifyMatchFailure(op, "Unable to materialize strides");
+
+    auto mixedOffsets = mlir::getAsOpFoldResult(adaptor.getIndices());
+    auto &&[expr, values] = mlir::computeLinearIndex(rewriter.getIndexAttr(0),
+                                                     strides, mixedOffsets);
+
+    mlir::OpFoldResult finalOffset =
+        mlir::affine::makeComposedFoldedAffineApply(rewriter, loc, expr,
+                                                    values);
+    mlir::Value finalOffsetVal =
+        mlir::getValueOrCreateConstantIndexOp(rewriter, loc, finalOffset);
+
+    mlir::Type ptrType = tupleType.getType(0);
+    mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    mlir::Value ptr =
+        rewriter.create<hc::hk::TupleExtractOp>(loc, ptrType, base, zero);
+    rewriter.replaceOpWithNewOp<hc::hk::PtrLoadOp>(
+        op, resultType, ptr, finalOffsetVal, /*mask*/ nullptr,
+        /*pass_thru*/ nullptr);
+    return mlir::success();
+  }
+};
+
+struct ConvertVecStore final
+    : mlir::OpConversionPattern<mlir::vector::StoreOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::vector::StoreOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::MemRefType memrefType = op.getMemRefType();
+    mlir::Value base = adaptor.getBase();
+    auto tupleType = mlir::dyn_cast<mlir::TupleType>(base.getType());
+    if (!tupleType)
+      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+
+    mlir::Location loc = op.getLoc();
+    llvm::SmallVector<mlir::OpFoldResult> strides;
+    if (mlir::failed(
+            materializeStrides(rewriter, loc, memrefType, base, strides)))
+      return rewriter.notifyMatchFailure(op, "Unable to materialize strides");
+
+    auto mixedOffsets = mlir::getAsOpFoldResult(adaptor.getIndices());
+    auto &&[expr, values] = mlir::computeLinearIndex(rewriter.getIndexAttr(0),
+                                                     strides, mixedOffsets);
+
+    mlir::OpFoldResult finalOffset =
+        mlir::affine::makeComposedFoldedAffineApply(rewriter, loc, expr,
+                                                    values);
+    mlir::Value finalOffsetVal =
+        mlir::getValueOrCreateConstantIndexOp(rewriter, loc, finalOffset);
+
+    mlir::Type ptrType = tupleType.getType(0);
+    mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    mlir::Value ptr =
+        rewriter.create<hc::hk::TupleExtractOp>(loc, ptrType, base, zero);
+    rewriter.replaceOpWithNewOp<hc::hk::PtrStoreOp>(
+        op, adaptor.getValueToStore(), ptr, finalOffsetVal, /*mask*/ nullptr);
     return mlir::success();
   }
 };
@@ -356,8 +439,8 @@ struct DecomposeMemrefsPass final
                                                               converter);
     patterns.insert<ConvertReturn>(converter, ctx);
 
-    patterns.insert<ConvertAlloca, ConvertSubview, ConvertLoad, ConvertStore>(
-        converter, ctx);
+    patterns.insert<ConvertAlloca, ConvertSubview, ConvertLoad, ConvertStore,
+                    ConvertVecLoad, ConvertVecStore>(converter, ctx);
 
     target.addDynamicallyLegalOp<mlir::func::FuncOp>(
         [&](mlir::func::FuncOp op) {
