@@ -305,4 +305,76 @@ def HKernel_ResolveSliceOp : HKernel_OpBase<"resolve_slice", [
   ];
 }
 
+// Ptr stuff, TODO: upstream
+
+def HKernel_PtrType : HKernel_Type<"Ptr", "ptr", [], "::mlir::Type"> {
+  let summary = "Typed pointer type";
+  let parameters = (ins
+      "::mlir::Type":$pointerType,
+      OptionalParameter<"::mlir::Attribute">:$memorySpace
+    );
+  let assemblyFormat = "`<` $pointerType ( `,` $memorySpace^ )? `>`";
+  let builders = [
+    TypeBuilderWithInferredContext<(ins
+        CArg<"::mlir::Type">:$type,
+        CArg<"::mlir::Attribute", "nullptr">:$memorySpace
+      ),
+    [{
+      return $_get(type.getContext(), type, memorySpace);
+    }]>
+  ];
+}
+
+def HKernel_PtrAllocaOp : HKernel_OpBase<"ptr_alloca", [Pure]> {
+  let arguments = (ins
+    AnySignlessIntegerOrIndex:$size
+  );
+  let results = (outs HKernel_PtrType:$result);
+
+  let assemblyFormat = "attr-dict $size `:` type($size) `,` qualified(type($result))";
+}
+
+def HKernel_PtrAddOp : HKernel_OpBase<"ptr_add", [Pure, AllTypesMatch<["base", "result"]>]> {
+  let arguments = (ins
+    HKernel_PtrType:$base,
+    AnySignlessIntegerOrIndex:$offset
+  );
+  let results = (outs HKernel_PtrType:$result);
+
+  let assemblyFormat = "attr-dict $base `:` qualified(type($base)) `,` $offset `:` type($offset)";
+}
+
+def HKernel_PtrLoadOp : HKernel_OpBase<"ptr_load", [AttrSizedOperandSegments]> {
+  let arguments = (ins
+    Arg<HKernel_PtrType, "the reference to load from", [MemRead]>:$base,
+    Optional<AnyType>:$offset,
+    Optional<AnyType>:$mask,
+    Optional<AnyType>:$pass_thru
+  );
+  let results = (outs AnyType:$result);
+
+  let assemblyFormat = [{
+    attr-dict $base `:` qualified(type($base))
+    (`[` $offset^ `:` type($offset) `]`)?
+    (`mask` $mask^ `:` type($mask) `,` $pass_thru `:` type($pass_thru))?
+    `:` type($result)
+  }];
+}
+
+def HKernel_PtrStoreOp : HKernel_OpBase<"ptr_store", [AttrSizedOperandSegments]> {
+  let arguments = (ins
+    AnyType:$value,
+    Arg<HKernel_PtrType, "the reference to load from", [MemWrite]>:$base,
+    Optional<AnyType>:$offset,
+    Optional<AnyType>:$mask
+  );
+
+  let assemblyFormat = [{
+    attr-dict $value `:` type($value)
+    $base `:` qualified(type($base))
+    (`[` $offset^ `:` type($offset) `]`)?
+    (`mask` $mask^ `:` type($mask))?
+  }];
+}
+
 #endif // HKERNEL_OPS
