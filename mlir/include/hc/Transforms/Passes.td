@@ -203,4 +203,11 @@ def DecomposeMemrefsPass : Pass<"hc-decompose-memrefs-pass"> {
   ];
 }
 
+def DecomposePointersPass : Pass<"hc-decompose-pointers-pass"> {
+  let dependentDialects = [
+    "::hc::hk::HKernelDialect",
+    "::mlir::arith::ArithDialect",
+  ];
+}
+
 #endif // _HC_TRANSFORMS_PASSES_TD_INCLUDED_

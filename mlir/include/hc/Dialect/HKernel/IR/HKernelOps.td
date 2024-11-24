@@ -7,6 +7,7 @@
 
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/IR/OpBase.td"
 
 include "hc/Dialect/HKernel/IR/HKernelOpsTypeInterfaces.td"
@@ -307,34 +308,55 @@ def HKernel_ResolveSliceOp : HKernel_OpBase<"resolve_slice", [
 
 // Ptr stuff, TODO: upstream
 
-def HKernel_PtrType : HKernel_Type<"Ptr", "ptr", [], "::mlir::Type"> {
-  let summary = "Typed pointer type";
+def HKernel_LogicalPtrAttr : HKernel_Attr<"LogicalPtr", "logical_ptr"> {
+  let summary = "Logical pointer attribute";
   let parameters = (ins
-      "::mlir::Type":$pointerType,
-      OptionalParameter<"::mlir::Attribute">:$memorySpace
+      "::mlir::Type":$offset_type,
+      OptionalParameter<"::mlir::Attribute">:$memory_space
     );
-  let assemblyFormat = "`<` $pointerType ( `,` $memorySpace^ )? `>`";
+  let assemblyFormat = "`<` $offset_type ( `,` $memory_space^ )? `>`";
   let builders = [
     TypeBuilderWithInferredContext<(ins
         CArg<"::mlir::Type">:$type,
-        CArg<"::mlir::Attribute", "nullptr">:$memorySpace
+        CArg<"::mlir::Attribute", "nullptr">:$memory_space
       ),
     [{
-      return $_get(type.getContext(), type, memorySpace);
+      return $_get(type.getContext(), type, memory_space);
     }]>
   ];
 }
 
-def HKernel_PtrAllocaOp : HKernel_OpBase<"ptr_alloca", [Pure]> {
+def HKernel_PtrType : HKernel_Type<"Ptr", "ptr", [], "::mlir::Type"> {
+  let summary = "Typed pointer type";
+  let parameters = (ins
+      "::mlir::Type":$pointer_type,
+      OptionalParameter<"::mlir::Attribute">:$memory_space
+    );
+  let assemblyFormat = "`<` $pointer_type ( `,` $memory_space^ )? `>`";
+  let builders = [
+    TypeBuilderWithInferredContext<(ins
+        CArg<"::mlir::Type">:$type,
+        CArg<"::mlir::Attribute", "nullptr">:$memory_space
+      ),
+    [{
+      return $_get(type.getContext(), type, memory_space);
+    }]>
+  ];
+}
+
+def HKernel_PtrAllocaOp : HKernel_OpBase<"ptr_alloca"> {
   let arguments = (ins
     AnySignlessIntegerOrIndex:$size
   );
-  let results = (outs HKernel_PtrType:$result);
+  let results = (outs Res<HKernel_PtrType, "",
+                      [MemAlloc<AutomaticAllocationScopeResource, 0, FullEffect>]>:$result);
 
   let assemblyFormat = "attr-dict $size `:` type($size) `,` qualified(type($result))";
 }
 
-def HKernel_PtrAddOp : HKernel_OpBase<"ptr_add", [Pure, AllTypesMatch<["base", "result"]>]> {
+def HKernel_PtrAddOp : HKernel_OpBase<"ptr_add", [
+  Pure, AllTypesMatch<["base", "result"]>, ViewLikeOpInterface,
+]> {
   let arguments = (ins
     HKernel_PtrType:$base,
     AnySignlessIntegerOrIndex:$offset
@@ -342,6 +364,10 @@ def HKernel_PtrAddOp : HKernel_OpBase<"ptr_add", [Pure, AllTypesMatch<["base", "
   let results = (outs HKernel_PtrType:$result);
 
   let assemblyFormat = "attr-dict $base `:` qualified(type($base)) `,` $offset `:` type($offset)";
+
+  let extraClassDeclaration = [{
+    ::mlir::Value getViewSource() { return getBase(); }
+  }];
 }
 
 def HKernel_PtrLoadOp : HKernel_OpBase<"ptr_load", [AttrSizedOperandSegments]> {
@@ -364,7 +390,7 @@ def HKernel_PtrLoadOp : HKernel_OpBase<"ptr_load", [AttrSizedOperandSegments]> {
 def HKernel_PtrStoreOp : HKernel_OpBase<"ptr_store", [AttrSizedOperandSegments]> {
   let arguments = (ins
     AnyType:$value,
-    Arg<HKernel_PtrType, "the reference to load from", [MemWrite]>:$base,
+    Arg<HKernel_PtrType, "the reference to store to", [MemWrite]>:$base,
     Optional<AnyType>:$offset,
     Optional<AnyType>:$mask
   );
