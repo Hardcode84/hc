@@ -108,6 +108,46 @@ struct ConvertPtrAdd final : mlir::OpConversionPattern<hc::hk::PtrAddOp> {
   }
 };
 
+struct ConvertPtrLoad final : mlir::OpConversionPattern<hc::hk::PtrLoadOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::PtrLoadOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto resType = getTypeConverter()->convertType(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    mlir::Value base = adaptor.getBase();
+    auto baseType = mlir::dyn_cast<mlir::TupleType>(base.getType());
+    if (!baseType || baseType.size() != 2 ||
+        !mlir::isa<hc::hk::PtrType>(baseType.getType(0)))
+      return rewriter.notifyMatchFailure(op, "Invalid base type");
+
+    auto ptrType = mlir::cast<hc::hk::PtrType>(baseType.getType(0));
+    auto offType = baseType.getType(1);
+    mlir::Location loc = op.getLoc();
+    mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    mlir::Value one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+    mlir::Value ptr = rewriter.create<hc::hk::TupleExtractOp>(
+        loc, ptrType, adaptor.getBase(), zero);
+    mlir::Value offset = rewriter.create<hc::hk::TupleExtractOp>(
+        loc, offType, adaptor.getBase(), one);
+    if (adaptor.getOffset()) {
+      mlir::Value dstOffset =
+          doCast(rewriter, loc, adaptor.getOffset(), offType);
+      auto ovfFlags = mlir::arith::IntegerOverflowFlags::nsw |
+                      mlir::arith::IntegerOverflowFlags::nuw;
+      offset = rewriter.create<mlir::arith::AddIOp>(loc, offset, dstOffset,
+                                                    ovfFlags);
+    }
+
+    rewriter.replaceOpWithNewOp<hc::hk::PtrLoadOp>(
+        op, resType, ptr, offset, adaptor.getMask(), adaptor.getPassThru());
+    return mlir::success();
+  }
+};
+
 struct ConvertReturn final : mlir::OpConversionPattern<mlir::func::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -163,7 +203,8 @@ struct DecomposePointersPass final
                                                               converter);
     patterns.insert<ConvertReturn>(converter, ctx);
 
-    patterns.insert<ConvertPtrAlloca, ConvertPtrAdd>(converter, ctx);
+    patterns.insert<ConvertPtrAlloca, ConvertPtrAdd, ConvertPtrLoad>(converter,
+                                                                     ctx);
 
     target.addDynamicallyLegalOp<mlir::func::FuncOp>(
         [&](mlir::func::FuncOp op) {

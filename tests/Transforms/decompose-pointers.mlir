@@ -45,3 +45,20 @@ func.func @test(%arg: !hkernel.ptr<f32, #hkernel.logical_ptr<i32>>, %offset: ind
   %0 = hkernel.ptr_add %arg : !hkernel.ptr<f32, #hkernel.logical_ptr<i32>>, %offset : index
   return %0 : !hkernel.ptr<f32, #hkernel.logical_ptr<i32>>
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:  (%[[ARG0:.*]]: tuple<!hkernel.ptr<f32>, i32>, %[[ARG1:.*]]: index)
+//   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG:  %[[C1:.*]] = arith.constant 1 : index
+//       CHECK:  %[[PTR:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>, i32>[%[[C0]]] -> !hkernel.ptr<f32>
+//       CHECK:  %[[OFF1:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>, i32>[%[[C1]]] -> i32
+//       CHECK:  %[[OFF2:.*]] = arith.index_cast %[[ARG1]] : index to i32
+//       CHECK:  %[[RES_OFF:.*]] = arith.addi %[[OFF1]], %[[OFF2]] overflow<nsw, nuw> : i32
+//       CHECK:  %[[RES:.*]] = hkernel.ptr_load %[[PTR]] : !hkernel.ptr<f32>[%[[RES_OFF]] : i32] : f32
+//       CHECK:  return %[[RES]] : f32
+func.func @test(%arg: !hkernel.ptr<f32, #hkernel.logical_ptr<i32>>, %offset: index) -> f32 {
+  %0 = hkernel.ptr_load %arg : !hkernel.ptr<f32, #hkernel.logical_ptr<i32>>[%offset : index] : f32
+  return %0 : f32
+}
