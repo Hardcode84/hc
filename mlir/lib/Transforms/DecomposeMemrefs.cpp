@@ -232,6 +232,87 @@ struct ConvertSubview final
   }
 };
 
+struct ConvertLoad final : mlir::OpConversionPattern<mlir::memref::LoadOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::LoadOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::MemRefType memrefType = op.getMemRefType();
+    auto tupleType =
+        mlir::dyn_cast<mlir::TupleType>(adaptor.getMemref().getType());
+    if (!tupleType)
+      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+
+    auto resultType = getTypeConverter()->convertType(op.getResult().getType());
+    if (!resultType)
+      return rewriter.notifyMatchFailure(op, "Unable to convert result type");
+
+    mlir::Location loc = op.getLoc();
+    llvm::SmallVector<mlir::OpFoldResult> strides;
+    if (mlir::failed(materializeStrides(rewriter, loc, memrefType,
+                                        adaptor.getMemref(), strides)))
+      return rewriter.notifyMatchFailure(op, "Unable to materialize strides");
+
+    auto mixedOffsets = mlir::getAsOpFoldResult(adaptor.getIndices());
+    auto &&[expr, values] = mlir::computeLinearIndex(rewriter.getIndexAttr(0),
+                                                     strides, mixedOffsets);
+
+    mlir::OpFoldResult finalOffset =
+        mlir::affine::makeComposedFoldedAffineApply(rewriter, loc, expr,
+                                                    values);
+    mlir::Value finalOffsetVal =
+        mlir::getValueOrCreateConstantIndexOp(rewriter, loc, finalOffset);
+
+    mlir::Type ptrType = tupleType.getType(0);
+    mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    mlir::Value ptr = rewriter.create<hc::hk::TupleExtractOp>(
+        loc, ptrType, adaptor.getMemref(), zero);
+    rewriter.replaceOpWithNewOp<hc::hk::PtrLoadOp>(
+        op, resultType, ptr, finalOffsetVal, /*mask*/ nullptr,
+        /*pass_thru*/ nullptr);
+    return mlir::success();
+  }
+};
+
+struct ConvertStore final : mlir::OpConversionPattern<mlir::memref::StoreOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::StoreOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::MemRefType memrefType = op.getMemRefType();
+    auto tupleType =
+        mlir::dyn_cast<mlir::TupleType>(adaptor.getMemref().getType());
+    if (!tupleType)
+      return rewriter.notifyMatchFailure(op, "Invalid emref type");
+
+    mlir::Location loc = op.getLoc();
+    llvm::SmallVector<mlir::OpFoldResult> strides;
+    if (mlir::failed(materializeStrides(rewriter, loc, memrefType,
+                                        adaptor.getMemref(), strides)))
+      return rewriter.notifyMatchFailure(op, "Unable to materialize strides");
+
+    auto mixedOffsets = mlir::getAsOpFoldResult(adaptor.getIndices());
+    auto &&[expr, values] = mlir::computeLinearIndex(rewriter.getIndexAttr(0),
+                                                     strides, mixedOffsets);
+
+    mlir::OpFoldResult finalOffset =
+        mlir::affine::makeComposedFoldedAffineApply(rewriter, loc, expr,
+                                                    values);
+    mlir::Value finalOffsetVal =
+        mlir::getValueOrCreateConstantIndexOp(rewriter, loc, finalOffset);
+
+    mlir::Type ptrType = tupleType.getType(0);
+    mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    mlir::Value ptr = rewriter.create<hc::hk::TupleExtractOp>(
+        loc, ptrType, adaptor.getMemref(), zero);
+    rewriter.replaceOpWithNewOp<hc::hk::PtrStoreOp>(
+        op, adaptor.getValue(), ptr, finalOffsetVal, /*mask*/ nullptr);
+    return mlir::success();
+  }
+};
+
 struct ConvertReturn final : mlir::OpConversionPattern<mlir::func::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -275,7 +356,8 @@ struct DecomposeMemrefsPass final
                                                               converter);
     patterns.insert<ConvertReturn>(converter, ctx);
 
-    patterns.insert<ConvertAlloca, ConvertSubview>(converter, ctx);
+    patterns.insert<ConvertAlloca, ConvertSubview, ConvertLoad, ConvertStore>(
+        converter, ctx);
 
     target.addDynamicallyLegalOp<mlir::func::FuncOp>(
         [&](mlir::func::FuncOp op) {

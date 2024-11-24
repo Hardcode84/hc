@@ -344,5 +344,37 @@ def HKernel_PtrAddOp : HKernel_OpBase<"ptr_add", [Pure, AllTypesMatch<["base", "
   let assemblyFormat = "attr-dict $base `:` qualified(type($base)) `,` $offset `:` type($offset)";
 }
 
+def HKernel_PtrLoadOp : HKernel_OpBase<"ptr_load", [AttrSizedOperandSegments]> {
+  let arguments = (ins
+    Arg<HKernel_PtrType, "the reference to load from", [MemRead]>:$base,
+    Optional<AnyType>:$offset,
+    Optional<AnyType>:$mask,
+    Optional<AnyType>:$pass_thru
+  );
+  let results = (outs AnyType:$result);
+
+  let assemblyFormat = [{
+    attr-dict $base `:` qualified(type($base))
+    (`[` $offset^ `:` type($offset) `]`)?
+    (`mask` $mask^ `:` type($mask) `,` $pass_thru `:` type($pass_thru))?
+    `:` type($result)
+  }];
+}
+
+def HKernel_PtrStoreOp : HKernel_OpBase<"ptr_store", [AttrSizedOperandSegments]> {
+  let arguments = (ins
+    AnyType:$value,
+    Arg<HKernel_PtrType, "the reference to load from", [MemWrite]>:$base,
+    Optional<AnyType>:$offset,
+    Optional<AnyType>:$mask
+  );
+
+  let assemblyFormat = [{
+    attr-dict $value `:` type($value)
+    $base `:` qualified(type($base))
+    (`[` $offset^ `:` type($offset) `]`)?
+    (`mask` $mask^ `:` type($mask))?
+  }];
+}
 
 #endif // HKERNEL_OPS

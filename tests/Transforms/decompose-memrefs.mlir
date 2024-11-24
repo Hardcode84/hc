@@ -111,3 +111,32 @@ func.func @test(%arg0: memref<?x?xf32, strided<[?, ?], offset: ?>>, %arg1: index
   %1 = memref.subview %arg0[%arg1, %arg2] [2, 3] [1, 1] : memref<?x?xf32, strided<[?, ?], offset: ?>> to memref<2x3xf32, strided<[?, ?], offset: ?>>
   return %1 : memref<2x3xf32, strided<[?, ?], offset: ?>>
 }
+
+// -----
+
+//       CHECK: #[[MAP:.*]] = affine_map<()[s0, s1] -> (s0 * 7 + s1)>
+// CHECK-LABEL: func @test
+//  CHECK-SAME:  (%[[ARG0:.*]]: tuple<!hkernel.ptr<f32>>, %[[ARG1:.*]]: index, %[[ARG2:.*]]: index)
+//   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
+//       CHECK:  %[[OFFSET:.*]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[ARG2]]]
+//       CHECK:  %[[PTR:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>>[%[[C0]]] -> !hkernel.ptr<f32>
+//       CHECK:  %[[RES:.*]] = hkernel.ptr_load %[[PTR]] : !hkernel.ptr<f32>[%0 : index] : f32
+//       CHECK:  return %[[RES]] : f32
+func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index) -> f32 {
+  %1 = memref.load %arg0[%arg1, %arg2] : memref<5x7xf32>
+  return %1 : f32
+}
+
+// -----
+
+//       CHECK: #[[MAP:.*]] = affine_map<()[s0, s1] -> (s0 * 7 + s1)>
+// CHECK-LABEL: func @test
+//  CHECK-SAME:  (%[[ARG0:.*]]: tuple<!hkernel.ptr<f32>>, %[[ARG1:.*]]: index, %[[ARG2:.*]]: index, %[[ARG3:.*]]: f32)
+//   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
+//       CHECK:  %[[OFFSET:.*]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[ARG2]]]
+//       CHECK:  %[[PTR:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>>[%[[C0]]] -> !hkernel.ptr<f32>
+//       CHECK:  hkernel.ptr_store %[[ARG3]] : f32 %[[PTR]] : !hkernel.ptr<f32>[%0 : index]
+func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index, %arg3: f32)  {
+  memref.store %arg3, %arg0[%arg1, %arg2] : memref<5x7xf32>
+  return
+}
