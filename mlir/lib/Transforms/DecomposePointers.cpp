@@ -56,6 +56,18 @@ struct DecomposePointersPass final
 
     // Convert unknown types to itself
     converter.addConversion([](mlir::Type type) { return type; });
+    converter.addConversion(
+        [&](mlir::TupleType type) -> std::optional<mlir::Type> {
+          llvm::SmallVector<mlir::Type> newTypes(type.size());
+          for (auto i : llvm::seq<size_t>(0, newTypes.size())) {
+            mlir::Type newType = converter.convertType(type.getType(i));
+            if (!newType)
+              return std::nullopt;
+
+            newTypes[i] = newType;
+          }
+          return mlir::TupleType::get(type.getContext(), newTypes);
+        });
 
     populateTypeConverter(ctx, converter);
 
