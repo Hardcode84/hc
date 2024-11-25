@@ -480,6 +480,23 @@ struct ConvertMaskedVecStore final
   }
 };
 
+struct ConvertDescCast final
+    : mlir::OpConversionPattern<hc::hk::MemrefDescriptorCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::MemrefDescriptorCastOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::Type dstType = getTypeConverter()->convertType(op.getType());
+    if (!dstType)
+      return rewriter.notifyMatchFailure(op, "Failed to conver dest type");
+
+    rewriter.replaceOpWithNewOp<hc::hk::MemrefDescriptorCastOp>(
+        op, dstType, adaptor.getSource());
+    return mlir::success();
+  }
+};
+
 struct DecomposeMemrefsPass final
     : public hc::impl::DecomposeMemrefsPassBase<DecomposeMemrefsPass> {
 
@@ -511,7 +528,7 @@ struct DecomposeMemrefsPass final
 
     patterns.insert<ConvertAlloca, ConvertSubview, ConvertLoad, ConvertStore,
                     ConvertVecLoad, ConvertVecStore, ConvertMaskedVecLoad,
-                    ConvertMaskedVecStore>(converter, ctx);
+                    ConvertMaskedVecStore, ConvertDescCast>(converter, ctx);
 
     target.markUnknownOpDynamicallyLegal(
         [&](mlir::Operation *op) -> bool { return converter.isLegal(op); });
