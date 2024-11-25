@@ -9,6 +9,7 @@
 
 #include "Utils.hpp"
 
+#include "hc/Pipelines/BackendPipeline.hpp"
 #include "hc/Pipelines/FrontendPipeline.hpp"
 #include "hc/Pipelines/MiddleendPipeline.hpp"
 
@@ -35,4 +36,5 @@ void Dispatcher::populateFrontendPipeline(mlir::PassManager &pm) {
 
 void Dispatcher::populateInvokePipeline(mlir::PassManager &pm) {
   hc::populateMiddleendPipeline(pm);
+  hc::populateBackendPipeline(pm);
 }
