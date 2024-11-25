@@ -81,9 +81,9 @@ func.func @test(%arg1: !hkernel<buffer <"W"> x f16>, %arg2: !typing<symbol "H">)
 //   CHECK-DAG:  %[[EXPR2:.*]] = hkernel.materialize_expr ![[SYM2]]
 //   CHECK-DAG:  %[[EXPR_VAL1:.*]] = builtin.unrealized_conversion_cast %[[EXPR1]] : ![[SYM1]] to index
 //   CHECK-DAG:  %[[EXPR_VAL2:.*]] = builtin.unrealized_conversion_cast %[[EXPR2]] : ![[SYM2]] to index
-//       CHECK:  %[[ALLOC1:.*]] = memref.alloc(%[[EXPR_VAL1]]) : memref<?xf16, #gpu.address_space<workgroup>>
+//       CHECK:  %[[ALLOC1:.*]] = memref.alloca(%[[EXPR_VAL1]]) : memref<?xf16, #gpu.address_space<workgroup>>
 //       CHECK:  %[[CAST1:.*]] = memref.cast %[[ALLOC1]] : memref<?xf16, #gpu.address_space<workgroup>> to memref<?xf16, strided<[?], offset: ?>, #gpu.address_space<workgroup>>
-//       CHECK:  %[[ALLOC2:.*]] = memref.alloc(%[[EXPR_VAL1]]) : memref<?xi1, #gpu.address_space<workgroup>>
+//       CHECK:  %[[ALLOC2:.*]] = memref.alloca(%[[EXPR_VAL1]]) : memref<?xi1, #gpu.address_space<workgroup>>
 //       CHECK:  %[[CAST2:.*]] = memref.cast %[[ALLOC2]] : memref<?xi1, #gpu.address_space<workgroup>> to memref<?xi1, strided<[?], offset: ?>, #gpu.address_space<workgroup>>
 //       CHECK:  scf.parallel (%[[I:.*]]) = (%[[C0]]) to (%[[EXPR_VAL1]]) step (%[[C1]]) {
 //       CHECK:    %[[M1:.*]] = arith.cmpi slt, %[[I]], %[[EXPR_VAL2]] : index
