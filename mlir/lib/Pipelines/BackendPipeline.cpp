@@ -21,6 +21,7 @@ static void populateOptPasses(mlir::PassManager &pm) {
 }
 
 void hc::populateBackendPipeline(mlir::PassManager &pm) {
+  pm.addPass(hc::createLegalizeMemrefABIPass());
   pm.addPass(hc::createDecomposeMemrefsPass());
   populateOptPasses(pm);
 }

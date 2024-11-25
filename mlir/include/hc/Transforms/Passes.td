@@ -195,6 +195,12 @@ def LegalizeBoolMemrefsPass : Pass<"hc-legalize-bool-memrefs-pass"> {
   ];
 }
 
+def LegalizeMemrefABIPass : Pass<"hc-legalize-memref-abi-pass"> {
+  let dependentDialects = [
+    "::hc::hk::HKernelDialect",
+  ];
+}
+
 def DecomposeMemrefsPass : Pass<"hc-decompose-memrefs-pass"> {
   let dependentDialects = [
     "::hc::hk::HKernelDialect",

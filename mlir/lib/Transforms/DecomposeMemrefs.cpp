@@ -19,6 +19,8 @@
 namespace hc {
 #define GEN_PASS_DEF_DECOMPOSEMEMREFSPASS
 #include "hc/Transforms/Passes.h.inc"
+#define GEN_PASS_DEF_LEGALIZEMEMREFABIPASS
+#include "hc/Transforms/Passes.h.inc"
 } // namespace hc
 
 static mlir::FailureOr<size_t> getNumDynamicFields(mlir::MemRefType type) {
@@ -574,6 +576,45 @@ struct DecomposeMemrefsPass final
     if (mlir::failed(
             mlir::applyFullConversion(mod, target, std::move(patterns))))
       signalPassFailure();
+  }
+};
+
+struct LegalizeMemrefABIPass final
+    : public hc::impl::LegalizeMemrefABIPassBase<LegalizeMemrefABIPass> {
+
+  void runOnOperation() override {
+    auto mod = getOperation();
+
+    mlir::OpBuilder builder(&getContext());
+    mod->walk([&](mlir::func::FuncOp func) -> mlir::WalkResult {
+      if (func.isExternal() ||
+          !func->hasAttr(hc::hk::getKernelEntryPointAttrName()))
+        return mlir::WalkResult::skip();
+
+      auto funcType = func.getFunctionType();
+      llvm::SmallVector<mlir::Type> argTypes =
+          llvm::to_vector(funcType.getInputs());
+
+      mlir::Block *entryBlock = &func.getFunctionBody().front();
+      builder.setInsertionPointToStart(entryBlock);
+
+      for (auto i : llvm::seq<size_t>(0, argTypes.size())) {
+        auto argType = mlir::dyn_cast<mlir::MemRefType>(argTypes[i]);
+        if (!argType)
+          continue;
+
+        auto newType = hc::hk::MemrefDescriptorType::get(argType);
+        argTypes[i] = newType;
+
+        auto arg = entryBlock->getArgument(i);
+        arg.setType(newType);
+        auto cast = builder.create<hc::hk::MemrefDescriptorCastOp>(
+            arg.getLoc(), argType, arg);
+        arg.replaceAllUsesExcept(cast.getResult(), cast);
+      }
+      func.setType(funcType.clone(argTypes, funcType.getResults()));
+      return mlir::WalkResult::skip();
+    });
   }
 };
 } // namespace
