@@ -308,6 +308,38 @@ def HKernel_ResolveSliceOp : HKernel_OpBase<"resolve_slice", [
 
 // Ptr stuff, TODO: upstream
 
+def HKernel_MemrefDescriptorType : HKernel_Type<"MemrefDescriptor", "memref_descriptor", [], "::mlir::Type"> {
+  let summary = "Memref descriptor";
+  let parameters = (ins
+      "::mlir::Type":$memref_type
+    );
+  let assemblyFormat = "`<` $memref_type `>`";
+  let builders = [
+    TypeBuilderWithInferredContext<(ins
+        CArg<"::mlir::Type">:$type
+      ),
+    [{
+      return $_get(type.getContext(), type);
+    }]>
+  ];
+}
+
+def HKernel_MemrefDescriptorCastOp: HKernel_OpBase<"memref_descriptor_cast", [
+  Pure, ViewLikeOpInterface
+]> {
+  let arguments = (ins
+    AnyType:$source
+  );
+  let results = (outs AnyType:$dest);
+
+  let assemblyFormat = "$source attr-dict `:` type($source) `to` type($dest)";
+
+  let extraClassDeclaration = [{
+    ::mlir::Value getViewSource() { return getSource(); }
+  }];
+}
+
+
 def HKernel_LogicalPtrAttr : HKernel_Attr<"LogicalPtr", "logical_ptr"> {
   let summary = "Logical pointer attribute";
   let parameters = (ins
