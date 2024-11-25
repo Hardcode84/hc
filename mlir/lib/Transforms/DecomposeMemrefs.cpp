@@ -113,6 +113,42 @@ materializeStrides(mlir::OpBuilder &builder, mlir::Location loc,
 }
 
 namespace {
+struct ConvertDim final : mlir::OpConversionPattern<mlir::memref::DimOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::DimOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto memrefType = mlir::cast<mlir::MemRefType>(op.getSource().getType());
+    auto idx = op.getConstantIndex();
+    if (!idx || *idx >= memrefType.getRank())
+      return rewriter.notifyMatchFailure(op, "Invalid dim index");
+
+    mlir::Value src = adaptor.getSource();
+    auto packedType = mlir::dyn_cast<mlir::TupleType>(src.getType());
+    if (!packedType)
+      return rewriter.notifyMatchFailure(op, "Invalid packed type");
+
+    mlir::Location loc = op.getLoc();
+    if (!memrefType.isDynamicDim(*idx)) {
+      rewriter.replaceOpWithNewOp<mlir::arith::ConstantIndexOp>(
+          op, memrefType.getDimSize(*idx));
+      return mlir::success();
+    }
+
+    int packedIdx = 1;
+    for (auto i : llvm::seq<int64_t>(0, *idx)) {
+      if (memrefType.isDynamicDim(i))
+        ++packedIdx;
+    }
+    mlir::Value packedIdxVal =
+        rewriter.create<mlir::arith::ConstantIndexOp>(loc, packedIdx);
+    rewriter.replaceOpWithNewOp<hc::hk::TupleExtractOp>(
+        op, rewriter.getIndexType(), src, packedIdxVal);
+    return mlir::success();
+  }
+};
+
 struct ConvertAlloca final : mlir::OpConversionPattern<mlir::memref::AllocaOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -526,9 +562,11 @@ struct DecomposeMemrefsPass final
 
     hc::populateFuncPatternsAndTypeConversion(patterns, target, converter);
 
-    patterns.insert<ConvertAlloca, ConvertSubview, ConvertLoad, ConvertStore,
-                    ConvertVecLoad, ConvertVecStore, ConvertMaskedVecLoad,
-                    ConvertMaskedVecStore, ConvertDescCast>(converter, ctx);
+    patterns
+        .insert<ConvertDim, ConvertAlloca, ConvertSubview, ConvertLoad,
+                ConvertStore, ConvertVecLoad, ConvertVecStore,
+                ConvertMaskedVecLoad, ConvertMaskedVecStore, ConvertDescCast>(
+            converter, ctx);
 
     target.markUnknownOpDynamicallyLegal(
         [&](mlir::Operation *op) -> bool { return converter.isLegal(op); });

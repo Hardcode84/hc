@@ -48,6 +48,19 @@ func.func @test(%arg: !hkernel.memref_descriptor<memref<?xf32>>) -> memref<?xf32
 // -----
 
 // CHECK-LABEL: func @test
+//  CHECK-SAME:  (%[[ARG:.*]]: tuple<!hkernel.ptr<f32>, index>)
+//       CHECK:  %[[C1:.*]] = arith.constant 1 : index
+//       CHECK:  %[[RES:.*]] = hkernel.tuple_extract %[[ARG]] : tuple<!hkernel.ptr<f32>, index>[%[[C1]]] -> index
+//       CHECK:  return %[[RES]] : index
+func.func @test(%arg: memref<10x?xf32>) -> index {
+  %c1 = arith.constant 1 : index
+  %dim = memref.dim %arg, %c1 : memref<10x?xf32>
+  return %dim : index
+}
+
+// -----
+
+// CHECK-LABEL: func @test
 //       CHECK:  %[[S:.*]] = arith.constant 10 : index
 //       CHECK:  %[[P:.*]] = hkernel.ptr_alloca %[[S]] : index, !hkernel.ptr<f32>
 //       CHECK:  %[[R:.*]] = hkernel.make_tuple %[[P]] : !hkernel.ptr<f32> -> tuple<!hkernel.ptr<f32>>
