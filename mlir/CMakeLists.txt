@@ -39,6 +39,7 @@ set(SOURCES_LIST
     lib/Dialect/PyIR/IR/PyIROps.cpp
     lib/Dialect/Typing/IR/TypingOps.cpp
     lib/Dialect/Typing/Transforms/Interpreter.cpp
+    lib/Pipelines/BackendPipeline.cpp
     lib/Pipelines/FrontendPipeline.cpp
     lib/Pipelines/MiddleendPipeline.cpp
     lib/Transforms/ClenaupPySetVar.cpp
@@ -68,6 +69,7 @@ set(HEADERS_LIST
     include/hc/Dialect/Typing/Transforms/Interpreter.hpp
     include/hc/InitHCDialects.hpp
     include/hc/InitHCPasses.hpp
+    include/hc/Pipelines/BackendPipeline.hpp
     include/hc/Pipelines/FrontendPipeline.hpp
     include/hc/Pipelines/MiddleendPipeline.hpp
     include/hc/Transforms/ModuleLinker.hpp

@@ -864,7 +864,7 @@ static llvm::SmallVector<mlir::Value> createAlloc(mlir::OpBuilder &builder,
         type.getShape(), type.getElementType(),
         mlir::MemRefLayoutAttrInterface{}, type.getMemorySpace());
     mlir::Value mem =
-        builder.create<mlir::memref::AllocOp>(loc, allocType, args);
+        builder.create<mlir::memref::AllocaOp>(loc, allocType, args);
     if (mem.getType() != type)
       mem = builder.create<mlir::memref::CastOp>(loc, type, mem);
 

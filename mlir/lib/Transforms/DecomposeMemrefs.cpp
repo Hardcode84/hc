@@ -19,6 +19,8 @@
 namespace hc {
 #define GEN_PASS_DEF_DECOMPOSEMEMREFSPASS
 #include "hc/Transforms/Passes.h.inc"
+#define GEN_PASS_DEF_LEGALIZEMEMREFABIPASS
+#include "hc/Transforms/Passes.h.inc"
 } // namespace hc
 
 static mlir::FailureOr<size_t> getNumDynamicFields(mlir::MemRefType type) {
@@ -113,6 +115,42 @@ materializeStrides(mlir::OpBuilder &builder, mlir::Location loc,
 }
 
 namespace {
+struct ConvertDim final : mlir::OpConversionPattern<mlir::memref::DimOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::DimOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto memrefType = mlir::cast<mlir::MemRefType>(op.getSource().getType());
+    auto idx = op.getConstantIndex();
+    if (!idx || *idx >= memrefType.getRank())
+      return rewriter.notifyMatchFailure(op, "Invalid dim index");
+
+    mlir::Value src = adaptor.getSource();
+    auto packedType = mlir::dyn_cast<mlir::TupleType>(src.getType());
+    if (!packedType)
+      return rewriter.notifyMatchFailure(op, "Invalid packed type");
+
+    mlir::Location loc = op.getLoc();
+    if (!memrefType.isDynamicDim(*idx)) {
+      rewriter.replaceOpWithNewOp<mlir::arith::ConstantIndexOp>(
+          op, memrefType.getDimSize(*idx));
+      return mlir::success();
+    }
+
+    int packedIdx = 1;
+    for (auto i : llvm::seq<int64_t>(0, *idx)) {
+      if (memrefType.isDynamicDim(i))
+        ++packedIdx;
+    }
+    mlir::Value packedIdxVal =
+        rewriter.create<mlir::arith::ConstantIndexOp>(loc, packedIdx);
+    rewriter.replaceOpWithNewOp<hc::hk::TupleExtractOp>(
+        op, rewriter.getIndexType(), src, packedIdxVal);
+    return mlir::success();
+  }
+};
+
 struct ConvertAlloca final : mlir::OpConversionPattern<mlir::memref::AllocaOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -526,9 +564,11 @@ struct DecomposeMemrefsPass final
 
     hc::populateFuncPatternsAndTypeConversion(patterns, target, converter);
 
-    patterns.insert<ConvertAlloca, ConvertSubview, ConvertLoad, ConvertStore,
-                    ConvertVecLoad, ConvertVecStore, ConvertMaskedVecLoad,
-                    ConvertMaskedVecStore, ConvertDescCast>(converter, ctx);
+    patterns
+        .insert<ConvertDim, ConvertAlloca, ConvertSubview, ConvertLoad,
+                ConvertStore, ConvertVecLoad, ConvertVecStore,
+                ConvertMaskedVecLoad, ConvertMaskedVecStore, ConvertDescCast>(
+            converter, ctx);
 
     target.markUnknownOpDynamicallyLegal(
         [&](mlir::Operation *op) -> bool { return converter.isLegal(op); });
@@ -536,6 +576,45 @@ struct DecomposeMemrefsPass final
     if (mlir::failed(
             mlir::applyFullConversion(mod, target, std::move(patterns))))
       signalPassFailure();
+  }
+};
+
+struct LegalizeMemrefABIPass final
+    : public hc::impl::LegalizeMemrefABIPassBase<LegalizeMemrefABIPass> {
+
+  void runOnOperation() override {
+    auto mod = getOperation();
+
+    mlir::OpBuilder builder(&getContext());
+    mod->walk([&](mlir::func::FuncOp func) -> mlir::WalkResult {
+      if (func.isExternal() ||
+          !func->hasAttr(hc::hk::getKernelEntryPointAttrName()))
+        return mlir::WalkResult::skip();
+
+      auto funcType = func.getFunctionType();
+      llvm::SmallVector<mlir::Type> argTypes =
+          llvm::to_vector(funcType.getInputs());
+
+      mlir::Block *entryBlock = &func.getFunctionBody().front();
+      builder.setInsertionPointToStart(entryBlock);
+
+      for (auto i : llvm::seq<size_t>(0, argTypes.size())) {
+        auto argType = mlir::dyn_cast<mlir::MemRefType>(argTypes[i]);
+        if (!argType)
+          continue;
+
+        auto newType = hc::hk::MemrefDescriptorType::get(argType);
+        argTypes[i] = newType;
+
+        auto arg = entryBlock->getArgument(i);
+        arg.setType(newType);
+        auto cast = builder.create<hc::hk::MemrefDescriptorCastOp>(
+            arg.getLoc(), argType, arg);
+        arg.replaceAllUsesExcept(cast.getResult(), cast);
+      }
+      func.setType(funcType.clone(argTypes, funcType.getResults()));
+      return mlir::WalkResult::skip();
+    });
   }
 };
 } // namespace
