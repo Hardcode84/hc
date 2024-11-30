@@ -9,6 +9,39 @@
 #include <mlir/Conversion/ConvertToLLVM/ToLLVMInterface.h>
 #include <mlir/Conversion/LLVMCommon/TypeConverter.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
+#include <mlir/Transforms/DialectConversion.h>
+
+namespace {
+struct ConvertPtrAdd final
+    : public mlir::OpConversionPattern<hc::hk::PtrAddOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::PtrAddOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::Value src = adaptor.getBase();
+    auto srcType = mlir::dyn_cast<mlir::LLVM::LLVMPointerType>(src.getType());
+    if (!srcType)
+      return rewriter.notifyMatchFailure(op, "Invalid src type");
+
+    auto converter = getTypeConverter();
+    auto opType = mlir::cast<hc::hk::PtrType>(op.getType());
+    auto dstType = converter->convertType<mlir::LLVM::LLVMPointerType>(opType);
+    if (!dstType)
+      return rewriter.notifyMatchFailure(op, "Invalid dst type");
+
+    mlir::Type elemType = converter->convertType(opType);
+    if (!elemType)
+      return rewriter.notifyMatchFailure(op, "Invalid element type");
+
+    mlir::Value offset = adaptor.getOffset();
+
+    rewriter.replaceOpWithNewOp<mlir::LLVM::GEPOp>(op, dstType, elemType, src,
+                                                   offset);
+    return mlir::success();
+  }
+};
+} // namespace
 
 static mlir::FailureOr<unsigned>
 getPtrAddressSpace(mlir::LLVMTypeConverter &converter, mlir::Attribute attr) {
@@ -44,6 +77,8 @@ void hc::populatePtrToLLVMConversionPatterns(
 
         return mlir::LLVM::LLVMPointerType::get(type.getContext(), *addrSpace);
       });
+
+  patterns.insert<ConvertPtrAdd>(converter, patterns.getContext());
 }
 
 namespace {
