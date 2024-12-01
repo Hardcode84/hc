@@ -51,6 +51,7 @@ set(SOURCES_LIST
     lib/Transforms/DecomposeMemrefs.cpp
     lib/Transforms/DecomposePointers.cpp
     lib/Transforms/DropTypeResolvers.cpp
+    lib/Transforms/ExpandTuple.cpp
     lib/Transforms/LegalizeBoolMemrefs.cpp
     lib/Transforms/LowerHKernel.cpp
     lib/Transforms/LowerScope.cpp
