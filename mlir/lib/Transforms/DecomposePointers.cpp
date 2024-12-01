@@ -25,7 +25,7 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
         if (!logical)
           return std::nullopt;
 
-        auto newPtrType = hc::hk::PtrType::get(type.getPointerType(),
+        auto newPtrType = hc::hk::PtrType::get(type.getElementType(),
                                                logical.getMemorySpace());
         return mlir::TupleType::get(type.getContext(),
                                     {newPtrType, logical.getOffsetType()});

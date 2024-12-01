@@ -361,10 +361,10 @@ def HKernel_LogicalPtrAttr : HKernel_Attr<"LogicalPtr", "logical_ptr"> {
 def HKernel_PtrType : HKernel_Type<"Ptr", "ptr", [], "::mlir::Type"> {
   let summary = "Typed pointer type";
   let parameters = (ins
-      "::mlir::Type":$pointer_type,
+      "::mlir::Type":$element_type,
       OptionalParameter<"::mlir::Attribute">:$memory_space
     );
-  let assemblyFormat = "`<` $pointer_type ( `,` $memory_space^ )? `>`";
+  let assemblyFormat = "`<` $element_type ( `,` $memory_space^ )? `>`";
   let builders = [
     TypeBuilderWithInferredContext<(ins
         CArg<"::mlir::Type">:$type,
