@@ -42,6 +42,29 @@ struct ConvertPtrAdd final
   }
 };
 
+struct ConvertPtrAlloca final
+    : public mlir::OpConversionPattern<hc::hk::PtrAllocaOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::PtrAllocaOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto converter = getTypeConverter();
+    auto opType = mlir::cast<hc::hk::PtrType>(op.getType());
+    auto resType = converter->convertType(opType);
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    mlir::Type elemType = converter->convertType(opType.getPointerType());
+    if (!elemType)
+      return rewriter.notifyMatchFailure(op, "Invalid element type");
+
+    rewriter.replaceOpWithNewOp<mlir::LLVM::AllocaOp>(op, resType, elemType,
+                                                      adaptor.getSize());
+    return mlir::success();
+  }
+};
+
 struct ConvertPtrLoad final
     : public mlir::OpConversionPattern<hc::hk::PtrLoadOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -171,8 +194,9 @@ void hc::populatePtrToLLVMConversionPatterns(
         return mlir::LLVM::LLVMPointerType::get(type.getContext(), *addrSpace);
       });
 
-  patterns.insert<ConvertPtrAdd, ConvertPtrLoad, ConvertPtrStore>(
-      converter, patterns.getContext());
+  patterns
+      .insert<ConvertPtrAdd, ConvertPtrAlloca, ConvertPtrLoad, ConvertPtrStore>(
+          converter, patterns.getContext());
 }
 
 namespace {

@@ -10,6 +10,18 @@ func.func @test(%arg: !hkernel.ptr<f32>) -> !hkernel.ptr<f32> {
 
 // -----
 
+func.func @test(%arg: index) -> !hkernel.ptr<f32> {
+  %0 = hkernel.ptr_alloca %arg : index, !hkernel.ptr<f32>
+  return %0 : !hkernel.ptr<f32>
+}
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:  (%[[ARG:.*]]: i64)
+//       CHECK:  %[[RES:.*]] = llvm.alloca %[[ARG]] x f32 : (i64) -> !llvm.ptr
+//       CHECK:  return %[[RES]] : !llvm.ptr
+
+// -----
+
 func.func @test(%arg: !hkernel.ptr<f32>, %offset: index) -> !hkernel.ptr<f32> {
   %0 = hkernel.ptr_add %arg : !hkernel.ptr<f32>, %offset : index
   return %0 : !hkernel.ptr<f32>
