@@ -30,7 +30,7 @@ struct ConvertPtrAdd final
     if (!dstType)
       return rewriter.notifyMatchFailure(op, "Invalid dst type");
 
-    mlir::Type elemType = converter->convertType(opType.getPointerType());
+    mlir::Type elemType = converter->convertType(opType.getElementType());
     if (!elemType)
       return rewriter.notifyMatchFailure(op, "Invalid element type");
 
@@ -55,7 +55,7 @@ struct ConvertPtrAlloca final
     if (!resType)
       return rewriter.notifyMatchFailure(op, "Invalid result type");
 
-    mlir::Type elemType = converter->convertType(opType.getPointerType());
+    mlir::Type elemType = converter->convertType(opType.getElementType());
     if (!elemType)
       return rewriter.notifyMatchFailure(op, "Invalid element type");
 
@@ -84,7 +84,7 @@ struct ConvertPtrLoad final
 
     if (mlir::Value offset = adaptor.getOffset()) {
       mlir::Type elemType = converter->convertType(
-          mlir::cast<hc::hk::PtrType>(op.getBase().getType()).getPointerType());
+          mlir::cast<hc::hk::PtrType>(op.getBase().getType()).getElementType());
       if (!elemType)
         return rewriter.notifyMatchFailure(op, "Invalid element type");
 
@@ -126,7 +126,7 @@ struct ConvertPtrStore final
 
     if (mlir::Value offset = adaptor.getOffset()) {
       mlir::Type elemType = converter->convertType(
-          mlir::cast<hc::hk::PtrType>(op.getBase().getType()).getPointerType());
+          mlir::cast<hc::hk::PtrType>(op.getBase().getType()).getElementType());
       if (!elemType)
         return rewriter.notifyMatchFailure(op, "Invalid element type");
 
@@ -142,7 +142,7 @@ struct ConvertPtrStore final
     if (mlir::Value mask = adaptor.getMask()) {
       // TODO: Annotate ptrs with alignment
       mlir::Type elemType =
-          mlir::cast<hc::hk::PtrType>(op.getBase().getType()).getPointerType();
+          mlir::cast<hc::hk::PtrType>(op.getBase().getType()).getElementType();
       elemType = converter->convertType(elemType);
       if (!elemType)
         return rewriter.notifyMatchFailure(op, "Invalid element type");
