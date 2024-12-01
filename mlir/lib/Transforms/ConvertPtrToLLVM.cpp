@@ -41,6 +41,51 @@ struct ConvertPtrAdd final
     return mlir::success();
   }
 };
+
+struct ConvertPtrLoad final
+    : public mlir::OpConversionPattern<hc::hk::PtrLoadOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::PtrLoadOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::Value src = adaptor.getBase();
+    auto srcType = mlir::dyn_cast<mlir::LLVM::LLVMPointerType>(src.getType());
+    if (!srcType)
+      return rewriter.notifyMatchFailure(op, "Invalid src type");
+
+    auto converter = getTypeConverter();
+    auto resType = converter->convertType(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    if (mlir::Value offset = adaptor.getOffset()) {
+      mlir::Type elemType = converter->convertType(
+          mlir::cast<hc::hk::PtrType>(op.getBase().getType()).getPointerType());
+      if (!elemType)
+        return rewriter.notifyMatchFailure(op, "Invalid element type");
+
+      if (mlir::isa<mlir::IntegerType>(offset.getType())) {
+        src = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), srcType, elemType,
+                                                 src, offset);
+      } else {
+        return rewriter.notifyMatchFailure(op, "Invalid offset type");
+      }
+    }
+
+    if (mlir::Value mask = adaptor.getMask()) {
+      // TODO: Annotate ptrs with alignment
+      unsigned align =
+          mlir::getElementTypeOrSelf(resType).getIntOrFloatBitWidth();
+      mlir::Value passThru = adaptor.getPassThru();
+      rewriter.replaceOpWithNewOp<mlir::LLVM::MaskedLoadOp>(
+          op, resType, src, mask, passThru, align);
+    } else {
+      rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, resType, src);
+    }
+    return llvm::success();
+  }
+};
 } // namespace
 
 static mlir::FailureOr<unsigned>
@@ -78,7 +123,8 @@ void hc::populatePtrToLLVMConversionPatterns(
         return mlir::LLVM::LLVMPointerType::get(type.getContext(), *addrSpace);
       });
 
-  patterns.insert<ConvertPtrAdd>(converter, patterns.getContext());
+  patterns.insert<ConvertPtrAdd, ConvertPtrLoad>(converter,
+                                                 patterns.getContext());
 }
 
 namespace {
