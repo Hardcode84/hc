@@ -40,7 +40,6 @@ def _add_sub(subs, sym, val):
 
 def _visit_arg_annotation(idx, ann, prev_handler):
     def istypingtype(a, typ):
-        print(a, typ)
         return (
             typing.get_origin(ann) == typ or isinstance(ann, typ) or issubclass(a, typ)
         )
