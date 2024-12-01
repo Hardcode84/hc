@@ -44,6 +44,7 @@ set(SOURCES_LIST
     lib/Pipelines/MiddleendPipeline.cpp
     lib/Transforms/ClenaupPySetVar.cpp
     lib/Transforms/ConverPyFuncToKernel.cpp
+    lib/Transforms/ConvertPtrToLLVM.cpp
     lib/Transforms/ConvertPyASTToIR.cpp
     lib/Transforms/ConvertPyFuncToFunc.cpp
     lib/Transforms/DecomposeHKOps.cpp
@@ -72,6 +73,7 @@ set(HEADERS_LIST
     include/hc/Pipelines/BackendPipeline.hpp
     include/hc/Pipelines/FrontendPipeline.hpp
     include/hc/Pipelines/MiddleendPipeline.hpp
+    include/hc/Transforms/ConvertPtrToLLVM.hpp
     include/hc/Transforms/ModuleLinker.hpp
     include/hc/Transforms/Passes.hpp
     include/hc/Utils.hpp

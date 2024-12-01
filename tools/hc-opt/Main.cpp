@@ -15,9 +15,10 @@ int main(int argc, char **argv) {
   hc::registerAllPasses();
 
   mlir::DialectRegistry registry;
-  registerAllDialects(registry);
+  mlir::registerAllDialects(registry);
   hc::registerAllDialects(registry);
-  registerAllExtensions(registry);
+  mlir::registerAllExtensions(registry);
+  hc::registerAllExtensions(registry);
 
   return mlir::asMainReturnCode(
       mlir::MlirOptMain(argc, argv, "HC modular optimizer driver\n", registry));
