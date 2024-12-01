@@ -30,7 +30,7 @@ struct ConvertPtrAdd final
     if (!dstType)
       return rewriter.notifyMatchFailure(op, "Invalid dst type");
 
-    mlir::Type elemType = converter->convertType(opType);
+    mlir::Type elemType = converter->convertType(opType.getPointerType());
     if (!elemType)
       return rewriter.notifyMatchFailure(op, "Invalid element type");
 

@@ -17,7 +17,7 @@ func.func @test(%arg: !hkernel.ptr<f32>, %offset: index) -> !hkernel.ptr<f32> {
 
 // CHECK-LABEL: func @test
 //  CHECK-SAME:  (%[[ARG:.*]]: !llvm.ptr, %[[OFF:.*]]: i64)
-//       CHECK:  %[[RES:.*]] = llvm.getelementptr %[[ARG]][%[[OFF]]] : (!llvm.ptr, i64) -> !llvm.ptr, !llvm.ptr
+//       CHECK:  %[[RES:.*]] = llvm.getelementptr %[[ARG]][%[[OFF]]] : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //       CHECK:  return %[[RES]] : !llvm.ptr
 
 // -----
