@@ -76,12 +76,60 @@ struct ConvertPtrLoad final
     if (mlir::Value mask = adaptor.getMask()) {
       // TODO: Annotate ptrs with alignment
       unsigned align =
-          mlir::getElementTypeOrSelf(resType).getIntOrFloatBitWidth();
+          mlir::getElementTypeOrSelf(resType).getIntOrFloatBitWidth() / 8;
       mlir::Value passThru = adaptor.getPassThru();
       rewriter.replaceOpWithNewOp<mlir::LLVM::MaskedLoadOp>(
           op, resType, src, mask, passThru, align);
     } else {
       rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, resType, src);
+    }
+    return llvm::success();
+  }
+};
+
+struct ConvertPtrStore final
+    : public mlir::OpConversionPattern<hc::hk::PtrStoreOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::PtrStoreOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::Value src = adaptor.getBase();
+    auto srcType = mlir::dyn_cast<mlir::LLVM::LLVMPointerType>(src.getType());
+    if (!srcType)
+      return rewriter.notifyMatchFailure(op, "Invalid src type");
+
+    auto converter = getTypeConverter();
+
+    if (mlir::Value offset = adaptor.getOffset()) {
+      mlir::Type elemType = converter->convertType(
+          mlir::cast<hc::hk::PtrType>(op.getBase().getType()).getPointerType());
+      if (!elemType)
+        return rewriter.notifyMatchFailure(op, "Invalid element type");
+
+      if (mlir::isa<mlir::IntegerType>(offset.getType())) {
+        src = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), srcType, elemType,
+                                                 src, offset);
+      } else {
+        return rewriter.notifyMatchFailure(op, "Invalid offset type");
+      }
+    }
+
+    mlir::Value value = adaptor.getValue();
+    if (mlir::Value mask = adaptor.getMask()) {
+      // TODO: Annotate ptrs with alignment
+      mlir::Type elemType =
+          mlir::cast<hc::hk::PtrType>(op.getBase().getType()).getPointerType();
+      elemType = converter->convertType(elemType);
+      if (!elemType)
+        return rewriter.notifyMatchFailure(op, "Invalid element type");
+
+      unsigned align =
+          mlir::getElementTypeOrSelf(elemType).getIntOrFloatBitWidth() / 8;
+      rewriter.replaceOpWithNewOp<mlir::LLVM::MaskedStoreOp>(op, value, src,
+                                                             mask, align);
+    } else {
+      rewriter.replaceOpWithNewOp<mlir::LLVM::StoreOp>(op, value, src);
     }
     return llvm::success();
   }
@@ -123,8 +171,8 @@ void hc::populatePtrToLLVMConversionPatterns(
         return mlir::LLVM::LLVMPointerType::get(type.getContext(), *addrSpace);
       });
 
-  patterns.insert<ConvertPtrAdd, ConvertPtrLoad>(converter,
-                                                 patterns.getContext());
+  patterns.insert<ConvertPtrAdd, ConvertPtrLoad, ConvertPtrStore>(
+      converter, patterns.getContext());
 }
 
 namespace {
