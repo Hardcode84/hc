@@ -216,4 +216,11 @@ def DecomposePointersPass : Pass<"hc-decompose-pointers-pass"> {
   ];
 }
 
+def ExpandTuplePass : Pass<"hc-expand-tuple-pass"> {
+  let dependentDialects = [
+    "::hc::hk::HKernelDialect",
+    "::mlir::arith::ArithDialect", // TODO: remove
+  ];
+}
+
 #endif // _HC_TRANSFORMS_PASSES_TD_INCLUDED_
