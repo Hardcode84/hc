@@ -194,6 +194,15 @@ void hc::populatePtrToLLVMConversionPatterns(
         return mlir::LLVM::LLVMPointerType::get(type.getContext(), *addrSpace);
       });
 
+  converter.addConversion([&converter](hc::hk::MemrefDescriptorType type)
+                              -> std::optional<mlir::Type> {
+    auto innerType = converter.convertType(type.getMemrefType());
+    if (!innerType)
+      return std::nullopt;
+
+    return innerType;
+  });
+
   patterns
       .insert<ConvertPtrAdd, ConvertPtrAlloca, ConvertPtrLoad, ConvertPtrStore>(
           converter, patterns.getContext());

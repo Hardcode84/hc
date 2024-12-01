@@ -102,3 +102,23 @@ func.func @test(%arg: !hkernel.ptr<f32>, %mask: vector<4xi1>, %value: vector<4xf
 // CHECK-LABEL: func @test
 //  CHECK-SAME:  (%[[ARG:.*]]: !llvm.ptr, %[[MASK:.*]]: vector<4xi1>, %[[VAL:.*]]: vector<4xf32>)
 //       CHECK:  llvm.intr.masked.store %[[VAL]], %[[ARG]], %[[MASK]] {alignment = 4 : i32} : vector<4xf32>, vector<4xi1> into !llvm.ptr
+
+// -----
+
+func.func @test(%arg: !hkernel.memref_descriptor<memref<?xf32>>) -> !hkernel.memref_descriptor<memref<?xf32>> {
+  return %arg : !hkernel.memref_descriptor<memref<?xf32>>
+}
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:  (%[[ARG:.*]]: !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>)
+//       CHECK:  return %[[ARG]] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+
+// -----
+
+func.func @test(%arg: !hkernel.memref_descriptor<memref<?x?xf32, strided<[?, ?], offset: ?>>>) -> !hkernel.memref_descriptor<memref<?x?xf32, strided<[?, ?], offset: ?>>> {
+  return %arg : !hkernel.memref_descriptor<memref<?x?xf32, strided<[?, ?], offset: ?>>>
+}
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:  (%[[ARG:.*]]: !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>)
+//       CHECK:  return %[[ARG]] : !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
