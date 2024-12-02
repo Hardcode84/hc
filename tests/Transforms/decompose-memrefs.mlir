@@ -38,8 +38,9 @@ func.func @test(%arg: memref<?xf32, strided<[?], offset: ?>>) -> memref<?xf32, s
 
 // CHECK-LABEL: func @test
 //  CHECK-SAME:  (%[[ARG:.*]]: !hkernel.memref_descriptor<memref<?xf32>>)
-//       CHECK:  %[[R:.*]] = hkernel.memref_descriptor_cast %[[ARG]] : !hkernel.memref_descriptor<memref<?xf32>> to tuple<!hkernel.ptr<f32>, index>
-//       CHECK:  return %[[R]] : tuple<!hkernel.ptr<f32>, index>
+//       CHECK:  %[[R:.*]]:2 = hkernel.memref_descriptor_cast %[[ARG]] : !hkernel.memref_descriptor<memref<?xf32>> to !hkernel.ptr<f32>, index
+//       CHECK:  %[[RES:.*]] = hkernel.make_tuple %[[R]]#0, %[[R]]#1 : !hkernel.ptr<f32>, index -> tuple<!hkernel.ptr<f32>, index>
+//       CHECK:  return %[[RES]] : tuple<!hkernel.ptr<f32>, index>
 func.func @test(%arg: !hkernel.memref_descriptor<memref<?xf32>>) -> memref<?xf32> {
   %0 = hkernel.memref_descriptor_cast %arg : !hkernel.memref_descriptor<memref<?xf32>> to memref<?xf32>
   return %0 : memref<?xf32>
