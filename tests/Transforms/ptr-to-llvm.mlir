@@ -122,3 +122,18 @@ func.func @test(%arg: !hkernel.memref_descriptor<memref<?x?xf32, strided<[?, ?],
 // CHECK-LABEL: func @test
 //  CHECK-SAME:  (%[[ARG:.*]]: !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>)
 //       CHECK:  return %[[ARG]] : !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
+
+// -----
+
+func.func @test(%arg: !hkernel.memref_descriptor<memref<?xf32>>) -> (!hkernel.ptr<f32>, index) {
+  %0 = hkernel.memref_descriptor_cast %arg : !hkernel.memref_descriptor<memref<?xf32>> to tuple<!hkernel.ptr<f32>, index>
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %ptr = hkernel.tuple_extract %0 : tuple<!hkernel.ptr<f32>, index>[%c0] -> !hkernel.ptr<f32>
+  %size = hkernel.tuple_extract %0 : tuple<!hkernel.ptr<f32>, index>[%c1] -> index
+  return %ptr, %size : !hkernel.ptr<f32>, index
+}
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:  (%[[ARG:.*]]: !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>)
+//       CHECK:  return %[[ARG]] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>

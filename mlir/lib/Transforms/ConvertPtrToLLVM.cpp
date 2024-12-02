@@ -7,11 +7,73 @@
 #include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
 
 #include <mlir/Conversion/ConvertToLLVM/ToLLVMInterface.h>
+#include <mlir/Conversion/LLVMCommon/MemRefBuilder.h>
 #include <mlir/Conversion/LLVMCommon/TypeConverter.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Transforms/DialectConversion.h>
 
 namespace {
+struct ConvertDescriptorCast final
+    : public mlir::OpConversionPattern<hc::hk::MemrefDescriptorCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::MemrefDescriptorCastOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto origSrcType =
+        mlir::dyn_cast<hc::hk::MemrefDescriptorType>(op.getSource().getType());
+    if (!origSrcType ||
+        !mlir::isa<mlir::MemRefType>(origSrcType.getMemrefType()))
+      return rewriter.notifyMatchFailure(op, "Invalid src type");
+
+    auto origDstType = mlir::dyn_cast<mlir::TupleType>(op.getType());
+    if (!origDstType)
+      return rewriter.notifyMatchFailure(op, "Invalid dst type");
+
+    auto resType =
+        getTypeConverter()->convertType<mlir::TupleType>(origDstType);
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Cannot convert result type");
+
+    auto memrefType = mlir::cast<mlir::MemRefType>(origSrcType.getMemrefType());
+
+    mlir::MemRefDescriptor desc(adaptor.getSource());
+
+    mlir::Location loc = op.getLoc();
+    mlir::Value ptr = desc.alignedPtr(rewriter, loc);
+    mlir::Value offset = desc.offset(rewriter, loc);
+    ptr = rewriter.create<mlir::LLVM::GEPOp>(loc, ptr.getType(),
+                                             rewriter.getI8Type(), ptr, offset,
+                                             /*inbounds*/ true);
+
+    llvm::SmallVector<mlir::Value> results;
+    results.emplace_back(ptr);
+    for (auto &&[i, s] : llvm::enumerate(memrefType.getShape())) {
+      if (!mlir::ShapedType::isDynamic(s))
+        continue;
+
+      results.emplace_back(desc.size(rewriter, loc, i));
+    }
+
+    if (!memrefType.getLayout().isIdentity()) {
+      int64_t offset; // unused
+      llvm::SmallVector<int64_t> strides;
+      if (mlir::failed(mlir::getStridesAndOffset(memrefType, strides, offset)))
+        return rewriter.notifyMatchFailure(op, "Failed to get strides");
+
+      for (auto &&[i, s] : llvm::enumerate(strides)) {
+        if (!mlir::ShapedType::isDynamic(s))
+          continue;
+
+        results.emplace_back(desc.stride(rewriter, loc, i));
+      }
+    }
+
+    rewriter.replaceOpWithNewOp<hc::hk::MakeTupleOp>(op, resType, results);
+    return mlir::success();
+  }
+};
+
 struct ConvertPtrAdd final
     : public mlir::OpConversionPattern<hc::hk::PtrAddOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -203,9 +265,22 @@ void hc::populatePtrToLLVMConversionPatterns(
     return innerType;
   });
 
-  patterns
-      .insert<ConvertPtrAdd, ConvertPtrAlloca, ConvertPtrLoad, ConvertPtrStore>(
-          converter, patterns.getContext());
+  converter.addConversion(
+      [&converter](mlir::TupleType type) -> std::optional<mlir::Type> {
+        llvm::SmallVector<mlir::Type> types(type.size());
+        for (auto &&[i, t] : llvm::enumerate(type.getTypes())) {
+          auto converted = converter.convertType(t);
+          if (!converted)
+            return std::nullopt;
+
+          types[i] = converted;
+        }
+
+        return mlir::TupleType::get(type.getContext(), types);
+      });
+  patterns.insert<ConvertDescriptorCast, ConvertPtrAdd, ConvertPtrAlloca,
+                  ConvertPtrLoad, ConvertPtrStore>(converter,
+                                                   patterns.getContext());
 }
 
 namespace {
