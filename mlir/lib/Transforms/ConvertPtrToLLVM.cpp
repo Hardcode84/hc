@@ -7,11 +7,72 @@
 #include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
 
 #include <mlir/Conversion/ConvertToLLVM/ToLLVMInterface.h>
+#include <mlir/Conversion/LLVMCommon/MemRefBuilder.h>
 #include <mlir/Conversion/LLVMCommon/TypeConverter.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Transforms/DialectConversion.h>
 
 namespace {
+struct ConvertDescriptorCast final
+    : public mlir::OpConversionPattern<hc::hk::MemrefDescriptorCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::MemrefDescriptorCastOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto origSrcType =
+        mlir::dyn_cast<hc::hk::MemrefDescriptorType>(op.getSource().getType());
+    if (!origSrcType ||
+        !mlir::isa<mlir::MemRefType>(origSrcType.getMemrefType()))
+      return rewriter.notifyMatchFailure(op, "Invalid src type");
+
+    llvm::SmallVector<mlir::Type> resTypes;
+    if (mlir::failed(
+            getTypeConverter()->convertTypes(op.getResultTypes(), resTypes)))
+      return rewriter.notifyMatchFailure(op, "Failed convert result types");
+
+    auto memrefType = mlir::cast<mlir::MemRefType>(origSrcType.getMemrefType());
+
+    mlir::MemRefDescriptor desc(adaptor.getSource());
+
+    mlir::Location loc = op.getLoc();
+    mlir::Value ptr = desc.alignedPtr(rewriter, loc);
+    mlir::Value offset = desc.offset(rewriter, loc);
+    ptr = rewriter.create<mlir::LLVM::GEPOp>(loc, ptr.getType(),
+                                             rewriter.getI8Type(), ptr, offset,
+                                             /*inbounds*/ true);
+
+    llvm::SmallVector<mlir::Value> results;
+    results.emplace_back(ptr);
+    for (auto &&[i, s] : llvm::enumerate(memrefType.getShape())) {
+      if (!mlir::ShapedType::isDynamic(s))
+        continue;
+
+      results.emplace_back(desc.size(rewriter, loc, i));
+    }
+
+    if (!memrefType.getLayout().isIdentity()) {
+      int64_t offset; // unused
+      llvm::SmallVector<int64_t> strides;
+      if (mlir::failed(mlir::getStridesAndOffset(memrefType, strides, offset)))
+        return rewriter.notifyMatchFailure(op, "Failed to get strides");
+
+      for (auto &&[i, s] : llvm::enumerate(strides)) {
+        if (!mlir::ShapedType::isDynamic(s))
+          continue;
+
+        results.emplace_back(desc.stride(rewriter, loc, i));
+      }
+    }
+
+    if (results.size() != resTypes.size())
+      return rewriter.notifyMatchFailure(op, "Results count mismatch");
+
+    rewriter.replaceOp(op, results);
+    return mlir::success();
+  }
+};
+
 struct ConvertPtrAdd final
     : public mlir::OpConversionPattern<hc::hk::PtrAddOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -194,9 +255,18 @@ void hc::populatePtrToLLVMConversionPatterns(
         return mlir::LLVM::LLVMPointerType::get(type.getContext(), *addrSpace);
       });
 
-  patterns
-      .insert<ConvertPtrAdd, ConvertPtrAlloca, ConvertPtrLoad, ConvertPtrStore>(
-          converter, patterns.getContext());
+  converter.addConversion([&converter](hc::hk::MemrefDescriptorType type)
+                              -> std::optional<mlir::Type> {
+    auto innerType = converter.convertType(type.getMemrefType());
+    if (!innerType)
+      return std::nullopt;
+
+    return innerType;
+  });
+
+  patterns.insert<ConvertDescriptorCast, ConvertPtrAdd, ConvertPtrAlloca,
+                  ConvertPtrLoad, ConvertPtrStore>(converter,
+                                                   patterns.getContext());
 }
 
 namespace {
