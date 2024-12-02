@@ -6,6 +6,7 @@
 
 #include <mlir/Conversion/AffineToStandard/AffineToStandard.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/GPU/Transforms/Passes.h>
 #include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Transforms/Passes.h>
@@ -24,4 +25,6 @@ void hc::populateBackendPipeline(mlir::PassManager &pm) {
   pm.addPass(hc::createLegalizeMemrefABIPass());
   pm.addPass(hc::createDecomposeMemrefsPass());
   populateOptPasses(pm);
+
+  pm.addPass(mlir::createGpuKernelOutliningPass());
 }
