@@ -26,14 +26,10 @@ struct ConvertDescriptorCast final
         !mlir::isa<mlir::MemRefType>(origSrcType.getMemrefType()))
       return rewriter.notifyMatchFailure(op, "Invalid src type");
 
-    auto origDstType = mlir::dyn_cast<mlir::TupleType>(op.getType());
-    if (!origDstType)
-      return rewriter.notifyMatchFailure(op, "Invalid dst type");
-
-    auto resType =
-        getTypeConverter()->convertType<mlir::TupleType>(origDstType);
-    if (!resType)
-      return rewriter.notifyMatchFailure(op, "Cannot convert result type");
+    llvm::SmallVector<mlir::Type> resTypes;
+    if (mlir::failed(
+            getTypeConverter()->convertTypes(op.getResultTypes(), resTypes)))
+      return rewriter.notifyMatchFailure(op, "Failed convert result types");
 
     auto memrefType = mlir::cast<mlir::MemRefType>(origSrcType.getMemrefType());
 
@@ -69,7 +65,10 @@ struct ConvertDescriptorCast final
       }
     }
 
-    rewriter.replaceOpWithNewOp<hc::hk::MakeTupleOp>(op, resType, results);
+    if (results.size() != resTypes.size())
+      return rewriter.notifyMatchFailure(op, "Results count mismatch");
+
+    rewriter.replaceOp(op, results);
     return mlir::success();
   }
 };
