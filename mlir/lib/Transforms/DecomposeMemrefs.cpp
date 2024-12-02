@@ -525,12 +525,19 @@ struct ConvertDescCast final
   mlir::LogicalResult
   matchAndRewrite(hc::hk::MemrefDescriptorCastOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    mlir::Type dstType = getTypeConverter()->convertType(op.getType());
-    if (!dstType)
-      return rewriter.notifyMatchFailure(op, "Failed to conver dest type");
+    if (op->getNumResults() != 1)
+      return rewriter.notifyMatchFailure(op, "Expected 1 result");
 
-    rewriter.replaceOpWithNewOp<hc::hk::MemrefDescriptorCastOp>(
-        op, dstType, adaptor.getSource());
+    auto dstType = getTypeConverter()->convertType<mlir::TupleType>(
+        op.getResult(0).getType());
+    if (!dstType)
+      return rewriter.notifyMatchFailure(op, "Failed to convert dest type");
+
+    mlir::Location loc = op.getLoc();
+    auto cast = rewriter.create<hc::hk::MemrefDescriptorCastOp>(
+        loc, dstType.getTypes(), adaptor.getSource());
+    rewriter.replaceOpWithNewOp<hc::hk::MakeTupleOp>(op, dstType,
+                                                     cast.getResults());
     return mlir::success();
   }
 };
@@ -610,7 +617,7 @@ struct LegalizeMemrefABIPass final
         arg.setType(newType);
         auto cast = builder.create<hc::hk::MemrefDescriptorCastOp>(
             arg.getLoc(), argType, arg);
-        arg.replaceAllUsesExcept(cast.getResult(), cast);
+        arg.replaceAllUsesExcept(cast.getResult(0), cast);
       }
       func.setType(funcType.clone(argTypes, funcType.getResults()));
       return mlir::WalkResult::skip();

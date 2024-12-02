@@ -330,9 +330,9 @@ def HKernel_MemrefDescriptorCastOp: HKernel_OpBase<"memref_descriptor_cast", [
   let arguments = (ins
     AnyType:$source
   );
-  let results = (outs AnyType:$dest);
+  let results = (outs Variadic<AnyType>:$results);
 
-  let assemblyFormat = "$source attr-dict `:` type($source) `to` type($dest)";
+  let assemblyFormat = "$source attr-dict `:` type($source) `to` type($results)";
 
   let extraClassDeclaration = [{
     ::mlir::Value getViewSource() { return getSource(); }
