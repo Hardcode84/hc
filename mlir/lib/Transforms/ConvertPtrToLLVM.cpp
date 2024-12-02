@@ -264,19 +264,6 @@ void hc::populatePtrToLLVMConversionPatterns(
     return innerType;
   });
 
-  converter.addConversion(
-      [&converter](mlir::TupleType type) -> std::optional<mlir::Type> {
-        llvm::SmallVector<mlir::Type> types(type.size());
-        for (auto &&[i, t] : llvm::enumerate(type.getTypes())) {
-          auto converted = converter.convertType(t);
-          if (!converted)
-            return std::nullopt;
-
-          types[i] = converted;
-        }
-
-        return mlir::TupleType::get(type.getContext(), types);
-      });
   patterns.insert<ConvertDescriptorCast, ConvertPtrAdd, ConvertPtrAlloca,
                   ConvertPtrLoad, ConvertPtrStore>(converter,
                                                    patterns.getContext());
