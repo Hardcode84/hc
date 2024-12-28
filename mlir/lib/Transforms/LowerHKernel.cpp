@@ -537,7 +537,7 @@ struct ResolveArgsPass final
         });
 
     // DCE
-    (void)applyPatternsAndFoldGreedily(getOperation(), {});
+    (void)applyPatternsGreedily(getOperation(), {});
   }
 };
 } // namespace

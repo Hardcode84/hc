@@ -460,7 +460,7 @@ struct GenResolversFuncsPass
                     ConvertTypingBinop<hc::py_ir::InplaceBinOp>>(ctx);
 
     if (mlir::failed(
-            applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
+            applyPatternsGreedily(getOperation(), std::move(patterns))))
       return signalPassFailure();
   }
 };

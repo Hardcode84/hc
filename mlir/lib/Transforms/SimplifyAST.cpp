@@ -105,7 +105,7 @@ struct SimplifyASTPass final
     hc::populateSimplifyASTPatterns(patterns);
 
     if (mlir::failed(
-            applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
+            applyPatternsGreedily(getOperation(), std::move(patterns))))
       return signalPassFailure();
   }
 };
