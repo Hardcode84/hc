@@ -184,7 +184,7 @@ jobs:
         run: |
           $external_lit="$env:GITHUB_WORKSPACE\scripts\runlit.py"
           $env:LLVM_DIR=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
-          $NANOBIND_DIR="C:\Miniconda3\envs\test-env\Lib\site-packages\nanobind\cmake"
+          $env:NANOBIND_DIR=(python -c "import nanobind; print(nanobind.cmake_dir())") -join ""
           mkdir -p cmake_build
           cd cmake_build
           cmake "$env:GITHUB_WORKSPACE"                                        `
