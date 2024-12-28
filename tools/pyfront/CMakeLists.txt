@@ -8,6 +8,7 @@ find_package(LLVM REQUIRED CONFIG)
 find_package(MLIR REQUIRED CONFIG)
 
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 find_package(nanobind REQUIRED)
 
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
@@ -32,7 +33,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    Python::Python
+    Python3::Python
     hc_core
     hc_frontend
     MLIRPass
