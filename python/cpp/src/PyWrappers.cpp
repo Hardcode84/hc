@@ -83,10 +83,9 @@ public:
 
           auto ctx = unwrap(context->get());
           mlir::OpBuilder builder(ctx);
-          auto nameAttr = builder.getStringAttr(py::cast<std::string>(name));
+          auto nameAttr = builder.getStringAttr(toString(name));
           for (auto &&[key, value] : params) {
-            paramNames.emplace_back(
-                builder.getStringAttr(py::cast<std::string>(key)));
+            paramNames.emplace_back(builder.getStringAttr(toString(key)));
             paramTypes.emplace_back(unwrap(py::cast<PyType>(key)));
           }
 
@@ -168,8 +167,7 @@ public:
         "get",
         [](py::str name, DefaultingPyMlirContext context) {
           auto ctx = unwrap(context->get());
-          MlirType t = wrap(
-              hc::typing::SymbolType::get(ctx, py::cast<std::string>(name)));
+          MlirType t = wrap(hc::typing::SymbolType::get(ctx, toString(name)));
           return PySymbolType(context->getRef(), t);
         },
         py::arg("params"), py::arg("context") = py::none(),
@@ -372,3 +370,5 @@ void populateMlirModule(py::module_ &m) {
   auto typingModule = m.def_submodule("typing", "hc typing module");
   populateTypingTypes(typingModule);
 }
+
+llvm::StringRef toString(py::handle h) { return py::str(h).c_str(); }

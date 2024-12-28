@@ -22,8 +22,8 @@ Context::Context() {
 Context::~Context() { popContext(&context); }
 
 static void readSettings(Settings &ret, py::dict &settings) {
-  ret.dumpAST = py::cast<bool>(settings["DUMP_AST"]);
-  ret.dumpIR = py::cast<bool>(settings["DUMP_IR"]);
+  ret.dumpAST = py::cast<int>(settings["DUMP_AST"]);
+  ret.dumpIR = py::cast<int>(settings["DUMP_IR"]);
 }
 
 static void readDebugTypes(py::dict &settings) {
@@ -35,7 +35,7 @@ static void readDebugTypes(py::dict &settings) {
     auto types = alloc.Allocate<const char *>(debugTypeSize);
     llvm::StringSaver strSaver(alloc);
     for (auto i : llvm::seq<size_t>(0, debugTypeSize))
-      types[i] = strSaver.save(py::cast<std::string>(debugType[i])).data();
+      types[i] = strSaver.save(toString(debugType[i])).data();
 
     llvm::setCurrentDebugTypes(types, static_cast<unsigned>(debugTypeSize));
   }

@@ -18,6 +18,8 @@
 
 namespace py = nanobind;
 
+static llvm::StringRef toStr(py::handle obj) { return py::str(obj).c_str(); }
+
 static void linkModules(MlirModule dest, MlirModule toLink) {
   mlir::ModuleOp destMod = unwrap(dest);
   mlir::ModuleOp toLinkMod = unwrap(toLink);
@@ -27,8 +29,7 @@ static void linkModules(MlirModule dest, MlirModule toLink) {
 
 static py::object loadMLIRModule(MlirContext ctx, py::str path) {
   mlir::ParserConfig config(unwrap(ctx));
-  auto mod = mlir::parseSourceFile<mlir::ModuleOp>(py::cast<std::string>(path),
-                                                   config);
+  auto mod = mlir::parseSourceFile<mlir::ModuleOp>(toStr(path), config);
   auto res = mlir::python::PyModule::forModule(wrap(mod.get()));
   mod.release();
   return res.getObject();
