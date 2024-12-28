@@ -436,6 +436,7 @@ jobs:
           export EXTERNAL_LIT=${GITHUB_WORKSPACE}/scripts/runlit.py
           export LLVM_DIR=/home/runner/work/llvm-mlir/_mlir_install
           export NANOBIND_DIR="$(python -c "import nanobind; print(nanobind.cmake_dir())")"
+          nm -D /usr/share/miniconda3/envs/test-env/lib/libpython3.10.so
           mkdir -p cmake_build
           cd cmake_build
           cmake ${GITHUB_WORKSPACE}                                            \
