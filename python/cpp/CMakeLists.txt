@@ -11,8 +11,7 @@ include(AddLLVM)
 include(AddMLIR)
 include(HandleLLVMOptions)
 
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
-find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+find_package(Python COMPONENTS Interpreter Development Development.Module REQUIRED)
 find_package(nanobind REQUIRED)
 
 # TODO: something better
@@ -62,8 +61,8 @@ target_include_directories(${python_module_name} PRIVATE ${CMAKE_CURRENT_SOURCE_
 target_include_directories(${python_module_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_link_libraries(${python_module_name} PRIVATE
-    Python3::Python
-    Python3::Module
+    Python::Python
+    Python::Module
     hc_core
     hc_frontend
     MLIRCAPIDebug
