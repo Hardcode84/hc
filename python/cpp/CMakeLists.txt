@@ -61,6 +61,7 @@ target_include_directories(${python_module_name} PRIVATE ${CMAKE_CURRENT_SOURCE_
 target_include_directories(${python_module_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_link_libraries(${python_module_name} PRIVATE
+    Python::Python
     Python::Module
     hc_core
     hc_frontend
