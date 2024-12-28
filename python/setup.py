@@ -57,6 +57,7 @@ def invoke_cmake(args):
 
 
 nanobind_dir = nanobind.cmake_dir()
+print("Nanobind dir", nanobind_dir)
 
 invoke_cmake(
     [
