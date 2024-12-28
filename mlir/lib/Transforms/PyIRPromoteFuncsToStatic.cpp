@@ -100,7 +100,7 @@ struct PyIRPromoteFuncsToStaticPass final
     hc::py_ir::CallOp::getCanonicalizationPatterns(patterns, ctx);
 
     if (mlir::failed(
-            applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
+            applyPatternsGreedily(getOperation(), std::move(patterns))))
       return signalPassFailure();
   }
 };

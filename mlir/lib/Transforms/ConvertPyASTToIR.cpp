@@ -640,7 +640,7 @@ struct ConvertPyASTToIRPass final
     mlir::cf::CondBranchOp::getCanonicalizationPatterns(patterns, ctx);
 
     if (mlir::failed(
-            applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
+            applyPatternsGreedily(getOperation(), std::move(patterns))))
       return signalPassFailure();
 
     getOperation()->walk([&](mlir::Operation *op) {

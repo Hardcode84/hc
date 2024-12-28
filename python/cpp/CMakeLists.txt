@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-find_package(pybind11 REQUIRED)
 find_package(LLVM REQUIRED CONFIG)
 find_package(MLIR REQUIRED CONFIG)
 
@@ -11,6 +10,9 @@ list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 include(AddLLVM)
 include(AddMLIR)
 include(HandleLLVMOptions)
+
+find_package(Python COMPONENTS Interpreter Development Development.Module REQUIRED)
+find_package(nanobind REQUIRED)
 
 # TODO: something better
 set(_python_sources ${LLVM_MAIN_INCLUDE_DIR}/../src/python/)
@@ -50,7 +52,7 @@ set(SOURCES_LIST
     src/Utils.hpp
   )
 
-pybind11_add_module(${python_module_name} MODULE
+nanobind_add_module(${python_module_name} MODULE
   ${SOURCES_LIST}
   ${MLIR_BINDINGS_SOURCES}
 )
@@ -61,6 +63,8 @@ target_include_directories(${python_module_name} PRIVATE ${CMAKE_CURRENT_SOURCE_
 target_link_libraries(${python_module_name} PRIVATE
     hc_core
     hc_frontend
+    Python::Python
+    Python::Module
     MLIRCAPIDebug
     MLIRCAPIIR
     MLIRCAPIInterfaces

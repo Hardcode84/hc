@@ -184,6 +184,7 @@ jobs:
         run: |
           $external_lit="$env:GITHUB_WORKSPACE\scripts\runlit.py"
           $env:LLVM_DIR=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
+          $env:NANOBIND_DIR=(python -c "import nanobind; print(nanobind.cmake_dir())") -join ""
           mkdir -p cmake_build
           cd cmake_build
           cmake "$env:GITHUB_WORKSPACE"                                        `
@@ -191,6 +192,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release                                         `
             -DLLVM_DIR="$env:LLVM_DIR/lib/cmake/llvm"                          `
             -DMLIR_DIR="$env:LLVM_DIR/lib/cmake/mlir"                          `
+            -Dnanobind_DIR="$env:NANOBIND_DIR"                                 `
             -DHC_ENABLE_TESTS=ON                                               `
             -DHC_ENABLE_TOOLS=ON                                               `
             -DLLVM_EXTERNAL_LIT="$external_lit"
@@ -433,6 +435,8 @@ jobs:
         run: |
           export EXTERNAL_LIT=${GITHUB_WORKSPACE}/scripts/runlit.py
           export LLVM_DIR=/home/runner/work/llvm-mlir/_mlir_install
+          export NANOBIND_DIR="$(python -c "import nanobind; print(nanobind.cmake_dir())")"
+          nm -D /usr/share/miniconda3/envs/test-env/lib/libpython3.10.so
           mkdir -p cmake_build
           cd cmake_build
           cmake ${GITHUB_WORKSPACE}                                            \
@@ -440,6 +444,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release                                         \
             -DLLVM_DIR=${LLVM_DIR}/lib/cmake/llvm                              \
             -DMLIR_DIR=${LLVM_DIR}/lib/cmake/mlir                              \
+            -Dnanobind_DIR=${NANOBIND_DIR}                                     \
             -DHC_ENABLE_TESTS=ON                                               \
             -DHC_ENABLE_TOOLS=ON                                               \
             -DLLVM_EXTERNAL_LIT=${EXTERNAL_LIT}

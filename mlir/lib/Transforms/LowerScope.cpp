@@ -318,7 +318,7 @@ struct LowerWorkgroupScopePass final
       return signalPassFailure();
 
     // DCE
-    (void)applyPatternsAndFoldGreedily(getOperation(), {});
+    (void)applyPatternsGreedily(getOperation(), {});
   }
 };
 
@@ -343,7 +343,7 @@ struct LowerSubgroupScopePass final
       return signalPassFailure();
 
     // DCE
-    (void)applyPatternsAndFoldGreedily(getOperation(), {});
+    (void)applyPatternsGreedily(getOperation(), {});
   }
 };
 } // namespace
