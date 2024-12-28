@@ -26,6 +26,8 @@
 
 namespace py = nanobind;
 
+static llvm::StringRef toString(py::handle h) { return py::str(h).c_str(); }
+
 template <> struct std::iterator_traits<nanobind::iterator> {
   using value_type = nanobind::handle;
   using reference = const value_type;
@@ -47,8 +49,8 @@ void DispatcherBase::definePyClass(py::module_ &m) {
 }
 
 static std::pair<std::string, std::string> getSource(py::handle desc) {
-  return {py::cast<std::string>(desc.attr("source")),
-          py::cast<std::string>(desc.attr("name"))};
+  return {std::string(toString(desc.attr("source"))),
+          std::string(toString(desc.attr("name")))};
 }
 
 static mlir::Attribute translateLiteral(mlir::MLIRContext *ctx,
@@ -66,7 +68,7 @@ static mlir::Attribute translateLiteral(mlir::MLIRContext *ctx,
   }
 
   reportError(llvm::Twine("Unsupported literal type: ") +
-              py::cast<std::string>(py::str(obj)));
+              toString(py::str(obj)));
 }
 
 static mlir::OwningOpRef<mlir::Operation *> importImpl(Context &context,
@@ -76,9 +78,9 @@ static mlir::OwningOpRef<mlir::Operation *> importImpl(Context &context,
   llvm::SmallVector<ImportedSym> symbols;
   for (auto &&[name, val] : py::cast<py::dict>(desc.attr("imported_symbols"))) {
     ImportedSym sym;
-    sym.name = py::cast<std::string>(name);
+    sym.name = toString(name);
     for (auto path : val)
-      sym.modulePath.emplace_back(py::cast<std::string>(path));
+      sym.modulePath.emplace_back(toString(path));
 
     symbols.emplace_back(std::move(sym));
   }
@@ -87,7 +89,7 @@ static mlir::OwningOpRef<mlir::Operation *> importImpl(Context &context,
   llvm::SmallVector<Literal> literals;
   for (auto &&[name, val] : py::cast<py::dict>(desc.attr("literals"))) {
     Literal lit;
-    lit.name = py::cast<std::string>(name);
+    lit.name = toString(name);
     lit.attr = translateLiteral(mlirContext, val);
     literals.emplace_back(std::move(lit));
   }
@@ -109,8 +111,7 @@ static mlir::OwningOpRef<mlir::Operation *> importImpl(Context &context,
   auto globalAttrs = desc.attr("global_attrs");
   if (!globalAttrs.is_none()) {
     for (auto &&[key, val] : py::cast<py::dict>(globalAttrs)) {
-      auto keyAttr =
-          mlir::StringAttr::get(mlirContext, py::cast<std::string>(key));
+      auto keyAttr = mlir::StringAttr::get(mlirContext, toString(key));
       auto attr = unwrap(py::cast<mlir::python::PyAttribute>(val));
       newMod->setAttr(keyAttr, attr);
     }
@@ -312,8 +313,7 @@ static mlir::Type getFloatType(mlir::MLIRContext *ctx) {
 }
 
 static void reportWrongDtype(py::handle dt) {
-  reportError(llvm::Twine("Invalid dtype: ") +
-              py::cast<std::string>(py::str(dt)));
+  reportError(llvm::Twine("Invalid dtype: ") + toString(py::str(dt)));
 };
 
 struct DispatcherBase::ArgsHandlerBuilder {
@@ -333,8 +333,7 @@ struct DispatcherBase::ArgsHandlerBuilder {
 
   HandlerT getArgHandler(py::handle arg) {
     auto getSym = [&](py::handle a) -> mlir::Type {
-      return hc::typing::SymbolType::get(&ctx,
-                                         py::cast<std::string>(a.attr("name")));
+      return hc::typing::SymbolType::get(&ctx, toString(a.attr("name")));
     };
 
     if (py::isinstance(arg, symbolType)) {
@@ -348,7 +347,7 @@ struct DispatcherBase::ArgsHandlerBuilder {
           updateRetMap(ret, sym, mlir::Float64Type::get(&ctx));
         } else {
           reportError(llvm::Twine("Unsupported type: ") +
-                      py::cast<std::string>(py::str(obj)));
+                      toString(py::str(obj)));
         }
         args.emplace_back(obj.ptr());
       };
@@ -381,7 +380,7 @@ struct DispatcherBase::ArgsHandlerBuilder {
           // TODO: Handle literals
         } else {
           reportError(llvm::Twine("Unsupported dim type: ") +
-                      py::cast<std::string>(py::str(s)));
+                      toString(py::str(s)));
         }
       }
 
@@ -431,8 +430,7 @@ struct DispatcherBase::ArgsHandlerBuilder {
       };
     }
 
-    reportError(llvm::Twine("Unsupported arg type: ") +
-                py::cast<std::string>(py::str(arg)));
+    reportError(llvm::Twine("Unsupported arg type: ") + toString(py::str(arg)));
   }
 
 private:
@@ -467,7 +465,7 @@ void DispatcherBase::populateArgsHandlers(py::handle args) {
   assert(argsHandlers.empty());
   argsHandlers.reserve(py::len(args));
   for (auto [name, elem] : py::cast<py::dict>(args)) {
-    auto nameAttr = mlir::StringAttr::get(&ctx, py::cast<std::string>(name));
+    auto nameAttr = mlir::StringAttr::get(&ctx, toString(name));
     auto handler = argsHandlerBuilder->getArgHandler(elem);
     argsHandlers.emplace_back(ArgDesc{nameAttr.getValue(), std::move(handler)});
   }
