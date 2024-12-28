@@ -433,13 +433,15 @@ jobs:
         run: |
           export EXTERNAL_LIT=${GITHUB_WORKSPACE}/scripts/runlit.py
           export LLVM_DIR=/home/runner/work/llvm-mlir/_mlir_install
+          export NANOBIND_DIR="$(python -c "import nanobind; print(nanobind.cmake_dir())")"
           mkdir -p cmake_build
           cd cmake_build
           cmake ${GITHUB_WORKSPACE}                                            \
             -GNinja                                                            \
             -DCMAKE_BUILD_TYPE=Release                                         \
             -DLLVM_DIR=${LLVM_DIR}/lib/cmake/llvm                              \
-            -DMLIR_DIR=${LLVM_DIR}/lib/cmake/mlir                              \
+            -DLLVM_DIR=${LLVM_DIR}/lib/cmake/llvm                              \
+            -Dnanobind_DIR=${NANOBIND_DIR}                                     \
             -DHC_ENABLE_TESTS=ON                                               \
             -DHC_ENABLE_TOOLS=ON                                               \
             -DLLVM_EXTERNAL_LIT=${EXTERNAL_LIT}
