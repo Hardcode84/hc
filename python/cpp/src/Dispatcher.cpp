@@ -13,7 +13,7 @@
 #include "hc/Pipelines/FrontendPipeline.hpp"
 #include "hc/Pipelines/MiddleendPipeline.hpp"
 
-namespace py = pybind11;
+namespace py = nanobind;
 
 void Dispatcher::definePyClass(py::module_ &m) {
   py::class_<Dispatcher, DispatcherBase>(m, "Dispatcher")

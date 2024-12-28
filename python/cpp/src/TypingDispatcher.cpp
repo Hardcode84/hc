@@ -16,7 +16,7 @@
 
 #include "IRModule.h"
 
-namespace py = pybind11;
+namespace py = nanobind;
 
 static void linkModules(MlirModule dest, MlirModule toLink) {
   mlir::ModuleOp destMod = unwrap(dest);
@@ -27,8 +27,8 @@ static void linkModules(MlirModule dest, MlirModule toLink) {
 
 static py::object loadMLIRModule(MlirContext ctx, py::str path) {
   mlir::ParserConfig config(unwrap(ctx));
-  auto mod =
-      mlir::parseSourceFile<mlir::ModuleOp>(path.cast<std::string>(), config);
+  auto mod = mlir::parseSourceFile<mlir::ModuleOp>(py::cast<std::string>(path),
+                                                   config);
   auto res = mlir::python::PyModule::forModule(wrap(mod.get()));
   mod.release();
   return res.getObject();

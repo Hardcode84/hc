@@ -6,6 +6,7 @@ import os
 import subprocess
 from setuptools import setup, find_packages
 import shutil
+import nanobind
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 cmake_build_dir = os.path.join(root_dir, "build")
@@ -55,6 +56,8 @@ def invoke_cmake(args):
     )
 
 
+nanobind_dir = nanobind.cmake_dir()
+
 invoke_cmake(
     [
         cmake_dir,
@@ -63,6 +66,7 @@ invoke_cmake(
         "-DCMAKE_BUILD_TYPE=Release",
         "-DLLVM_DIR=" + LLVM_DIR,
         "-DMLIR_DIR=" + MLIR_DIR,
+        "-Dnanobind_DIR=" + nanobind_dir,
         "-DHC_ENABLE_PYTHON=ON",
         "-DHC_ENABLE_TOOLS=ON",  # need hc-opt to convert mlir files to bytecode
         "-DHC_ENABLE_TESTS=OFF",

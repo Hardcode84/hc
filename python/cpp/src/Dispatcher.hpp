@@ -8,11 +8,11 @@
 
 class Dispatcher : public DispatcherBase {
 public:
-  static void definePyClass(pybind11::module_ &m);
+  static void definePyClass(nanobind::module_ &m);
 
   using DispatcherBase::DispatcherBase;
 
-  void call(pybind11::args args, pybind11::kwargs kwargs);
+  void call(nanobind::args args, nanobind::kwargs kwargs);
 
 protected:
   virtual void populateFrontendPipeline(mlir::PassManager &pm) override;

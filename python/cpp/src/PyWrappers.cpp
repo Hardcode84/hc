@@ -4,6 +4,7 @@
 
 #include "PyWrappers.hpp"
 
+#include <mlir/Bindings/Python/Nanobind.h>
 #include <mlir/CAPI/AffineExpr.h>
 #include <mlir/CAPI/IR.h>
 #include <mlir/IR/Builders.h>
@@ -14,13 +15,13 @@
 
 #include "hc/Dialect/Typing/IR/TypingOps.hpp"
 
-namespace py = pybind11;
+namespace py = nanobind;
 static mlir::python::PyMlirContextRef translateContext(mlir::MLIRContext *ctx) {
   return mlir::python::PyMlirContext::forContext(MlirContext{ctx});
 }
 
 void pushContext(mlir::MLIRContext *ctx) {
-  translateContext(ctx)->contextEnter();
+  mlir::python::PyMlirContext::contextEnter(translateContext(ctx).getObject());
 }
 
 void popContext(mlir::MLIRContext *ctx) {
@@ -82,11 +83,11 @@ public:
 
           auto ctx = unwrap(context->get());
           mlir::OpBuilder builder(ctx);
-          auto nameAttr = builder.getStringAttr(name.cast<std::string>());
+          auto nameAttr = builder.getStringAttr(py::cast<std::string>(name));
           for (auto &&[key, value] : params) {
             paramNames.emplace_back(
-                builder.getStringAttr(key.cast<std::string>()));
-            paramTypes.emplace_back(unwrap(key.cast<PyType>()));
+                builder.getStringAttr(py::cast<std::string>(key)));
+            paramTypes.emplace_back(unwrap(py::cast<PyType>(key)));
           }
 
           MlirType t = wrap(hc::typing::IdentType::get(ctx, nameAttr,
@@ -113,7 +114,7 @@ public:
         [](py::iterable params, DefaultingPyMlirContext context) {
           llvm::SmallVector<mlir::Type> paramsArr;
           for (auto param : params)
-            paramsArr.emplace_back(unwrap(param.cast<PyType>()));
+            paramsArr.emplace_back(unwrap(py::cast<PyType>(param)));
 
           auto ctx = unwrap(context->get());
           MlirType t = wrap(hc::typing::SequenceType::get(ctx, paramsArr));
@@ -167,8 +168,8 @@ public:
         "get",
         [](py::str name, DefaultingPyMlirContext context) {
           auto ctx = unwrap(context->get());
-          MlirType t =
-              wrap(hc::typing::SymbolType::get(ctx, name.cast<std::string>()));
+          MlirType t = wrap(
+              hc::typing::SymbolType::get(ctx, py::cast<std::string>(name)));
           return PySymbolType(context->getRef(), t);
         },
         py::arg("params"), py::arg("context") = py::none(),
@@ -193,7 +194,7 @@ public:
           auto ctx = unwrap(expr.get()).getContext();
           llvm::SmallVector<mlir::Type> paramsArr;
           for (auto p : params)
-            paramsArr.emplace_back(unwrap(p.cast<mlir::python::PyType>()));
+            paramsArr.emplace_back(unwrap(py::cast<mlir::python::PyType>(p)));
 
           auto type =
               hc::typing::ExprType::get(ctx, paramsArr, unwrap(expr.get()));
@@ -256,7 +257,7 @@ public:
 };
 } // namespace
 
-static void populateTypingTypes(py::module &m) {
+static void populateTypingTypes(py::module_ &m) {
   PyValueType::bind(m);
   PyIdentType::bind(m);
   PySequenceType::bind(m);
@@ -267,14 +268,14 @@ static void populateTypingTypes(py::module &m) {
   PyTypeAttr::bind(m);
 }
 
-void populateMlirModule(py::module &m) {
+void populateMlirModule(py::module_ &m) {
   // TODO: refactor upstream
   m.doc() = "MLIR Python Native Extension";
 
-  py::class_<PyGlobals>(m, "_Globals", py::module_local())
-      .def_property("dialect_search_modules",
-                    &PyGlobals::getDialectSearchPrefixes,
-                    &PyGlobals::setDialectSearchPrefixes)
+  py::class_<PyGlobals>(m, "_Globals")
+      .def_prop_rw("dialect_search_modules",
+                   &PyGlobals::getDialectSearchPrefixes,
+                   &PyGlobals::setDialectSearchPrefixes)
       .def(
           "append_dialect_search_prefix",
           [](PyGlobals &self, std::string moduleName) {
@@ -298,15 +299,14 @@ void populateMlirModule(py::module &m) {
   // Aside from making the globals accessible to python, having python manage
   // it is necessary to make sure it is destroyed (and releases its python
   // resources) properly.
-  m.attr("globals") =
-      py::cast(new PyGlobals, py::return_value_policy::take_ownership);
+  m.attr("globals") = py::cast(new PyGlobals, py::rv_policy::take_ownership);
 
   // Registration decorators.
   m.def(
       "register_dialect",
-      [](py::object pyClass) {
+      [](py::type_object pyClass) {
         std::string dialectNamespace =
-            pyClass.attr("DIALECT_NAMESPACE").cast<std::string>();
+            nanobind::cast<std::string>(pyClass.attr("DIALECT_NAMESPACE"));
         PyGlobals::get().registerDialectImpl(dialectNamespace, pyClass);
         return pyClass;
       },
@@ -314,11 +314,12 @@ void populateMlirModule(py::module &m) {
       "Class decorator for registering a custom Dialect wrapper");
   m.def(
       "register_operation",
-      [](const py::object &dialectClass, bool replace) -> py::cpp_function {
+      [](const py::type_object &dialectClass, bool replace) -> py::object {
         return py::cpp_function(
-            [dialectClass, replace](py::object opClass) -> py::object {
+            [dialectClass,
+             replace](py::type_object opClass) -> py::type_object {
               std::string operationName =
-                  opClass.attr("OPERATION_NAME").cast<std::string>();
+                  nanobind::cast<std::string>(opClass.attr("OPERATION_NAME"));
               PyGlobals::get().registerOperationImpl(operationName, opClass,
                                                      replace);
 
@@ -333,9 +334,9 @@ void populateMlirModule(py::module &m) {
       "a dialect");
   m.def(
       MLIR_PYTHON_CAPI_TYPE_CASTER_REGISTER_ATTR,
-      [](MlirTypeID mlirTypeID, bool replace) -> py::cpp_function {
-        return py::cpp_function([mlirTypeID,
-                                 replace](py::object typeCaster) -> py::object {
+      [](MlirTypeID mlirTypeID, bool replace) -> py::object {
+        return py::cpp_function([mlirTypeID, replace](
+                                    py::callable typeCaster) -> py::object {
           PyGlobals::get().registerTypeCaster(mlirTypeID, typeCaster, replace);
           return typeCaster;
         });
@@ -344,9 +345,9 @@ void populateMlirModule(py::module &m) {
       "Register a type caster for casting MLIR types to custom user types.");
   m.def(
       MLIR_PYTHON_CAPI_VALUE_CASTER_REGISTER_ATTR,
-      [](MlirTypeID mlirTypeID, bool replace) -> py::cpp_function {
+      [](MlirTypeID mlirTypeID, bool replace) -> py::object {
         return py::cpp_function(
-            [mlirTypeID, replace](py::object valueCaster) -> py::object {
+            [mlirTypeID, replace](py::callable valueCaster) -> py::object {
               PyGlobals::get().registerValueCaster(mlirTypeID, valueCaster,
                                                    replace);
               return valueCaster;

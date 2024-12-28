@@ -12,7 +12,7 @@
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/StringSaver.h>
 
-namespace py = pybind11;
+namespace py = nanobind;
 
 Context::Context() {
   context.loadDialect<hc::py_ir::PyIRDialect, hc::typing::TypingDialect>();
@@ -22,12 +22,12 @@ Context::Context() {
 Context::~Context() { popContext(&context); }
 
 static void readSettings(Settings &ret, py::dict &settings) {
-  ret.dumpAST = settings["DUMP_AST"].cast<bool>();
-  ret.dumpIR = settings["DUMP_IR"].cast<bool>();
+  ret.dumpAST = py::cast<bool>(settings["DUMP_AST"]);
+  ret.dumpIR = py::cast<bool>(settings["DUMP_IR"]);
 }
 
 static void readDebugTypes(py::dict &settings) {
-  auto debugType = settings["DEBUG_TYPE"].cast<py::list>();
+  auto debugType = py::cast<py::list>(settings["DEBUG_TYPE"]);
   auto debugTypeSize = debugType.size();
   if (debugTypeSize != 0) {
     llvm::DebugFlag = true;
@@ -35,7 +35,7 @@ static void readDebugTypes(py::dict &settings) {
     auto types = alloc.Allocate<const char *>(debugTypeSize);
     llvm::StringSaver strSaver(alloc);
     for (auto i : llvm::seq<size_t>(0, debugTypeSize))
-      types[i] = strSaver.save(debugType[i].cast<std::string>()).data();
+      types[i] = strSaver.save(py::cast<std::string>(debugType[i])).data();
 
     llvm::setCurrentDebugTypes(types, static_cast<unsigned>(debugTypeSize));
   }
@@ -45,8 +45,8 @@ py::capsule createContext(py::dict settings) {
   auto ctx = std::make_unique<Context>();
   readSettings(ctx->settings, settings);
   readDebugTypes(settings);
-  auto dtor = [](void *ptr) { delete static_cast<Context *>(ptr); };
-  pybind11::capsule ret(ctx.get(), dtor);
+  auto dtor = [](void *ptr) noexcept { delete static_cast<Context *>(ptr); };
+  py::capsule ret(ctx.get(), dtor);
   ctx.release();
   return ret;
 }

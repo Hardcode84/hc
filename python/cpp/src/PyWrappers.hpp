@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <pybind11/pybind11.h>
+#include <nanobind/nanobind.h>
 
 namespace mlir {
 class MLIRContext;
@@ -13,4 +13,4 @@ class MLIRContext;
 void pushContext(mlir::MLIRContext *ctx);
 void popContext(mlir::MLIRContext *ctx);
 
-void populateMlirModule(pybind11::module &m);
+void populateMlirModule(nanobind::module_ &m);

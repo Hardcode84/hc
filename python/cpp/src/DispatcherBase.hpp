@@ -9,7 +9,7 @@
 #include <mlir/IR/OwningOpRef.h>
 #include <mlir/IR/Types.h>
 
-#include <pybind11/pybind11.h>
+#include <nanobind/nanobind.h>
 
 namespace mlir {
 class Operation;
@@ -20,10 +20,10 @@ struct Context;
 
 class DispatcherBase {
 public:
-  DispatcherBase(pybind11::capsule ctx, pybind11::object getDesc);
+  DispatcherBase(nanobind::capsule ctx, nanobind::object getDesc);
   virtual ~DispatcherBase();
 
-  static void definePyClass(pybind11::module_ &m);
+  static void definePyClass(nanobind::module_ &m);
 
 protected:
   virtual void populateImportPipeline(mlir::PassManager &pm) = 0;
@@ -31,21 +31,21 @@ protected:
   virtual void populateInvokePipeline(mlir::PassManager &pm) = 0;
 
   mlir::Operation *runFrontend();
-  void invokeFunc(const pybind11::args &args, const pybind11::kwargs &kwargs);
+  void invokeFunc(const nanobind::args &args, const nanobind::kwargs &kwargs);
 
 private:
   using OpRef = mlir::OwningOpRef<mlir::Operation *>;
   struct ArgsHandlerBuilder;
 
   Context &context;
-  pybind11::object contextRef; // to keep context alive
-  pybind11::object getFuncDesc;
+  nanobind::object contextRef; // to keep context alive
+  nanobind::object getFuncDesc;
   OpRef mod;
   std::unique_ptr<ArgsHandlerBuilder> argsHandlerBuilder;
 
   struct ArgDesc {
     llvm::StringRef name;
-    std::function<void(mlir::MLIRContext &, pybind11::handle,
+    std::function<void(mlir::MLIRContext &, nanobind::handle,
                        llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &,
                        llvm::SmallVectorImpl<PyObject *> &)>
         handler;
@@ -60,13 +60,13 @@ private:
 
   llvm::SmallDenseMap<const void *, FuncT> funcsCache;
 
-  void populateArgsHandlers(pybind11::handle args);
-  mlir::Attribute processArgs(const pybind11::args &args,
-                              const pybind11::kwargs &kwargs,
+  void populateArgsHandlers(nanobind::handle args);
+  mlir::Attribute processArgs(const nanobind::args &args,
+                              const nanobind::kwargs &kwargs,
                               llvm::SmallVectorImpl<PyObject *> &retArgs) const;
 
   void linkModules(mlir::Operation *rootModule,
-                   const pybind11::dict &currentDeps);
+                   const nanobind::dict &currentDeps);
   OpRef importFuncForLinking(
       llvm::SmallVectorImpl<std::pair<DispatcherBase *, mlir::Operation *>>
           &unresolved);

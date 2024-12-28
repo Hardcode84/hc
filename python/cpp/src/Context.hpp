@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <pybind11/pybind11.h>
+#include <nanobind/nanobind.h>
 
 #include <mlir/IR/MLIRContext.h>
 
@@ -21,4 +21,4 @@ struct Context {
   Settings settings;
 };
 
-pybind11::capsule createContext(pybind11::dict settings);
+nanobind::capsule createContext(nanobind::dict settings);
