@@ -25,6 +25,8 @@ using namespace nanobind::literals;
 
 static size_t len(py::handle obj) { return py::len(obj); }
 
+static llvm::StringRef toStr(py::handle obj) { return py::str(obj).c_str(); }
+
 static void initPython() {
   static int i = []() {
     if (Py_IsInitialized())
@@ -79,7 +81,7 @@ struct ParserState {
       if (py::isinstance(node, cls))
         return handler;
 
-    auto nodeTypeStr = py::cast<std::string>(py::str(node.type()));
+    auto nodeTypeStr = toStr(node.type());
     reportError(llvm::Twine("Unsupported ast node: ") + nodeTypeStr);
   }
 
@@ -145,7 +147,7 @@ struct ArgHandler {
     if (!annot.is_none())
       annotVal = state.argsStack.pop_back_val();
 
-    auto name = py::cast<std::string>(node.attr("arg"));
+    auto name = toStr(node.attr("arg"));
     auto &builder = state.builder;
     mlir::Value val =
         builder.create<hc::py_ast::ArgOp>(state.getLoc(node), name, annotVal);
@@ -189,7 +191,7 @@ struct AttributeHandler {
 
   static void processArg(ParserState &state, py::handle node) {
     auto value = state.argsStack.pop_back_val();
-    auto attr = py::cast<std::string>(node.attr("attr"));
+    auto attr = toStr(node.attr("attr"));
     auto &builder = state.builder;
     mlir::Value res = builder.create<hc::py_ast::AttributeOp>(
         state.getLoc(node), value, attr);
@@ -220,8 +222,8 @@ static hc::py_ast::BinOpVal getBinOpVal(ParserState &state, py::handle obj) {
     if (py::isinstance(obj, t))
       return op;
 
-  reportError(llvm::Twine("unhandled BinOp type \"") +
-              py::cast<std::string>(py::str(obj.type())) + "\"");
+  reportError(llvm::Twine("unhandled BinOp type \"") + toStr(obj.type()) +
+              "\"");
 }
 
 struct AugAssignHandler {
@@ -291,8 +293,8 @@ struct BoolOpHandler {
     } else if (py::isinstance(pyOp, astMod.attr("And"))) {
       Op = BT::and_;
     } else {
-      reportError(llvm::Twine("unhandled BoolOp op \"") +
-                  py::cast<std::string>(py::str(pyOp.type())) + "\"");
+      reportError(llvm::Twine("unhandled BoolOp op \"") + toStr(pyOp.type()) +
+                  "\"");
     }
 
     auto &builder = state.builder;
@@ -373,8 +375,8 @@ struct CompareHandler {
         if (py::isinstance(obj, t))
           return op;
 
-      reportError(llvm::Twine("unhandled cmp type \"") +
-                  py::cast<std::string>(py::str(obj.type())) + "\"");
+      reportError(llvm::Twine("unhandled cmp type \"") + toStr(obj.type()) +
+                  "\"");
     };
 
     llvm::SmallVector<CmpOp> ops;
@@ -411,17 +413,18 @@ struct ConstantHandler {
     } else if (py::isinstance<py::float_>(val)) {
       attr = builder.getF64FloatAttr(py::cast<double>(val));
     } else if (py::isinstance<dummy_complex>(val)) {
-      auto c = py::cast<std::complex<double>>(val);
+      auto real = py::cast<double>(val.attr("real"));
+      auto imag = py::cast<double>(val.attr("imag"));
       auto type = mlir::ComplexType::get(builder.getF64Type());
-      attr = mlir::complex::NumberAttr::get(type, c.real(), c.imag());
+      attr = mlir::complex::NumberAttr::get(type, real, imag);
     } else if (py::isinstance<py::str>(val)) {
-      auto str = py::cast<std::string>(val);
+      auto str = toStr(val);
       attr = builder.getStringAttr(str);
     } else if (val.is_none()) {
       attr = hc::py_ast::NoneAttr::get(builder.getContext());
     } else {
-      reportError(llvm::Twine("unhandled const type \"") +
-                  py::cast<std::string>(py::str(val.type())) + "\"");
+      reportError(llvm::Twine("unhandled const type \"") + toStr(val.type()) +
+                  "\"");
     }
 
     mlir::Value res =
@@ -516,7 +519,7 @@ struct FuncHandler {
     auto posArgs = args.drop_back(nDecors).take_back(nArgs);
     auto decors = args.take_back(nDecors);
 
-    auto name = py::cast<std::string>(node.attr("name"));
+    auto name = toStr(node.attr("name"));
     auto mod = builder.create<hc::py_ast::PyFuncOp>(state.getLoc(node), name,
                                                     posArgs, decors);
     state.argsStack.pop_back_n(nArgs + nDecors);
@@ -622,7 +625,7 @@ struct KeywordHandler {
     auto val = state.argsStack.pop_back_val();
     auto &builder = state.builder;
 
-    auto arg = py::cast<std::string>(node.attr("arg"));
+    auto arg = toStr(node.attr("arg"));
     mlir::Value res =
         builder.create<hc::py_ast::KeywordOp>(state.getLoc(node), arg, val);
 
@@ -675,7 +678,7 @@ struct NameHandler {
 
   static void parse(ParserState &state, py::handle node) {
     auto &builder = state.builder;
-    auto id = py::cast<std::string>(node.attr("id"));
+    auto id = toStr(node.attr("id"));
     mlir::Value val =
         builder.create<hc::py_ast::NameOp>(state.getLoc(node), id);
     state.argsStack.push_back(val);
@@ -804,8 +807,8 @@ struct UnaryOpHandler {
       if (py::isinstance(obj, t))
         return op;
 
-    reportError(llvm::Twine("unhandled UnaryOp type \"") +
-                py::cast<std::string>(py::str(obj.type())) + "\"");
+    reportError(llvm::Twine("unhandled UnaryOp type \"") + toStr(obj.type()) +
+                "\"");
   }
 
   static void parse(ParserState &state, py::handle node) {
@@ -912,10 +915,8 @@ importPyModuleImpl(llvm::StringRef str, mlir::ModuleOp module, bool dumpAST) {
   auto mod = py::module_::import_("ast");
   auto parse = mod.attr("parse");
   auto ast = parse(toStr(str));
-  if (dumpAST) {
-    llvm::outs() << py::cast<std::string>(mod.attr("dump")(ast, "indent"_a = 1))
-                 << "\n";
-  }
+  if (dumpAST)
+    llvm::outs() << toStr(mod.attr("dump")(ast, "indent"_a = 1)) << "\n";
 
   return parseModule(mod, ast, module);
 }
