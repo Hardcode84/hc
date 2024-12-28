@@ -22,6 +22,7 @@ set(HEADERS_LIST
 
 add_library(${PROJECT_NAME} STATIC ${SOURCES_LIST} ${HEADERS_LIST})
 
+nanobind_build_library(nanobind-static)
 target_link_libraries(${PROJECT_NAME} PRIVATE
     hc_core
     nanobind-static

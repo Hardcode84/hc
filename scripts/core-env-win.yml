@@ -16,5 +16,6 @@ dependencies:
   - pytest-xdist
   - greenlet
   - nanobind
+  - pybind11
   - numpy
   - sympy
