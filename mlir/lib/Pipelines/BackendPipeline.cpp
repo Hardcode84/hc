@@ -26,5 +26,6 @@ void hc::populateBackendPipeline(mlir::PassManager &pm) {
   pm.addPass(hc::createDecomposeMemrefsPass());
   populateOptPasses(pm);
 
+  pm.addPass(mlir::createGpuLauchSinkIndexComputationsPass());
   pm.addPass(mlir::createGpuKernelOutliningPass());
 }
