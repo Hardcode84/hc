@@ -5,6 +5,7 @@
 #include "hc/Pipelines/MiddleendPipeline.hpp"
 
 #include <mlir/Conversion/AffineToStandard/AffineToStandard.h>
+#include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Pass/PassManager.h>
@@ -15,6 +16,7 @@
 static void populateOptPasses(mlir::PassManager &pm) {
   pm.addPass(mlir::createCompositeFixedPointPass(
       "OptPass", [](mlir::OpPassManager &p) {
+        p.addPass(mlir::arith::createIntRangeOptimizationsPass());
         p.addPass(mlir::createCanonicalizerPass());
         p.addPass(mlir::createCSEPass());
       }));

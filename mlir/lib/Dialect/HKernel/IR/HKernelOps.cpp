@@ -437,6 +437,17 @@ void hc::hk::SuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
   build(odsBuilder, odsState, types, args);
 }
 
+void hc::hk::SuggestBlockSizeOp::inferResultRanges(
+    mlir::ArrayRef<mlir::ConstantIntRanges> argRanges,
+    mlir::SetIntRangeFn setResultRanges) {
+  for (mlir::Value result : this->getResults()) {
+    auto width = mlir::ConstantIntRanges::getStorageBitwidth(result.getType());
+    auto min = llvm::APInt(width, 1);
+    auto max = llvm::APInt::getSignedMaxValue(width);
+    setResultRanges(result, mlir::ConstantIntRanges::fromSigned(min, max));
+  }
+}
+
 void hc::hk::ResolveSliceOp::build(::mlir::OpBuilder &odsBuilder,
                                    ::mlir::OperationState &odsState,
                                    mlir::Value src_size, mlir::Value lower,
