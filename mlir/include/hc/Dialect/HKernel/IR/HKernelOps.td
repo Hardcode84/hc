@@ -6,6 +6,7 @@
 #define HKERNEL_OPS
 
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/InferIntRangeInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/IR/OpBase.td"
@@ -264,7 +265,10 @@ def EnvironmentRegionYieldOp : HKernel_OpBase<"env_region_yield", [
   let assemblyFormat = "attr-dict ($results^ `:` type($results))?";
 }
 
-def HKernel_SuggestBlockSizeOp : HKernel_OpBase<"suggest_block_size", [Pure]> {
+def HKernel_SuggestBlockSizeOp : HKernel_OpBase<"suggest_block_size", [
+  Pure,
+  DeclareOpInterfaceMethods<InferIntRangeInterface, ["inferResultRanges"]>
+]> {
   let arguments = (ins
     Variadic<Index>:$work_size
   );
