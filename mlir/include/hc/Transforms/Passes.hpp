@@ -6,12 +6,22 @@
 
 #include <mlir/Pass/Pass.h>
 
+#include <mlir/Conversion/GPUToROCDL/Runtimes.h> // TODO: remove
+
 namespace mlir {
 namespace cf {
 class ControlFlowDialect;
 }
 namespace func {
 class FuncDialect;
+}
+
+namespace ROCDL {
+class ROCDLDialect;
+}
+
+namespace gpu {
+class GPUModuleOp;
 }
 } // namespace mlir
 
