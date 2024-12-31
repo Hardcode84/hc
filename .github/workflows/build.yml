@@ -54,7 +54,7 @@ jobs:
         with:
           auto-update-conda: true
           run-post: false
-          miniforge-variant: Mambaforge
+          miniforge-variant: Miniforge
           miniforge-version: latest
           channel-priority: "disabled"
           activate-environment: test-env
@@ -153,7 +153,7 @@ jobs:
         with:
           auto-update-conda: true
           run-post: false
-          miniforge-variant: Mambaforge
+          miniforge-variant: Miniforge
           miniforge-version: latest
           channel-priority: "disabled"
           activate-environment: test-env
