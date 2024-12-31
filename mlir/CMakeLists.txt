@@ -52,6 +52,7 @@ set(SOURCES_LIST
     lib/Transforms/DecomposePointers.cpp
     lib/Transforms/DropTypeResolvers.cpp
     lib/Transforms/ExpandTuple.cpp
+    lib/Transforms/GpuToROCDL.cpp
     lib/Transforms/LegalizeBoolMemrefs.cpp
     lib/Transforms/LowerHKernel.cpp
     lib/Transforms/LowerScope.cpp
@@ -93,13 +94,14 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     MLIRDialectUtils
     MLIRFuncDialect
     MLIRGPUDialect
+    MLIRGPUToROCDLTransforms
     MLIRGPUTransforms
     MLIRIR
     MLIRSCFDialect
     MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
-    )
+  )
 
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
     ${MLIR_INCLUDE_DIRS}

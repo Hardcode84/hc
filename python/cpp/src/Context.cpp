@@ -4,17 +4,25 @@
 
 #include "Context.hpp"
 
-#include "hc/Dialect/PyIR/IR/PyIROps.hpp"
-#include "hc/Dialect/Typing/IR/TypingOps.hpp"
+#include "hc/InitHCDialects.hpp"
 
 #include "PyWrappers.hpp"
+
+#include <mlir/InitAllExtensions.h>
 
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/StringSaver.h>
 
 namespace py = nanobind;
 
-Context::Context() {
+static mlir::DialectRegistry createRegistry() {
+  mlir::DialectRegistry registry;
+  mlir::registerAllExtensions(registry);
+  hc::registerAllExtensions(registry);
+  return registry;
+}
+
+Context::Context() : context(createRegistry()) {
   context.loadDialect<hc::py_ir::PyIRDialect, hc::typing::TypingDialect>();
   pushContext(&context);
 }

@@ -11,6 +11,10 @@ include(AddLLVM)
 include(AddMLIR)
 include(HandleLLVMOptions)
 
+get_property(mlir_dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
+get_property(mlir_conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
+get_property(mlir_extension_libs GLOBAL PROPERTY MLIR_EXTENSION_LIBS)
+
 find_package(Python COMPONENTS Interpreter Development Development.Module REQUIRED)
 find_package(nanobind REQUIRED)
 
@@ -70,6 +74,9 @@ target_link_libraries(${python_module_name} PRIVATE
     MLIRCAPIInterfaces
     MLIRCAPITransforms
     MLIRPass
+    ${mlir_dialect_libs}
+    ${mlir_conversion_libs}
+    ${mlir_extension_libs}
   )
 
 apply_llvm_compile_flags(${python_module_name})

@@ -5,7 +5,9 @@
 #include "hc/Pipelines/BackendPipeline.hpp"
 
 #include <mlir/Conversion/AffineToStandard/AffineToStandard.h>
+#include <mlir/Conversion/Passes.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/GPU/Transforms/Passes.h>
 #include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Pass/PassManager.h>
@@ -24,8 +26,12 @@ static void populateOptPasses(mlir::PassManager &pm) {
 void hc::populateBackendPipeline(mlir::PassManager &pm) {
   pm.addPass(hc::createLegalizeMemrefABIPass());
   pm.addPass(hc::createDecomposeMemrefsPass());
+  pm.addNestedPass<mlir::func::FuncOp>(mlir::createLowerAffinePass());
   populateOptPasses(pm);
 
   pm.addPass(mlir::createGpuLauchSinkIndexComputationsPass());
   pm.addPass(mlir::createGpuKernelOutliningPass());
+
+  auto &gpuPm = pm.nest<mlir::gpu::GPUModuleOp>();
+  gpuPm.addPass(hc::createConvertGpuOpsToROCDLOps());
 }
