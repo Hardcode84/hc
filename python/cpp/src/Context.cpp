@@ -10,6 +10,7 @@
 
 #include <mlir/InitAllExtensions.h>
 #include <mlir/Target/LLVM/ROCDL/Target.h>
+#include <mlir/Target/LLVMIR/Dialect/All.h>
 
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/StringSaver.h>
@@ -21,6 +22,7 @@ static mlir::DialectRegistry createRegistry() {
   mlir::registerAllExtensions(registry);
   hc::registerAllExtensions(registry);
   mlir::ROCDL::registerROCDLTargetInterfaceExternalModels(registry);
+  mlir::registerAllToLLVMIRTranslations(registry);
   return registry;
 }
 

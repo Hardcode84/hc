@@ -74,6 +74,7 @@ target_link_libraries(${python_module_name} PRIVATE
     MLIRCAPIInterfaces
     MLIRCAPITransforms
     MLIRPass
+    MLIRToLLVMIRTranslationRegistration
     ${mlir_dialect_libs}
     ${mlir_conversion_libs}
     ${mlir_extension_libs}
