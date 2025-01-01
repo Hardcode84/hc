@@ -19,6 +19,9 @@ struct Context {
 
   mlir::MLIRContext context;
   Settings settings;
+
+  // TODO: We need lld for AMDGPU linking
+  std::string llvmBinPath;
 };
 
 nanobind::capsule createContext(nanobind::dict settings);

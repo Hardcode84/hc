@@ -15,7 +15,7 @@
 
 #include "hc/Transforms/Passes.hpp"
 
-static void populateOptPasses(mlir::PassManager &pm) {
+static void populateOptPasses(mlir::OpPassManager &pm) {
   pm.addPass(mlir::createCompositeFixedPointPass(
       "OptPass", [](mlir::OpPassManager &p) {
         p.addPass(mlir::createCanonicalizerPass());
@@ -23,7 +23,8 @@ static void populateOptPasses(mlir::PassManager &pm) {
       }));
 }
 
-void hc::populateBackendPipeline(mlir::PassManager &pm) {
+void hc::populateBackendPipeline(mlir::PassManager &pm,
+                                 llvm::StringRef llvmBinDir) {
   pm.addPass(hc::createLegalizeMemrefABIPass());
   pm.addPass(hc::createDecomposeMemrefsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLowerAffinePass());
@@ -34,4 +35,11 @@ void hc::populateBackendPipeline(mlir::PassManager &pm) {
 
   auto &gpuPm = pm.nest<mlir::gpu::GPUModuleOp>();
   gpuPm.addPass(hc::createConvertGpuOpsToROCDLOps());
+  populateOptPasses(gpuPm);
+
+  pm.addPass(mlir::createGpuROCDLAttachTarget());
+
+  mlir::GpuModuleToBinaryPassOptions toBinaryOpts;
+  toBinaryOpts.toolkitPath = llvmBinDir;
+  pm.addPass(mlir::createGpuModuleToBinaryPass(toBinaryOpts));
 }

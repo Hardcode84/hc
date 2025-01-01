@@ -4,10 +4,14 @@
 
 #pragma once
 
+namespace llvm {
+class StringRef;
+}
+
 namespace mlir {
 class PassManager;
 }
 
 namespace hc {
-void populateBackendPipeline(mlir::PassManager &pm);
+void populateBackendPipeline(mlir::PassManager &pm, llvm::StringRef llvmBinDir);
 }

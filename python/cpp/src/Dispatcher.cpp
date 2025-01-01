@@ -7,6 +7,7 @@
 #include <llvm/ADT/Twine.h>
 #include <mlir/IR/Operation.h>
 
+#include "Context.hpp"
 #include "Utils.hpp"
 
 #include "hc/Pipelines/BackendPipeline.hpp"
@@ -36,5 +37,5 @@ void Dispatcher::populateFrontendPipeline(mlir::PassManager &pm) {
 
 void Dispatcher::populateInvokePipeline(mlir::PassManager &pm) {
   hc::populateMiddleendPipeline(pm);
-  hc::populateBackendPipeline(pm);
+  hc::populateBackendPipeline(pm, context.llvmBinPath);
 }

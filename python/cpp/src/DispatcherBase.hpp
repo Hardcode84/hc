@@ -33,11 +33,12 @@ protected:
   mlir::Operation *runFrontend();
   void invokeFunc(const nanobind::args &args, const nanobind::kwargs &kwargs);
 
+  Context &context;
+
 private:
   using OpRef = mlir::OwningOpRef<mlir::Operation *>;
   struct ArgsHandlerBuilder;
 
-  Context &context;
   nanobind::object contextRef; // to keep context alive
   nanobind::object getFuncDesc;
   OpRef mod;

@@ -9,6 +9,8 @@
 #include "PyWrappers.hpp"
 
 #include <mlir/InitAllExtensions.h>
+#include <mlir/Target/LLVM/ROCDL/Target.h>
+#include <mlir/Target/LLVMIR/Dialect/All.h>
 
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/StringSaver.h>
@@ -19,6 +21,8 @@ static mlir::DialectRegistry createRegistry() {
   mlir::DialectRegistry registry;
   mlir::registerAllExtensions(registry);
   hc::registerAllExtensions(registry);
+  mlir::ROCDL::registerROCDLTargetInterfaceExternalModels(registry);
+  mlir::registerAllToLLVMIRTranslations(registry);
   return registry;
 }
 
@@ -52,6 +56,7 @@ static void readDebugTypes(py::dict &settings) {
 py::capsule createContext(py::dict settings) {
   auto ctx = std::make_unique<Context>();
   readSettings(ctx->settings, settings);
+  ctx->llvmBinPath = toString(settings["LLVM_BIN_PATH"]);
   readDebugTypes(settings);
   auto dtor = [](void *ptr) noexcept { delete static_cast<Context *>(ptr); };
   py::capsule ret(ctx.get(), dtor);
