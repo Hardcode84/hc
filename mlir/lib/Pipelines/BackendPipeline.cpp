@@ -15,7 +15,7 @@
 
 #include "hc/Transforms/Passes.hpp"
 
-static void populateOptPasses(mlir::PassManager &pm) {
+static void populateOptPasses(mlir::OpPassManager &pm) {
   pm.addPass(mlir::createCompositeFixedPointPass(
       "OptPass", [](mlir::OpPassManager &p) {
         p.addPass(mlir::createCanonicalizerPass());
@@ -34,4 +34,8 @@ void hc::populateBackendPipeline(mlir::PassManager &pm) {
 
   auto &gpuPm = pm.nest<mlir::gpu::GPUModuleOp>();
   gpuPm.addPass(hc::createConvertGpuOpsToROCDLOps());
+  populateOptPasses(gpuPm);
+
+  pm.addPass(mlir::createGpuROCDLAttachTarget());
+  pm.addPass(mlir::createGpuModuleToBinaryPass());
 }

@@ -9,6 +9,7 @@
 #include "PyWrappers.hpp"
 
 #include <mlir/InitAllExtensions.h>
+#include <mlir/Target/LLVM/ROCDL/Target.h>
 
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/StringSaver.h>
@@ -19,6 +20,7 @@ static mlir::DialectRegistry createRegistry() {
   mlir::DialectRegistry registry;
   mlir::registerAllExtensions(registry);
   hc::registerAllExtensions(registry);
+  mlir::ROCDL::registerROCDLTargetInterfaceExternalModels(registry);
   return registry;
 }
 
