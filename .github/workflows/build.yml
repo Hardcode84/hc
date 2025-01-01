@@ -96,11 +96,11 @@ jobs:
           cmake ../llvm                                                        `
             -GNinja                                                            `
             -DCMAKE_BUILD_TYPE=Release                                         `
-            -DLLVM_ENABLE_PROJECTS=mlir;lld                                    `
+            -DLLVM_ENABLE_PROJECTS="mlir;lld                                   `
             -DLLVM_ENABLE_ASSERTIONS=ON                                        `
             -DLLVM_ENABLE_RTTI=ON                                              `
             -DLLVM_INSTALL_UTILS=ON                                            `
-            -DLLVM_TARGETS_TO_BUILD=X86;AMDGPU                                 `
+            -DLLVM_TARGETS_TO_BUILD="X86;AMDGPU"                               `
             -DLLVM_ENABLE_BINDINGS=OFF                                         `
             -DLLVM_ENABLE_ZSTD=OFF                                             `
             -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   `
@@ -340,11 +340,11 @@ jobs:
           cmake ../llvm                                                        \
             -GNinja                                                            \
             -DCMAKE_BUILD_TYPE=Release                                         \
-            -DLLVM_ENABLE_PROJECTS=mlir;lld                                    \
+            -DLLVM_ENABLE_PROJECTS="mlir;lld"                                  \
             -DLLVM_ENABLE_ASSERTIONS=ON                                        \
             -DLLVM_ENABLE_RTTI=ON                                              \
             -DLLVM_INSTALL_UTILS=ON                                            \
-            -DLLVM_TARGETS_TO_BUILD=X86;AMDGPU                                 \
+            -DLLVM_TARGETS_TO_BUILD="X86;AMDGPU"                               \
             -DLLVM_ENABLE_BINDINGS=OFF                                         \
             -DLLVM_ENABLE_ZSTD=OFF                                             \
             -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   \
