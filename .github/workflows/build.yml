@@ -96,7 +96,7 @@ jobs:
           cmake ../llvm                                                        `
             -GNinja                                                            `
             -DCMAKE_BUILD_TYPE=Release                                         `
-            -DLLVM_ENABLE_PROJECTS="mlir;lld                                   `
+            -DLLVM_ENABLE_PROJECTS="mlir;lld"                                  `
             -DLLVM_ENABLE_ASSERTIONS=ON                                        `
             -DLLVM_ENABLE_RTTI=ON                                              `
             -DLLVM_INSTALL_UTILS=ON                                            `
