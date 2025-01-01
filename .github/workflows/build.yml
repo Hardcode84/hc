@@ -16,6 +16,8 @@ concurrency:
 
 env:
   LLVM_SHA_FILE: llvm-sha.txt
+  LLVM_CACHE_NUMBER: 2  # Increase to reset cache
+  CONDA_CACHE_NUMBER: 1  # Increase to reset cache
 
 jobs:
   build_llvm_win:
@@ -42,12 +44,10 @@ jobs:
 
       - name: Cache conda packages
         uses: actions/cache@v3
-        env:
-          CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: ~/conda_pkgs_dir
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
+            ${{ runner.os }}-conda-${{ env.CONDA_CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
@@ -72,8 +72,6 @@ jobs:
       - name: Cache LLVM-MLIR
         id: cache-llvm-mlir
         uses: actions/cache@v3
-        env:
-          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: |
             D:\a\hc\llvm-mlir\_mlir_install\**
@@ -98,11 +96,11 @@ jobs:
           cmake ../llvm                                                        `
             -GNinja                                                            `
             -DCMAKE_BUILD_TYPE=Release                                         `
-            -DLLVM_ENABLE_PROJECTS=mlir                                        `
+            -DLLVM_ENABLE_PROJECTS=mlir;lld                                    `
             -DLLVM_ENABLE_ASSERTIONS=ON                                        `
             -DLLVM_ENABLE_RTTI=ON                                              `
             -DLLVM_INSTALL_UTILS=ON                                            `
-            -DLLVM_TARGETS_TO_BUILD=X86                                        `
+            -DLLVM_TARGETS_TO_BUILD=X86;AMDGPU                                 `
             -DLLVM_ENABLE_BINDINGS=OFF                                         `
             -DLLVM_ENABLE_ZSTD=OFF                                             `
             -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   `
@@ -140,12 +138,10 @@ jobs:
 
       - name: Cache conda packages
         uses: actions/cache@v3
-        env:
-          CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: ~/conda_pkgs_dir
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
+            ${{ runner.os }}-conda-${{ env.CONDA_CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
@@ -170,8 +166,6 @@ jobs:
       - name: Cache LLLVM-MLIR
         id: cache-llvm-mlir
         uses: actions/cache@v3
-        env:
-          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: |
             D:\a\hc\llvm-mlir\_mlir_install\**
@@ -231,12 +225,10 @@ jobs:
 
       - name: Cache conda packages
         uses: actions/cache@v3
-        env:
-          CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: ~/conda_pkgs_dir
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
+            ${{ runner.os }}-conda-${{ env.CONDA_CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
@@ -261,8 +253,6 @@ jobs:
       - name: Cache LLLVM-MLIR
         id: cache-llvm-mlir
         uses: actions/cache@v3
-        env:
-          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: |
             D:\a\hc\llvm-mlir\_mlir_install\**
@@ -299,12 +289,10 @@ jobs:
 
       - name: Cache conda packages
         uses: actions/cache@v3
-        env:
-          CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: ~/.conda/pkgs
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
+            ${{ runner.os }}-conda-${{ env.CONDA_CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
@@ -327,8 +315,6 @@ jobs:
       - name: Cache LLLVM-MLIR
         id: cache-llvm-mlir
         uses: actions/cache@v3
-        env:
-          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: |
             /home/runner/work/llvm-mlir/_mlir_install/**
@@ -354,16 +340,16 @@ jobs:
           cmake ../llvm                                                        \
             -GNinja                                                            \
             -DCMAKE_BUILD_TYPE=Release                                         \
-            -DLLVM_ENABLE_PROJECTS=mlir                                        \
+            -DLLVM_ENABLE_PROJECTS=mlir;lld                                    \
             -DLLVM_ENABLE_ASSERTIONS=ON                                        \
             -DLLVM_ENABLE_RTTI=ON                                              \
             -DLLVM_INSTALL_UTILS=ON                                            \
-            -DLLVM_TARGETS_TO_BUILD=X86                                        \
+            -DLLVM_TARGETS_TO_BUILD=X86;AMDGPU                                 \
             -DLLVM_ENABLE_BINDINGS=OFF                                         \
             -DLLVM_ENABLE_ZSTD=OFF                                             \
             -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   \
             -DMLIR_INCLUDE_TESTS=OFF                                           \
-            -DLLVM_DISTRIBUTION_COMPONENTS="llvm-headers;llvm-libraries;cmake-exports;FileCheck;count;not;mlir-headers;mlir-libraries;mlir-cmake-exports;mlir-tblgen;mlir-python-sources" \
+            -DLLVM_DISTRIBUTION_COMPONENTS="llvm-headers;llvm-libraries;cmake-exports;FileCheck;count;not;mlir-headers;mlir-libraries;mlir-cmake-exports;mlir-tblgen;mlir-python-sources;lld" \
             -DCMAKE_INSTALL_PREFIX=/home/runner/work/llvm-mlir/_mlir_install
           ninja install-distribution-stripped
           cp bin/FileCheck /home/runner/work/llvm-mlir/_mlir_install/bin/
@@ -390,12 +376,10 @@ jobs:
 
       - name: Cache conda packages
         uses: actions/cache@v3
-        env:
-          CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: ~/.conda/pkgs
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
+            ${{ runner.os }}-conda-${{ env.CONDA_CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
@@ -418,8 +402,6 @@ jobs:
       - name: Cache LLLVM-MLIR
         id: cache-llvm-mlir
         uses: actions/cache@v3
-        env:
-          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: |
             /home/runner/work/llvm-mlir/_mlir_install/**
@@ -474,12 +456,10 @@ jobs:
 
       - name: Cache conda packages
         uses: actions/cache@v3
-        env:
-          CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: ~/.conda/pkgs
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
+            ${{ runner.os }}-conda-${{ env.CONDA_CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
@@ -502,8 +482,6 @@ jobs:
       - name: Cache LLLVM-MLIR
         id: cache-llvm-mlir
         uses: actions/cache@v3
-        env:
-          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: |
             /home/runner/work/llvm-mlir/_mlir_install/**

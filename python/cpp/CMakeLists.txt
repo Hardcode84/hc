@@ -89,3 +89,4 @@ target_include_directories(${python_module_name} PRIVATE
   )
 
 install(TARGETS ${python_module_name} DESTINATION ${CMAKE_INSTALL_PREFIX})
+install(DIRECTORY ${LLVM_TOOLS_BINARY_DIR} DESTINATION "${CMAKE_INSTALL_PREFIX}/llvm" FILES_MATCHING PATTERN "ld.lld*")

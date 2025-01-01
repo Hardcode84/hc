@@ -23,7 +23,8 @@ static void populateOptPasses(mlir::OpPassManager &pm) {
       }));
 }
 
-void hc::populateBackendPipeline(mlir::PassManager &pm) {
+void hc::populateBackendPipeline(mlir::PassManager &pm,
+                                 llvm::StringRef llvmBinDir) {
   pm.addPass(hc::createLegalizeMemrefABIPass());
   pm.addPass(hc::createDecomposeMemrefsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLowerAffinePass());
@@ -37,5 +38,8 @@ void hc::populateBackendPipeline(mlir::PassManager &pm) {
   populateOptPasses(gpuPm);
 
   pm.addPass(mlir::createGpuROCDLAttachTarget());
-  pm.addPass(mlir::createGpuModuleToBinaryPass());
+
+  mlir::GpuModuleToBinaryPassOptions toBinaryOpts;
+  toBinaryOpts.toolkitPath = llvmBinDir;
+  pm.addPass(mlir::createGpuModuleToBinaryPass(toBinaryOpts));
 }

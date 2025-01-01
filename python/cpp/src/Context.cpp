@@ -56,6 +56,7 @@ static void readDebugTypes(py::dict &settings) {
 py::capsule createContext(py::dict settings) {
   auto ctx = std::make_unique<Context>();
   readSettings(ctx->settings, settings);
+  ctx->llvmBinPath = toString(settings["LLVM_BIN_PATH"]);
   readDebugTypes(settings);
   auto dtor = [](void *ptr) noexcept { delete static_cast<Context *>(ptr); };
   py::capsule ret(ctx.get(), dtor);
