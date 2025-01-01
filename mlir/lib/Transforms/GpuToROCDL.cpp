@@ -14,6 +14,7 @@
 #include <mlir/Conversion/LLVMCommon/Pattern.h>
 #include <mlir/Conversion/LLVMCommon/TypeConverter.h>
 #include <mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h>
+#include <mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h>
 #include <mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h>
 #include <mlir/Dialect/AMDGPU/Utils/Chipset.h>
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
@@ -156,6 +157,9 @@ struct LowerGpuOpsToROCDLOpsPass
                                                      llvmPatterns);
     }
 
+    // TODO: These aren't covered by the ConvertToLLVMPatternInterface right
+    // now.
+    populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
     populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns,
                                             *maybeChipset);
     populateGpuToROCDLConversionPatterns(converter, llvmPatterns, runtime);
