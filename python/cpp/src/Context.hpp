@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "hc/ExecutionEngine/ExecutionEngine.hpp"
+
 #include <nanobind/nanobind.h>
 
 #include <mlir/IR/MLIRContext.h>
@@ -15,11 +17,12 @@ struct Settings {
 };
 
 struct Context {
-  Context();
+  Context(nanobind::dict settings_);
   ~Context();
 
   mlir::MLIRContext context;
   Settings settings;
+  hc::ExecutionEngine executionEngine;
 
   // TODO: We need lld for AMDGPU linking
   std::string llvmBinPath;

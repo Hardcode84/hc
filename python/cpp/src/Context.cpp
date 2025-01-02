@@ -13,8 +13,10 @@
 #include <mlir/Target/LLVM/ROCDL/Target.h>
 #include <mlir/Target/LLVMIR/Dialect/All.h>
 
+#include <llvm/ExecutionEngine/Orc/Mangling.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/StringSaver.h>
+#include <llvm/Support/TargetSelect.h>
 
 namespace py = nanobind;
 
@@ -27,17 +29,57 @@ static mlir::DialectRegistry createRegistry() {
   return registry;
 }
 
-Context::Context() : context(createRegistry()) {
-  context.loadDialect<hc::py_ir::PyIRDialect, hc::typing::TypingDialect>();
-  pushContext(&context);
-}
+static hc::ExecutionEngineOptions
+getExecutionEngineOpts(const py::dict &settings) {
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  llvm::InitializeNativeTargetAsmParser();
 
-Context::~Context() { popContext(&context); }
+  hc::ExecutionEngineOptions opts;
+  //        [&](llvm::orc::MangleAndInterner m) -> llvm::orc::SymbolMap {
+  //      llvm::orc::SymbolMap ret;
+  //      for (auto &&[name, ptr] : symbolList) {
+  //        opts.symbolMap =
+  //        llvm::orc::ExecutorSymbolDef jitPtr{
+  //            llvm::orc::ExecutorAddr::fromPtr(ptr),
+  //            llvm::JITSymbolFlags::Exported};
+  //        ret.insert({m(name), jitPtr});
+  //      }
+  //      return ret;
+  //    };
+  opts.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
+
+  //    auto llvmPrinter = settings["llvm_printer"];
+  //    if (!llvmPrinter.is_none())
+  //      opts.transformer = getLLModulePrinter(llvmPrinter);
+
+  //    auto optimizedPrinter = settings["optimized_printer"];
+  //    if (!optimizedPrinter.is_none())
+  //      opts.lateTransformer = getLLModulePrinter(optimizedPrinter);
+
+  //    auto asmPrinter = settings["asm_printer"];
+  //    if (!asmPrinter.is_none())
+  //      opts.asmPrinter = getPrinter(asmPrinter);
+
+  return opts;
+}
 
 static void readSettings(Settings &ret, py::dict &settings) {
   ret.dumpAST = py::cast<int>(settings["DUMP_AST"]);
   ret.dumpIR = py::cast<int>(settings["DUMP_IR"]);
 }
+
+Context::Context(nanobind::dict settings_)
+    : context(createRegistry()),
+      executionEngine(getExecutionEngineOpts(settings_)) {
+  context.loadDialect<hc::py_ir::PyIRDialect, hc::typing::TypingDialect>();
+
+  readSettings(settings, settings_);
+  llvmBinPath = toString(settings_["LLVM_BIN_PATH"]);
+  pushContext(&context);
+}
+
+Context::~Context() { popContext(&context); }
 
 static void readDebugTypes(py::dict &settings) {
   auto debugType = py::cast<py::list>(settings["DEBUG_TYPE"]);
@@ -55,9 +97,7 @@ static void readDebugTypes(py::dict &settings) {
 }
 
 py::capsule createContext(py::dict settings) {
-  auto ctx = std::make_unique<Context>();
-  readSettings(ctx->settings, settings);
-  ctx->llvmBinPath = toString(settings["LLVM_BIN_PATH"]);
+  auto ctx = std::make_unique<Context>(settings);
   readDebugTypes(settings);
   auto dtor = [](void *ptr) noexcept { delete static_cast<Context *>(ptr); };
   py::capsule ret(ctx.get(), dtor);

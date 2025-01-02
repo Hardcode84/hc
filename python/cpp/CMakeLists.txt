@@ -70,6 +70,11 @@ target_link_libraries(${python_module_name} PRIVATE
     hc_frontend
     Python::Python
     Python::Module
+    LLVM${LLVM_NATIVE_ARCH}AsmParser
+    LLVM${LLVM_NATIVE_ARCH}CodeGen
+    LLVM${LLVM_NATIVE_ARCH}Desc
+    LLVMOrcJIT
+    LLVMTarget
     MLIRCAPIDebug
     MLIRCAPIIR
     MLIRCAPIInterfaces

@@ -68,7 +68,7 @@ class ExecutionEngine {
 public:
   using ModuleHandle = void *;
 
-  ExecutionEngine(ExecutionEngineOptions options);
+  ExecutionEngine(const ExecutionEngineOptions &options);
   ~ExecutionEngine();
 
   /// Compiles given module, adds it to execution engine and run its contructors

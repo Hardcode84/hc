@@ -231,7 +231,7 @@ private:
 };
 } // namespace
 
-hc::ExecutionEngine::ExecutionEngine(ExecutionEngineOptions options)
+hc::ExecutionEngine::ExecutionEngine(const ExecutionEngineOptions &options)
     : cache(options.enableObjectCache ? new SimpleObjectCache() : nullptr),
       gdbListener(options.enableGDBNotificationListener
                       ? llvm::JITEventListener::createGDBRegistrationListener()
