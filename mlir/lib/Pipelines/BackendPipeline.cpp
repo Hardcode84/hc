@@ -42,4 +42,10 @@ void hc::populateBackendPipeline(mlir::PassManager &pm,
   mlir::GpuModuleToBinaryPassOptions toBinaryOpts;
   toBinaryOpts.toolkitPath = llvmBinDir;
   pm.addPass(mlir::createGpuModuleToBinaryPass(toBinaryOpts));
+
+  pm.addPass(hc::createGPUToGPURuntimePass());
+  pm.addPass(mlir::createConvertToLLVMPass());
+  pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+  pm.addPass(mlir::createSymbolDCEPass());
+  populateOptPasses(gpuPm);
 }

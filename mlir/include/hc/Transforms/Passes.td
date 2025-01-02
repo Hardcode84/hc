@@ -223,6 +223,12 @@ def ExpandTuplePass : Pass<"hc-expand-tuple-pass"> {
   ];
 }
 
+def GPUToGPURuntimePass : Pass<"hc-gpu-to-gpu-runtime-pass", "::mlir::ModuleOp"> {
+  let dependentDialects = [
+    "::mlir::LLVM::LLVMDialect",
+  ];
+}
+
 // TODO: Fix upstream
 def ConvertGpuOpsToROCDLOps : Pass<"hc-convert-gpu-to-rocdl", "::mlir::gpu::GPUModuleOp"> {
   let summary = "Generate ROCDL operations for gpu operations";

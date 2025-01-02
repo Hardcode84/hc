@@ -52,6 +52,7 @@ set(SOURCES_LIST
     lib/Transforms/DecomposePointers.cpp
     lib/Transforms/DropTypeResolvers.cpp
     lib/Transforms/ExpandTuple.cpp
+    lib/Transforms/GpuToGpuRuntime.cpp
     lib/Transforms/GpuToROCDL.cpp
     lib/Transforms/LegalizeBoolMemrefs.cpp
     lib/Transforms/LowerHKernel.cpp

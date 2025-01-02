@@ -244,8 +244,7 @@ getPtrAddressSpace(mlir::LLVMTypeConverter &converter, mlir::Attribute attr) {
   return mlir::failure();
 }
 
-void hc::populatePtrToLLVMConversionPatterns(
-    mlir::LLVMTypeConverter &converter, mlir::RewritePatternSet &patterns) {
+void hc::populatePtrToLLVMTypeConverter(mlir::LLVMTypeConverter &converter) {
   converter.addConversion(
       [&converter](hc::hk::PtrType type) -> std::optional<mlir::Type> {
         auto addrSpace = getPtrAddressSpace(converter, type.getMemorySpace());
@@ -264,6 +263,14 @@ void hc::populatePtrToLLVMConversionPatterns(
     return innerType;
   });
 
+  converter.addConversion(
+      [](hc::hk::CurrentGroupType type) -> std::optional<mlir::Type> {
+        return mlir::LLVM::LLVMPointerType::get(type.getContext());
+      });
+}
+
+void hc::populatePtrToLLVMConversionPatterns(
+    mlir::LLVMTypeConverter &converter, mlir::RewritePatternSet &patterns) {
   patterns.insert<ConvertDescriptorCast, ConvertPtrAdd, ConvertPtrAlloca,
                   ConvertPtrLoad, ConvertPtrStore>(converter,
                                                    patterns.getContext());
@@ -281,6 +288,7 @@ struct PtrToLLVMDialectInterface : public ConvertToLLVMPatternInterface {
   void populateConvertToLLVMConversionPatterns(
       ConversionTarget &target, LLVMTypeConverter &typeConverter,
       RewritePatternSet &patterns) const final {
+    hc::populatePtrToLLVMTypeConverter(typeConverter);
     hc::populatePtrToLLVMConversionPatterns(typeConverter, patterns);
   }
 };

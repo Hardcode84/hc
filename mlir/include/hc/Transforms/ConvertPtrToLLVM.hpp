@@ -11,6 +11,7 @@ class RewritePatternSet;
 } // namespace mlir
 
 namespace hc {
+void populatePtrToLLVMTypeConverter(mlir::LLVMTypeConverter &converter);
 void populatePtrToLLVMConversionPatterns(mlir::LLVMTypeConverter &converter,
                                          mlir::RewritePatternSet &patterns);
 
