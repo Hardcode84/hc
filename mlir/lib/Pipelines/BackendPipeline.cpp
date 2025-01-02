@@ -45,6 +45,7 @@ void hc::populateBackendPipeline(mlir::PassManager &pm,
 
   pm.addPass(hc::createGPUToGPURuntimePass());
   pm.addPass(mlir::createConvertToLLVMPass());
+  pm.addPass(mlir::createReconcileUnrealizedCastsPass());
   pm.addPass(mlir::createSymbolDCEPass());
   populateOptPasses(gpuPm);
 }

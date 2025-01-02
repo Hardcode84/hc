@@ -262,6 +262,11 @@ void hc::populatePtrToLLVMTypeConverter(mlir::LLVMTypeConverter &converter) {
 
     return innerType;
   });
+
+  converter.addConversion(
+      [](hc::hk::CurrentGroupType type) -> std::optional<mlir::Type> {
+        return mlir::LLVM::LLVMPointerType::get(type.getContext());
+      });
 }
 
 void hc::populatePtrToLLVMConversionPatterns(
