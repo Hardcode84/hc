@@ -344,6 +344,8 @@ struct GPUToGPURuntimePass final
     if (mlir::failed(
             mlir::applyPartialConversion(mod, target, std::move(patterns))))
       signalPassFailure();
+
+    mod->walk([](mlir::gpu::BinaryOp op) { op->erase(); });
   }
 };
 } // namespace

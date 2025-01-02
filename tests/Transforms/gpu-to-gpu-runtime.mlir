@@ -1,9 +1,10 @@
 // RUN: hc-opt -split-input-file %s --hc-gpu-to-gpu-runtime-pass | FileCheck %s
 
 // CHECK-LABEL: func @copy_kernel
-//       CHECK: llvm.call @hcgpuGetKernel
-//       CHECK: llvm.call @hcgpuSuggestBlockSize
-//       CHECK: llvm.call @hcgpuLaunchKernel
+//       CHECK:   llvm.call @hcgpuGetKernel
+//       CHECK:   llvm.call @hcgpuSuggestBlockSize
+//       CHECK:   llvm.call @hcgpuLaunchKernel
+//   CHECK-NOT:  gpu.binary
 
 module attributes {gpu.container_module} {
   func.func @copy_kernel(%arg0: !hkernel<current_group 2>, %arg1: !hkernel.memref_descriptor<memref<?x?xi32, strided<[?, ?], offset: ?>>>, %arg2: !hkernel.memref_descriptor<memref<?x?xi32, strided<[?, ?], offset: ?>>>) attributes {kernel.entrypoint} {
