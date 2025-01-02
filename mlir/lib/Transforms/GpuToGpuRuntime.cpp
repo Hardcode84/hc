@@ -133,31 +133,39 @@ struct ConvertGpuLaunch final
     if (op->getNumResults() != 0)
       return rewriter.notifyMatchFailure(op, "Cannot replace op with results");
 
-    auto kernelBinary = SymbolTable::lookupNearestSymbolFrom<gpu::BinaryOp>(
-        op, op.getKernelModuleName());
-    if (!kernelBinary)
-      return rewriter.notifyMatchFailure(
-          op, "Couldn't find the binary holding the kernel: " +
-                  op.getKernelModuleName().getValue());
-
-    gpu::ObjectAttr object = getSelectedObject(kernelBinary);
-    if (!object)
-      return rewriter.notifyMatchFailure(op, "Cannot get gpu object");
-
-    StringRef objData = object.getObject();
-
     mlir::Location loc = op.getLoc();
-    mlir::Value handlePtr =
-        createGlobal(rewriter, llvmPointerType, mod, "kernel_handle");
-    mlir::Value dataPtr = mlir::LLVM::createGlobalString(
-        loc, rewriter, getUniqueLLVMGlobalName(mod, "kernel_data"), objData,
-        mlir::LLVM::Linkage::Internal);
-    mlir::Value dataSize = rewriter.create<mlir::LLVM::ConstantOp>(
-        loc, llvmIndexType, objData.size());
+    mlir::Value kernel;
+    {
+      OpBuilder::InsertionGuard g(rewriter);
+      mlir::Block *block = &op->getParentOfType<mlir::FunctionOpInterface>()
+                                .getFunctionBody()
+                                .front();
+      rewriter.setInsertionPointToStart(block);
+      auto kernelBinary = SymbolTable::lookupNearestSymbolFrom<gpu::BinaryOp>(
+          op, op.getKernelModuleName());
+      if (!kernelBinary)
+        return rewriter.notifyMatchFailure(
+            op, "Couldn't find the binary holding the kernel: " +
+                    op.getKernelModuleName().getValue());
 
-    mlir::Value kernel =
-        getKernelBuilder.create(loc, rewriter, {handlePtr, dataPtr, dataSize})
-            .getResult();
+      gpu::ObjectAttr object = getSelectedObject(kernelBinary);
+      if (!object)
+        return rewriter.notifyMatchFailure(op, "Cannot get gpu object");
+
+      StringRef objData = object.getObject();
+
+      mlir::Value handlePtr =
+          createGlobal(rewriter, llvmPointerType, mod, "kernel_handle");
+      mlir::Value dataPtr = mlir::LLVM::createGlobalString(
+          loc, rewriter, getUniqueLLVMGlobalName(mod, "kernel_data"), objData,
+          mlir::LLVM::Linkage::Internal);
+      mlir::Value dataSize = rewriter.create<mlir::LLVM::ConstantOp>(
+          loc, llvmIndexType, objData.size());
+
+      kernel =
+          getKernelBuilder.create(loc, rewriter, {handlePtr, dataPtr, dataSize})
+              .getResult();
+    }
 
     mlir::SmallVector<mlir::Value> suggestedBlockSizes;
 
@@ -173,7 +181,7 @@ struct ConvertGpuLaunch final
     };
 
     constexpr unsigned ndims = 3;
-    mlir::Value ndimsVal = createConst(ndims);
+
     auto sizesType = mlir::LLVM::LLVMArrayType::get(llvmIndexType, ndims);
     mlir::Value blockSizesOrig[ndims] = {op.getBlockSizeX(), op.getBlockSizeY(),
                                          op.getBlockSizeZ()};
@@ -181,6 +189,8 @@ struct ConvertGpuLaunch final
                                            adaptor.getBlockSizeY(),
                                            adaptor.getBlockSizeZ()};
     mlir::Value blockSizes[ndims];
+
+    mlir::Operation *suggestOp = nullptr;
     for (auto &&[i, origArg, arg] :
          llvm::enumerate(blockSizesOrig, blockSizesBefore)) {
       auto suggested = origArg.getDefiningOp<hc::hk::SuggestBlockSizeOp>();
@@ -190,6 +200,9 @@ struct ConvertGpuLaunch final
       }
 
       if (suggestedBlockSizes.empty()) {
+        suggestOp = suggested;
+        OpBuilder::InsertionGuard g(rewriter);
+        rewriter.setInsertionPoint(suggestOp);
         mlir::Value globalSizesArray =
             rewriter.create<mlir::LLVM::PoisonOp>(loc, sizesType);
         mlir::ValueRange workSize = suggested.getWorkSize();
@@ -212,6 +225,7 @@ struct ConvertGpuLaunch final
                                              globalSizes);
 
         mlir::Value blockSizes = createAlloca(llvmIndexType, ndims);
+        mlir::Value ndimsVal = createConst(ndims);
         suggestBlockSizeBuilder.create(
             loc, rewriter, {kernel, globalSizes, blockSizes, ndimsVal});
         mlir::Value blockSizeArray =
@@ -228,6 +242,11 @@ struct ConvertGpuLaunch final
       blockSizes[i] = suggestedBlockSizes[i];
     }
 
+    if (suggestOp)
+      rewriter.replaceOp(suggestOp,
+                         mlir::ValueRange(suggestedBlockSizes)
+                             .take_front(suggestOp->getNumResults()));
+
     mlir::Value gridSizes[ndims] = {
         adaptor.getGridSizeX(), adaptor.getGridSizeY(), adaptor.getGridSizeZ()};
 
@@ -235,6 +254,8 @@ struct ConvertGpuLaunch final
         allocArray(rewriter, loc, llvmIndexType, gridSizes);
     mlir::Value blockSizesPtr =
         allocArray(rewriter, loc, llvmIndexType, blockSizes);
+
+    mlir::Value ndimsVal = createConst(ndims);
 
     mlir::ValueRange args = adaptor.getKernelOperands();
 
