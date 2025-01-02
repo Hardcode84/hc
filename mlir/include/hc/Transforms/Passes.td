@@ -223,7 +223,7 @@ def ExpandTuplePass : Pass<"hc-expand-tuple-pass"> {
   ];
 }
 
-def GPUToGPURuntime : Pass<"hc-gpu-to-gpu-runtime", "::mlir::ModuleOp"> {
+def GPUToGPURuntimePass : Pass<"hc-gpu-to-gpu-runtime-pass", "::mlir::ModuleOp"> {
   let dependentDialects = [
     "::mlir::LLVM::LLVMDialect",
   ];

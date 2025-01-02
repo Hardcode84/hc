@@ -1,4 +1,4 @@
-// RUN: hc-opt -split-input-file %s --hc-gpu-to-gpu-runtime | FileCheck %s
+// RUN: hc-opt -split-input-file %s --hc-gpu-to-gpu-runtime-pass | FileCheck %s
 
 // CHECK-LABEL: func @copy_kernel
 //       CHECK: llvm.call @hcgpuGetKernel

@@ -14,7 +14,7 @@
 #include <mlir/Transforms/DialectConversion.h>
 
 namespace hc {
-#define GEN_PASS_DEF_GPUTOGPURUNTIME
+#define GEN_PASS_DEF_GPUTOGPURUNTIMEPASS
 #include "hc/Transforms/Passes.h.inc"
 } // namespace hc
 
@@ -304,8 +304,8 @@ private:
       }};
 };
 
-struct GPUToGPURuntime final
-    : public hc::impl::GPUToGPURuntimeBase<GPUToGPURuntime> {
+struct GPUToGPURuntimePass final
+    : public hc::impl::GPUToGPURuntimePassBase<GPUToGPURuntimePass> {
 
   void runOnOperation() override {
     auto mod = getOperation();
