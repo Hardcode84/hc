@@ -43,7 +43,11 @@ DispatcherBase::DispatcherBase(py::capsule ctx, py::object getDesc)
       argsHandlerBuilder(
           std::make_unique<ArgsHandlerBuilder>(context.context)) {}
 
-DispatcherBase::~DispatcherBase() {}
+DispatcherBase::~DispatcherBase() {
+  auto &ee = context.executionEngine;
+  for (auto h : compilerModules)
+    ee.releaseModule(h);
+}
 
 void DispatcherBase::definePyClass(py::module_ &m) {
   py::class_<DispatcherBase>(m, "DispatcherBase");
@@ -72,8 +76,8 @@ static mlir::Attribute translateLiteral(mlir::MLIRContext *ctx,
               toString(py::str(obj)));
 }
 
-static mlir::OwningOpRef<mlir::Operation *> importImpl(Context &context,
-                                                       py::handle desc) {
+static std::pair<mlir::OwningOpRef<mlir::Operation *>, std::string>
+importImpl(Context &context, py::handle desc) {
   auto [src, funcName] = getSource(desc);
 
   llvm::SmallVector<ImportedSym> symbols;
@@ -117,7 +121,7 @@ static mlir::OwningOpRef<mlir::Operation *> importImpl(Context &context,
       newMod->setAttr(keyAttr, attr);
     }
   }
-  return newMod;
+  return {std::move(newMod), funcName};
 }
 
 static hc::py_ir::PyModuleOp getIRModImpl(mlir::Operation *op) {
@@ -218,7 +222,7 @@ mlir::Operation *DispatcherBase::runFrontend() {
   if (!mod) {
     assert(getFuncDesc);
     py::object desc = getFuncDesc();
-    auto newMod = importImpl(context, desc);
+    auto &&[newMod, funcName] = importImpl(context, desc);
     runPipeline(context, newMod.get(),
                 [this](mlir::PassManager &pm) { populateImportPipeline(pm); });
 
@@ -231,6 +235,7 @@ mlir::Operation *DispatcherBase::runFrontend() {
     mod = std::move(newMod);
 
     populateArgsHandlers(desc.attr("args"));
+    this->funcName = std::move(funcName);
   }
   return mod.get();
 }
@@ -247,11 +252,22 @@ void DispatcherBase::invokeFunc(const py::args &args,
     runPipeline(context, newMod.get(),
                 [this](mlir::PassManager &pm) { populateInvokePipeline(pm); });
     newMod.get()->dump();
-    reportError("TODO: compile");
 
-    // TODO: codegen
-    it = funcsCache.insert({keyPtr, nullptr}).first;
+    auto &ee = context.executionEngine;
+    auto res = ee.loadModule(mlir::cast<mlir::ModuleOp>(newMod.get()));
+    if (!res)
+      reportError(llvm::Twine("Failed to load MLIR module:\n") +
+                  llvm::toString(res.takeError()));
+
+    compilerModules.emplace_back(*res);
+    auto func = ee.lookup(*res, funcName + "_pyabi");
+    if (!func)
+      reportError(llvm::Twine("Failed to get function pointer:\n") +
+                  llvm::toString(func.takeError()));
+
+    it = funcsCache.insert({keyPtr, reinterpret_cast<FuncT>(*func)}).first;
   }
+  reportError("TODO: run");
 
   auto func = it->second;
   ExceptionDesc exc;
@@ -520,7 +536,7 @@ DispatcherBase::OpRef DispatcherBase::importFuncForLinking(
         &unresolved) {
   assert(getFuncDesc);
   py::object desc = getFuncDesc();
-  auto ret = importImpl(context, desc);
+  auto &&[ret, funcName] = importImpl(context, desc);
 
   runPipeline(context, ret.get(),
               [this](mlir::PassManager &pm) { populateImportPipeline(pm); });
@@ -528,5 +544,5 @@ DispatcherBase::OpRef DispatcherBase::importFuncForLinking(
   auto deps = py::cast<py::dict>(desc.attr("dispatcher_deps"));
   auto irMod = getIRMod(ret.get());
   getModuleDeps(irMod, deps, unresolved);
-  return ret;
+  return std::move(ret);
 }

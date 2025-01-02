@@ -60,7 +60,9 @@ private:
 
   using FuncT = int (*)(ExceptionDesc *exc, PyObject *args[]);
 
+  std::string funcName;
   llvm::SmallDenseMap<const void *, FuncT> funcsCache;
+  llvm::SmallVector<void *> compilerModules;
 
   void populateArgsHandlers(nanobind::handle args);
   mlir::Attribute processArgs(const nanobind::args &args,

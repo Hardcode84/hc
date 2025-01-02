@@ -40,6 +40,7 @@ set(SOURCES_LIST
     lib/Dialect/PyIR/IR/PyIROps.cpp
     lib/Dialect/Typing/IR/TypingOps.cpp
     lib/Dialect/Typing/Transforms/Interpreter.cpp
+    lib/ExecutionEngine/ExecutionEngine.cpp
     lib/Pipelines/BackendPipeline.cpp
     lib/Pipelines/FrontendPipeline.cpp
     lib/Pipelines/MiddleendPipeline.cpp
@@ -72,6 +73,7 @@ set(HEADERS_LIST
     include/hc/Dialect/Typing/IR/TypingOps.hpp
     include/hc/Dialect/Typing/IR/TypingOpsInterfaces.hpp
     include/hc/Dialect/Typing/Transforms/Interpreter.hpp
+    include/hc/ExecutionEngine/ExecutionEngine.hpp
     include/hc/InitHCDialects.hpp
     include/hc/InitHCPasses.hpp
     include/hc/Pipelines/BackendPipeline.hpp
