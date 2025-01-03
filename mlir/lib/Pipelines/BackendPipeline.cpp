@@ -27,6 +27,7 @@ static void populateOptPasses(mlir::OpPassManager &pm) {
 void hc::populateBackendPipeline(mlir::PassManager &pm,
                                  llvm::StringRef llvmBinDir) {
   pm.addPass(hc::createLegalizeMemrefABIPass());
+  pm.addPass(hc::createCreatePyWrapperPass());
   pm.addPass(hc::createDecomposeMemrefsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLowerAffinePass());
   populateOptPasses(pm);

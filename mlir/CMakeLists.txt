@@ -49,6 +49,7 @@ set(SOURCES_LIST
     lib/Transforms/ConvertPtrToLLVM.cpp
     lib/Transforms/ConvertPyASTToIR.cpp
     lib/Transforms/ConvertPyFuncToFunc.cpp
+    lib/Transforms/CreatePyWrapper.cpp
     lib/Transforms/DecomposeHKOps.cpp
     lib/Transforms/DecomposeMemrefs.cpp
     lib/Transforms/DecomposePointers.cpp

@@ -45,7 +45,7 @@ static gpu::ObjectAttr getSelectedObject(gpu::BinaryOp op) {
     if (auto indexAttr = mlir::dyn_cast<IntegerAttr>(target)) {
       index = indexAttr.getInt();
     } else {
-      for (auto [i, attr] : llvm::enumerate(objects)) {
+      for (auto &&[i, attr] : llvm::enumerate(objects)) {
         auto obj = mlir::dyn_cast<gpu::ObjectAttr>(attr);
         if (obj.getTarget() == target) {
           index = i;

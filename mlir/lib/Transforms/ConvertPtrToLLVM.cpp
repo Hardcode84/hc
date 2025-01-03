@@ -14,6 +14,94 @@
 #include <mlir/Transforms/DialectConversion.h>
 
 namespace {
+struct ConvertGetPyArgOp final
+    : public mlir::OpConversionPattern<hc::hk::GetPyArgOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::GetPyArgOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto module = op->getParentOfType<mlir::ModuleOp>();
+    if (!module)
+      return rewriter.notifyMatchFailure(op, "No parent module");
+
+    mlir::Type i32Type = rewriter.getI32Type();
+    auto func = op->getParentOfType<mlir::FunctionOpInterface>();
+    if (!func || func.getResultTypes() != mlir::ArrayRef(i32Type))
+      return rewriter.notifyMatchFailure(op, "Invalid parent func");
+
+    mlir::Type origType = op.getType();
+    mlir::Type resType = getTypeConverter()->convertType(origType);
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Cannot convert result type");
+
+    auto ptrType = mlir::LLVM::LLVMPointerType::get(rewriter.getContext());
+    mlir::Location loc = op.getLoc();
+
+    auto getFunction = [&](mlir::StringRef functionName, mlir::Type returnType,
+                           mlir::ArrayRef<mlir::Type> argTypes) {
+      auto funcType = mlir::LLVM::LLVMFunctionType::get(returnType, argTypes);
+      if (auto function =
+              module.lookupSymbol<mlir::LLVM::LLVMFuncOp>(functionName))
+        return function;
+
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPointToEnd(module.getBody());
+      return rewriter.create<mlir::LLVM::LLVMFuncOp>(rewriter.getUnknownLoc(),
+                                                     functionName, funcType);
+    };
+    auto getArgFunc = getFunction("hcgpuGetPyArg", ptrType, {ptrType, i32Type});
+
+    mlir::Value argIndex = rewriter.create<mlir::LLVM::ConstantOp>(
+        loc, i32Type, adaptor.getIndex());
+    mlir::Value getArgsArgs[] = {adaptor.getArgs(), argIndex};
+    mlir::Value arg =
+        rewriter.create<mlir::LLVM::CallOp>(loc, getArgFunc, getArgsArgs)
+            .getResult();
+    mlir::Value resPtr = [&] {
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPointToStart(&func.getFunctionBody().front());
+      mlir::Value size = rewriter.create<mlir::LLVM::ConstantOp>(
+          loc, rewriter.getI64Type(), 1);
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, ptrType, resType, size);
+    }();
+
+    mlir::Value convertRes;
+    if (mlir::isa<hc::hk::MemrefDescriptorType>(origType)) {
+      auto convertArgFunc = getFunction("hcgpuConvertPyArray", i32Type,
+                                        {ptrType, ptrType, ptrType});
+      mlir::Value convertArgs[] = {adaptor.getErrorContext(), arg, resPtr};
+      convertRes =
+          rewriter.create<mlir::LLVM::CallOp>(loc, convertArgFunc, convertArgs)
+              .getResult();
+    } else {
+      return rewriter.notifyMatchFailure(op, "Unsupported return type");
+    }
+
+    mlir::Value zero = rewriter.create<mlir::LLVM::ConstantOp>(loc, i32Type, 0);
+    mlir::Value success = rewriter.create<mlir::LLVM::ICmpOp>(
+        loc, rewriter.getI1Type(), mlir::LLVM::ICmpPredicate::eq, convertRes,
+        zero);
+
+    auto &&[successBlock, failureBlock] = [&] {
+      mlir::Block *successBlock = rewriter.splitBlock(
+          rewriter.getBlock(), rewriter.getInsertionPoint());
+      mlir::Block *failureBlock = rewriter.createBlock(successBlock);
+      rewriter.create<mlir::LLVM::ReturnOp>(loc, convertRes);
+      return std::pair(successBlock, failureBlock);
+    }();
+
+    rewriter.setInsertionPointAfter(success.getDefiningOp());
+    rewriter.create<mlir::LLVM::CondBrOp>(loc, success, successBlock,
+                                          failureBlock);
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToStart(successBlock);
+    mlir::Value result =
+        rewriter.create<mlir::LLVM::LoadOp>(loc, resType, resPtr);
+    rewriter.replaceOp(op, result);
+    return mlir::success();
+  }
+};
 struct ConvertDescriptorCast final
     : public mlir::OpConversionPattern<hc::hk::MemrefDescriptorCastOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -264,17 +352,26 @@ void hc::populatePtrToLLVMTypeConverter(mlir::LLVMTypeConverter &converter) {
     return innerType;
   });
 
+  auto ptrType = mlir::LLVM::LLVMPointerType::get(&converter.getContext());
   converter.addConversion(
-      [](hc::hk::CurrentGroupType type) -> std::optional<mlir::Type> {
-        return mlir::LLVM::LLVMPointerType::get(type.getContext());
+      [ptrType](hc::hk::CurrentGroupType) -> std::optional<mlir::Type> {
+        return ptrType;
+      });
+  converter.addConversion(
+      [ptrType](hc::hk::ErrorContextType) -> std::optional<mlir::Type> {
+        return ptrType;
+      });
+  converter.addConversion(
+      [ptrType](hc::hk::PyArgsType) -> std::optional<mlir::Type> {
+        return ptrType;
       });
 }
 
 void hc::populatePtrToLLVMConversionPatterns(
     mlir::LLVMTypeConverter &converter, mlir::RewritePatternSet &patterns) {
-  patterns.insert<ConvertDescriptorCast, ConvertPtrAdd, ConvertPtrAlloca,
-                  ConvertPtrLoad, ConvertPtrStore>(converter,
-                                                   patterns.getContext());
+  patterns.insert<ConvertGetPyArgOp, ConvertDescriptorCast, ConvertPtrAdd,
+                  ConvertPtrAlloca, ConvertPtrLoad, ConvertPtrStore>(
+      converter, patterns.getContext());
 }
 
 namespace {

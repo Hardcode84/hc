@@ -310,6 +310,23 @@ def HKernel_ResolveSliceOp : HKernel_OpBase<"resolve_slice", [
   ];
 }
 
+// pyapi
+
+def HKernel_ErrorContextType : HKernel_Type<"ErrorContext", "error_context", [], "::mlir::Type">;
+
+def HKernel_PyArgsType : HKernel_Type<"PyArgs", "py_args", [], "::mlir::Type">;
+
+def HKernel_GetPyArgOp : HKernel_OpBase<"get_py_arg", [Pure]> {
+  let arguments = (ins
+    HKernel_PyArgsType:$args,
+    I64Attr:$index,
+    HKernel_ErrorContextType:$error_context
+  );
+  let results = (outs AnyType:$result);
+
+  let assemblyFormat = "attr-dict $args `[` $index `]` `,` $error_context `:` type($result)";
+}
+
 // Ptr stuff, TODO: upstream
 
 def HKernel_MemrefDescriptorType : HKernel_Type<"MemrefDescriptor", "memref_descriptor", [], "::mlir::Type"> {
