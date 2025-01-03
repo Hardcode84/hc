@@ -229,6 +229,14 @@ def GPUToGPURuntimePass : Pass<"hc-gpu-to-gpu-runtime-pass", "::mlir::ModuleOp">
   ];
 }
 
+def CreatePyWrapperPass : Pass<"hc-create-py-wrapper-pass", "::mlir::ModuleOp"> {
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::ub::UBDialect",
+    "::hc::hk::HKernelDialect",
+  ];
+}
+
 // TODO: Fix upstream
 def ConvertGpuOpsToROCDLOps : Pass<"hc-convert-gpu-to-rocdl", "::mlir::gpu::GPUModuleOp"> {
   let summary = "Generate ROCDL operations for gpu operations";
