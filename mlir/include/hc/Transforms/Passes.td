@@ -237,6 +237,12 @@ def CreatePyWrapperPass : Pass<"hc-create-py-wrapper-pass", "::mlir::ModuleOp"> 
   ];
 }
 
+def LegalizeLLVMABIPass : Pass<"hc-legalize-llvm-abi-pass", "::mlir::ModuleOp"> {
+  let dependentDialects = [
+    "::mlir::LLVM::LLVMDialect",
+  ];
+}
+
 // TODO: Fix upstream
 def ConvertGpuOpsToROCDLOps : Pass<"hc-convert-gpu-to-rocdl", "::mlir::gpu::GPUModuleOp"> {
   let summary = "Generate ROCDL operations for gpu operations";
