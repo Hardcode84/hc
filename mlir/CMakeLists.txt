@@ -58,6 +58,7 @@ set(SOURCES_LIST
     lib/Transforms/GpuToGpuRuntime.cpp
     lib/Transforms/GpuToROCDL.cpp
     lib/Transforms/LegalizeBoolMemrefs.cpp
+    lib/Transforms/LegalizeLLVMABI.cpp
     lib/Transforms/LowerHKernel.cpp
     lib/Transforms/LowerScope.cpp
     lib/Transforms/ModuleLinker.cpp
