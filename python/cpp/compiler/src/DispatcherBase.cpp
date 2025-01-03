@@ -19,6 +19,8 @@
 #include "hc/Dialect/Typing/IR/TypingOps.hpp"
 #include "hc/Transforms/ModuleLinker.hpp"
 
+#include "PyRuntimeShared.hpp"
+
 #include "CompilerFront.hpp"
 #include "Context.hpp"
 #include "Utils.hpp"
@@ -270,7 +272,7 @@ void DispatcherBase::invokeFunc(const py::args &args,
   reportError("TODO: run");
 
   auto func = it->second;
-  ExceptionDesc exc;
+  hc::ExceptionDesc exc;
   if (func(&exc, funcArgs.data()) != 0)
     reportError(exc.message);
 }

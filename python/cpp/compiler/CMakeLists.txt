@@ -16,7 +16,7 @@ get_property(mlir_dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(mlir_conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 get_property(mlir_extension_libs GLOBAL PROPERTY MLIR_EXTENSION_LIBS)
 
-find_package(Python COMPONENTS Interpreter Development Development.Module REQUIRED)
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(nanobind REQUIRED)
 
 # TODO: something better
@@ -91,6 +91,7 @@ apply_llvm_compile_flags(${python_module_name})
 target_include_directories(${python_module_name} PRIVATE
     ${LLVM_INCLUDE_DIRS}
     ${MLIR_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
     ${_python_sources}/MLIRPythonExtension.Core
   )
 

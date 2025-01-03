@@ -19,6 +19,10 @@ class PassManager;
 
 struct Context;
 
+namespace hc {
+struct ExceptionDesc;
+}
+
 class DispatcherBase {
 public:
   DispatcherBase(nanobind::capsule ctx, nanobind::object getDesc);
@@ -54,11 +58,7 @@ private:
   };
   llvm::SmallVector<ArgDesc> argsHandlers;
 
-  struct ExceptionDesc {
-    std::string message;
-  };
-
-  using FuncT = int (*)(ExceptionDesc *exc, PyObject *args[]);
+  using FuncT = int (*)(hc::ExceptionDesc *exc, PyObject *args[]);
 
   std::string funcName;
   llvm::SmallDenseMap<const void *, FuncT> funcsCache;
