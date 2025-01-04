@@ -72,6 +72,7 @@ invoke_cmake(
         "-DHC_ENABLE_PYTHON=ON",
         "-DHC_ENABLE_TOOLS=ON",  # need hc-opt to convert mlir files to bytecode
         "-DHC_ENABLE_TESTS=OFF",
+        "-DHC_ENABLE_GPU_LOADER=ON",
     ]
 )
 invoke_cmake(["--build", ".", "--config", "Release"])
