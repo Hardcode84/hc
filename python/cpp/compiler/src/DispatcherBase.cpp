@@ -269,8 +269,6 @@ void DispatcherBase::invokeFunc(const py::args &args,
 
     it = funcsCache.insert({keyPtr, reinterpret_cast<FuncT>(*func)}).first;
   }
-  reportError("TODO: run");
-
   auto func = it->second;
   hc::ExceptionDesc exc;
   if (func(&exc, funcArgs.data()) != 0)

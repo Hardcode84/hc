@@ -9,6 +9,8 @@
 
 extern "C" HC_PYTHON_RUNTIME_EXPORT int
 hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc, PyObject *obj, void *ret) {
+  fprintf(stderr, "Not implemented\n");
+  fflush(stderr);
   abort();
 }
 
