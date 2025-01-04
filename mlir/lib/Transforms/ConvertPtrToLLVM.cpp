@@ -50,14 +50,13 @@ struct ConvertGetPyArgOp final
       return rewriter.create<mlir::LLVM::LLVMFuncOp>(rewriter.getUnknownLoc(),
                                                      functionName, funcType);
     };
-    auto getArgFunc = getFunction("hcgpuGetPyArg", ptrType, {ptrType, i32Type});
 
     mlir::Value argIndex = rewriter.create<mlir::LLVM::ConstantOp>(
         loc, i32Type, adaptor.getIndex());
-    mlir::Value getArgsArgs[] = {adaptor.getArgs(), argIndex};
-    mlir::Value arg =
-        rewriter.create<mlir::LLVM::CallOp>(loc, getArgFunc, getArgsArgs)
-            .getResult();
+    mlir::Value arg = rewriter.create<mlir::LLVM::GEPOp>(
+        loc, ptrType, ptrType, adaptor.getArgs(), argIndex,
+        /*inbounds*/ true);
+
     mlir::Value resPtr = [&] {
       mlir::OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointToStart(&func.getFunctionBody().front());

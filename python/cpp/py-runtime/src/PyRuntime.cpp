@@ -7,11 +7,6 @@
 #include "PyRuntimeShared.hpp"
 #include "hc-python-runtime_export.h"
 
-extern "C" HC_PYTHON_RUNTIME_EXPORT PyObject *hcgpuGetPyArg(PyObject *args,
-                                                            int index) {
-  abort();
-}
-
 extern "C" HC_PYTHON_RUNTIME_EXPORT int
 hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc, PyObject *obj, void *ret) {
   abort();

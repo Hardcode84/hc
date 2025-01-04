@@ -7,7 +7,6 @@ from .settings import register_cfunc
 
 runtime_lib = load_lib("hc-python-runtime")
 
-register_cfunc(runtime_lib, "hcgpuGetPyArg")
 register_cfunc(runtime_lib, "hcgpuConvertPyArray")
 
 register_cfunc(runtime_lib, "hcgpuGetKernel")
