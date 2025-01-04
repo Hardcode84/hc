@@ -9,8 +9,9 @@
 //       CHECK:   %[[D4:.*]] = llvm.mlir.poison : !llvm.ptr
 //       CHECK:   %[[D5:.*]] = llvm.mlir.constant(1 : i32) : i32
 //       CHECK:   %[[D6:.*]] = llvm.getelementptr inbounds %[[ARG1]][%[[D5]]] : (!llvm.ptr, i32) -> !llvm.ptr, !llvm.ptr
+//       CHECK:   %[[A1:.*]] = llvm.load %[[D6]] : !llvm.ptr -> !llvm.ptr
 //       CHECK:   %[[RANK1:.*]] = llvm.mlir.constant(2 : i32) : i32
-//       CHECK:   %[[D7:.*]] = llvm.call @hcgpuConvertPyArray(%[[ARG0]], %[[D6]], %[[RANK1]], %[[D3]]) : (!llvm.ptr, !llvm.ptr, i32, !llvm.ptr) -> i32
+//       CHECK:   %[[D7:.*]] = llvm.call @hcgpuConvertPyArray(%[[ARG0]], %[[A1]], %[[RANK1]], %[[D3]]) : (!llvm.ptr, !llvm.ptr, i32, !llvm.ptr) -> i32
 //       CHECK:   %[[D8:.*]] = llvm.mlir.constant(0 : i32) : i32
 //       CHECK:   %[[D9:.*]] = llvm.icmp "eq" %[[D7]], %[[D8]] : i32
 //       CHECK:   llvm.cond_br %[[D9]], ^bb2, ^bb1
@@ -20,8 +21,9 @@
 //       CHECK:   %[[D10:.*]] = llvm.load %[[D3]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
 //       CHECK:   %[[D11:.*]] = llvm.mlir.constant(2 : i32) : i32
 //       CHECK:   %[[D12:.*]] = llvm.getelementptr inbounds %[[ARG1]][%[[D11]]] : (!llvm.ptr, i32) -> !llvm.ptr, !llvm.ptr
+//       CHECK:   %[[A2:.*]] = llvm.load %[[D12]] : !llvm.ptr -> !llvm.ptr
 //       CHECK:   %[[RANK2:.*]] = llvm.mlir.constant(2 : i32) : i32
-//       CHECK:   %[[D13:.*]] = llvm.call @hcgpuConvertPyArray(%[[ARG0]], %[[D12]], %[[RANK2]], %[[D1]]) : (!llvm.ptr, !llvm.ptr, i32, !llvm.ptr) -> i32
+//       CHECK:   %[[D13:.*]] = llvm.call @hcgpuConvertPyArray(%[[ARG0]], %[[A2]], %[[RANK2]], %[[D1]]) : (!llvm.ptr, !llvm.ptr, i32, !llvm.ptr) -> i32
 //       CHECK:   %[[D14:.*]] = llvm.mlir.constant(0 : i32) : i32
 //       CHECK:   %[[D15:.*]] = llvm.icmp "eq" %[[D13]], %[[D14]] : i32
 //       CHECK:   llvm.cond_br %[[D15]], ^bb4, ^bb3

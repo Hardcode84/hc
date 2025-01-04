@@ -53,9 +53,10 @@ struct ConvertGetPyArgOp final
 
     mlir::Value argIndex = rewriter.create<mlir::LLVM::ConstantOp>(
         loc, i32Type, adaptor.getIndex());
-    mlir::Value arg = rewriter.create<mlir::LLVM::GEPOp>(
+    mlir::Value ptr = rewriter.create<mlir::LLVM::GEPOp>(
         loc, ptrType, ptrType, adaptor.getArgs(), argIndex,
         /*inbounds*/ true);
+    mlir::Value arg = rewriter.create<mlir::LLVM::LoadOp>(loc, ptrType, ptr);
 
     mlir::Value resPtr = [&] {
       mlir::OpBuilder::InsertionGuard g(rewriter);
