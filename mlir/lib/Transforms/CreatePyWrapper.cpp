@@ -49,6 +49,7 @@ struct CreatePyWrapperPass final
       mlir::Value pyArgs = block->getArgument(1);
 
       llvm::SmallVector<mlir::Value> args;
+      int argIdx = 0;
       for (auto &&[i, argType] :
            llvm::enumerate(func.getFunctionType().getInputs())) {
         if (mlir::isa<hc::hk::CurrentGroupType>(argType)) {
@@ -57,7 +58,7 @@ struct CreatePyWrapperPass final
         }
 
         args.emplace_back(builder.create<hc::hk::GetPyArgOp>(
-            loc, argType, pyArgs, i, errContext));
+            loc, argType, pyArgs, argIdx++, errContext));
       }
 
       builder.create<mlir::func::CallOp>(loc, func, args);
