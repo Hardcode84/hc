@@ -35,18 +35,24 @@ getExecutionEngineOpts(const py::dict &settings) {
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
 
+  llvm::SmallVector<std::pair<std::string, void *>, 0> symMap;
+  for (auto &&[key, val] : py::cast<py::dict>(settings["JIT_SYMBOLS"])) {
+    auto name = py::str(key).c_str();
+    auto ptr = reinterpret_cast<void *>(py::cast<intptr_t>(val));
+    symMap.emplace_back(name, ptr);
+  }
+
   hc::ExecutionEngineOptions opts;
-  //        [&](llvm::orc::MangleAndInterner m) -> llvm::orc::SymbolMap {
-  //      llvm::orc::SymbolMap ret;
-  //      for (auto &&[name, ptr] : symbolList) {
-  //        opts.symbolMap =
-  //        llvm::orc::ExecutorSymbolDef jitPtr{
-  //            llvm::orc::ExecutorAddr::fromPtr(ptr),
-  //            llvm::JITSymbolFlags::Exported};
-  //        ret.insert({m(name), jitPtr});
-  //      }
-  //      return ret;
-  //    };
+  opts.symbolMap = [syms = std::move(symMap)](
+                       llvm::orc::MangleAndInterner m) -> llvm::orc::SymbolMap {
+    llvm::orc::SymbolMap ret;
+    for (auto &&[name, ptr] : syms) {
+      llvm::orc::ExecutorSymbolDef jitPtr{llvm::orc::ExecutorAddr::fromPtr(ptr),
+                                          llvm::JITSymbolFlags::Exported};
+      ret.insert({m(name), jitPtr});
+    }
+    return ret;
+  };
   opts.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
   //    auto llvmPrinter = settings["llvm_printer"];

@@ -7,28 +7,28 @@
 #include "PyRuntimeShared.hpp"
 #include "hc-python-runtime_export.h"
 
-HC_PYTHON_RUNTIME_EXPORT PyObject *hcgpuGetPyArg(PyObject *args, int index) {
+extern "C" HC_PYTHON_RUNTIME_EXPORT PyObject *hcgpuGetPyArg(PyObject *args,
+                                                            int index) {
   abort();
 }
 
-HC_PYTHON_RUNTIME_EXPORT int hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc,
-                                                 PyObject *obj, void *ret) {
+extern "C" HC_PYTHON_RUNTIME_EXPORT int
+hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc, PyObject *obj, void *ret) {
   abort();
 }
 
-HC_PYTHON_RUNTIME_EXPORT void *hcgpuGetKernel(void **handle, const void *data,
-                                              size_t dataSize) {
+extern "C" HC_PYTHON_RUNTIME_EXPORT void *
+hcgpuGetKernel(void **handle, const void *data, size_t dataSize) {
   abort();
 }
 
-HC_PYTHON_RUNTIME_EXPORT void hcgpuSuggestBlockSize(void *kernel,
-                                                    const size_t *globalSizes,
-                                                    size_t *blockSizesRet,
-                                                    size_t nDim) {
+extern "C" HC_PYTHON_RUNTIME_EXPORT void
+hcgpuSuggestBlockSize(void *kernel, const size_t *globalSizes,
+                      size_t *blockSizesRet, size_t nDim) {
   abort();
 }
 
-HC_PYTHON_RUNTIME_EXPORT void
+extern "C" HC_PYTHON_RUNTIME_EXPORT void
 hcgpuLaunchKernel(void *kernel, const size_t *gridSizes,
                   const size_t *blockSizes, size_t nDim, void **args,
                   size_t nArgs, size_t sharedMemSize) {

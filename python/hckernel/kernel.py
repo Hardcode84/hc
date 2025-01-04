@@ -10,7 +10,6 @@ from .dispatcher import create_dispatcher
 from .indexing import _index_symbol_internal
 from .mlir import ir
 from .mlir import typing
-from . import py_runtime
 
 
 def _get_num_dims(arg):

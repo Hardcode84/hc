@@ -8,5 +8,6 @@ from types import FunctionType
 
 from ._native.compiler import create_context, Dispatcher
 from .settings import settings as _settings
+from . import py_runtime
 
 mlir_context = create_context(_settings)
