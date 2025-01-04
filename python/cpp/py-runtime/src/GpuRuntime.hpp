@@ -6,7 +6,8 @@
 
 #include <cstdlib>
 
-void *getKernelImpl(void **handle, const void *data, size_t dataSize) noexcept;
+void *getKernelImpl(void **handle, const void *data, size_t dataSize,
+                    const char *kenrnelName) noexcept;
 
 void suggestBlockSizeImpl(void *kernel, const size_t *globalSizes,
                           size_t *blockSizesRet, size_t nDim) noexcept;

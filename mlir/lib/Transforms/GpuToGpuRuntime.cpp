@@ -163,8 +163,14 @@ struct ConvertGpuLaunch final
       mlir::Value dataSize = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmIndexType, objData.size());
 
+      auto entrypointName = op.getKernelName().getValue().str();
+      entrypointName.append(std::string_view("\0", 1));
+      mlir::Value kernelName = mlir::LLVM::createGlobalString(
+          loc, rewriter, getUniqueLLVMGlobalName(mod, "kernel_name"),
+          entrypointName, mlir::LLVM::Linkage::Internal);
       kernel =
-          getKernelBuilder.create(loc, rewriter, {handlePtr, dataPtr, dataSize})
+          getKernelBuilder
+              .create(loc, rewriter, {handlePtr, dataPtr, dataSize, kernelName})
               .getResult();
     }
 
@@ -302,6 +308,7 @@ private:
                                               llvmPointerType, // globalHandle
                                               llvmPointerType, // data
                                               llvmIndexType,   // data size
+                                              llvmPointerType, // entrypointName
                                           }};
   FunctionCallBuilder suggestBlockSizeBuilder = {
       "hcgpuSuggestBlockSize",

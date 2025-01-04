@@ -16,7 +16,8 @@ static void errCallback(void * /*ctx*/, OlSeverity /*sev*/, const char *desc) {
 static OlDevice device = nullptr;
 static OlQueue queue = nullptr;
 
-void *getKernelImpl(void **handle, const void *data, size_t dataSize) noexcept {
+void *getKernelImpl(void **handle, const void *data, size_t dataSize,
+                    const char *kenrnelName) noexcept {
   if (void *cached = *handle)
     return cached;
 
@@ -34,7 +35,7 @@ void *getKernelImpl(void **handle, const void *data, size_t dataSize) noexcept {
   if (!module)
     abort();
 
-  OlKernel kernel = olGetKernel(module, "main");
+  OlKernel kernel = olGetKernel(module, kenrnelName);
   if (!kernel)
     abort();
 

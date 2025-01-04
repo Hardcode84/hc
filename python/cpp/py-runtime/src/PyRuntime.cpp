@@ -52,9 +52,10 @@ hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc, void *obj, int rank,
 }
 
 extern "C" HC_PYTHON_RUNTIME_EXPORT void *
-hcgpuGetKernel(void **handle, const void *data, size_t dataSize) noexcept {
+hcgpuGetKernel(void **handle, const void *data, size_t dataSize,
+               const char *kenrnelName) noexcept {
   LOG_FUNC();
-  return getKernelImpl(handle, data, dataSize);
+  return getKernelImpl(handle, data, dataSize, kenrnelName);
 }
 
 extern "C" HC_PYTHON_RUNTIME_EXPORT void
