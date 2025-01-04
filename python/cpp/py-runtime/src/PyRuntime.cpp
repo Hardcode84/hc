@@ -8,8 +8,10 @@
 #include "hc-python-runtime_export.h"
 
 namespace {
+static bool traceFunctions = true;
+
 struct FuncScope {
-  FuncScope(const char *funcName) : name(funcName), enable(true) {
+  FuncScope(const char *funcName) : name(funcName), enable(traceFunctions) {
     if (enable) {
       fprintf(stdout, "%s enter\n", name);
       fflush(stdout);
@@ -31,9 +33,11 @@ private:
 #define LOG_FUNC() FuncScope _scope(__func__)
 
 extern "C" HC_PYTHON_RUNTIME_EXPORT int
-hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc, PyObject *obj, void *ret) {
+hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc, PyObject *obj, int rank,
+                    void *ret) {
   LOG_FUNC();
-  abort();
+  errorDesc->message = "Not implemented";
+  return 1;
 }
 
 extern "C" HC_PYTHON_RUNTIME_EXPORT void *

@@ -66,10 +66,16 @@ struct ConvertGetPyArgOp final
     }();
 
     mlir::Value convertRes;
-    if (mlir::isa<hc::hk::MemrefDescriptorType>(origType)) {
+    if (auto memrefDesc =
+            mlir::dyn_cast<hc::hk::MemrefDescriptorType>(origType)) {
+      auto rank =
+          mlir::cast<mlir::MemRefType>(memrefDesc.getMemrefType()).getRank();
+      mlir::Value rankVal =
+          rewriter.create<mlir::LLVM::ConstantOp>(loc, i32Type, rank);
       auto convertArgFunc = getFunction("hcgpuConvertPyArray", i32Type,
-                                        {ptrType, ptrType, ptrType});
-      mlir::Value convertArgs[] = {adaptor.getErrorContext(), arg, resPtr};
+                                        {ptrType, ptrType, i32Type, ptrType});
+      mlir::Value convertArgs[] = {adaptor.getErrorContext(), arg, rankVal,
+                                   resPtr};
       convertRes =
           rewriter.create<mlir::LLVM::CallOp>(loc, convertArgFunc, convertArgs)
               .getResult();
