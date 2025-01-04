@@ -19,7 +19,7 @@ public:
 
   template <typename T>
   T getSymbol(const char *symName, ErrorReporter reportError, void *ctx) {
-    return static_cast<T>(this->getSymbol(symName, reportError, ctx));
+    return reinterpret_cast<T>(this->getSymbol(symName, reportError, ctx));
   }
 
   explicit operator bool() const { return _handle; }
