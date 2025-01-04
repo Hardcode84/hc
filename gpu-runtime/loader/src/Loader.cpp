@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include <memory>
+#include <string>
 #include <string_view>
 
 #define OFFLOAD_API_EXPORT HC_GPU_RUNTIME_LOADER_EXPORT
