@@ -50,14 +50,14 @@ struct ConvertGetPyArgOp final
       return rewriter.create<mlir::LLVM::LLVMFuncOp>(rewriter.getUnknownLoc(),
                                                      functionName, funcType);
     };
-    auto getArgFunc = getFunction("hcgpuGetPyArg", ptrType, {ptrType, i32Type});
 
     mlir::Value argIndex = rewriter.create<mlir::LLVM::ConstantOp>(
         loc, i32Type, adaptor.getIndex());
-    mlir::Value getArgsArgs[] = {adaptor.getArgs(), argIndex};
-    mlir::Value arg =
-        rewriter.create<mlir::LLVM::CallOp>(loc, getArgFunc, getArgsArgs)
-            .getResult();
+    mlir::Value ptr = rewriter.create<mlir::LLVM::GEPOp>(
+        loc, ptrType, ptrType, adaptor.getArgs(), argIndex,
+        /*inbounds*/ true);
+    mlir::Value arg = rewriter.create<mlir::LLVM::LoadOp>(loc, ptrType, ptr);
+
     mlir::Value resPtr = [&] {
       mlir::OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointToStart(&func.getFunctionBody().front());
@@ -67,10 +67,16 @@ struct ConvertGetPyArgOp final
     }();
 
     mlir::Value convertRes;
-    if (mlir::isa<hc::hk::MemrefDescriptorType>(origType)) {
+    if (auto memrefDesc =
+            mlir::dyn_cast<hc::hk::MemrefDescriptorType>(origType)) {
+      auto rank =
+          mlir::cast<mlir::MemRefType>(memrefDesc.getMemrefType()).getRank();
+      mlir::Value rankVal =
+          rewriter.create<mlir::LLVM::ConstantOp>(loc, i32Type, rank);
       auto convertArgFunc = getFunction("hcgpuConvertPyArray", i32Type,
-                                        {ptrType, ptrType, ptrType});
-      mlir::Value convertArgs[] = {adaptor.getErrorContext(), arg, resPtr};
+                                        {ptrType, ptrType, i32Type, ptrType});
+      mlir::Value convertArgs[] = {adaptor.getErrorContext(), arg, rankVal,
+                                   resPtr};
       convertRes =
           rewriter.create<mlir::LLVM::CallOp>(loc, convertArgFunc, convertArgs)
               .getResult();
