@@ -8,10 +8,10 @@
 #include "PyABI.hpp"
 
 namespace {
-static bool traceFunctions = true;
+static bool TraceFunctions = false;
 
 struct FuncScope {
-  FuncScope(const char *funcName) : name(funcName), enable(traceFunctions) {
+  FuncScope(const char *funcName) : name(funcName), enable(TraceFunctions) {
     if (enable) {
       fprintf(stdout, "%s enter\n", name);
       fflush(stdout);
@@ -31,6 +31,11 @@ private:
 };
 } // namespace
 #define LOG_FUNC() FuncScope _scope(__func__)
+
+extern "C" HC_PYTHON_RUNTIME_EXPORT void
+hcgpuEnableTraceFunctions(int val) noexcept {
+  TraceFunctions = val;
+}
 
 extern "C" HC_PYTHON_RUNTIME_EXPORT int
 hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc, void *obj, int rank,
