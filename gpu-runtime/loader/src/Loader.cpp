@@ -14,6 +14,27 @@
 
 #include "SharedLib.hpp"
 
+static const std::unique_ptr<char[]> *runtimeSearchPaths = nullptr;
+extern "C" HC_GPU_RUNTIME_LOADER_EXPORT void
+setGPULoaderSearchPaths(const char *paths[], size_t count) {
+  delete[] runtimeSearchPaths;
+  runtimeSearchPaths = nullptr;
+
+  if (count == 0)
+    return;
+
+  auto temp = std::make_unique<std::unique_ptr<char[]>[]>(count + 1);
+  for (size_t i = 0; i < count; ++i) {
+    std::string_view str(paths[i]);
+    auto buff = std::make_unique<char[]>(str.size() + 1);
+    std::copy_n(str.data(), str.size(), buff.get());
+    buff[str.size()] = '\0';
+    temp[i] = std::move(buff);
+  }
+
+  runtimeSearchPaths = temp.release();
+}
+
 namespace {
 struct ErrorContext {
   OlErrorCallback errorCallback = nullptr;
@@ -24,6 +45,11 @@ struct ErrorContext {
     errCtx->errorCallback(errCtx->ctx, OlSeverity::Error, str);
   }
 
+  static void reportMessage(void *ctx, const char *str) {
+    auto errCtx = static_cast<ErrorContext *>(ctx);
+    errCtx->errorCallback(errCtx->ctx, OlSeverity::Message, str);
+  }
+
   void reportError(const char *str) {
     errorCallback(ctx, OlSeverity::Error, str);
   }
@@ -32,7 +58,7 @@ struct ErrorContext {
 #define INIT_FUNC(func)                                                        \
   do {                                                                         \
     this->func = this->lib.getSymbol<decltype(this->func)>(                    \
-        #func, &ErrorContext::reportError, &errCtx);                           \
+        "ol" #func, &ErrorContext::reportError, &errCtx);                      \
     if (!this->func)                                                           \
       failed = true;                                                           \
   } while (false)
@@ -40,7 +66,7 @@ struct ErrorContext {
 
 struct API {
   API(const char *libName, ErrorContext &errCtx)
-      : lib(libName, &ErrorContext::reportError, &errCtx) {
+      : lib(libName, &ErrorContext::reportMessage, &errCtx) {
     if (!lib)
       return;
 
@@ -183,13 +209,29 @@ OlDevice olCreateDevice(const char *desc, OlErrorCallback errCallback,
     errCtx.reportError(str.c_str());
     return nullptr;
   }
-  auto libname =
-      getLibName("hc-" + std::string(descStr.substr(0, sep)) + "-runtime");
-  auto device = std::make_unique<LoaderDevice>(libname.c_str(), desc, errCtx);
-  if (!device->isValid())
-    return nullptr;
+  auto runtimeName = std::string(descStr.substr(0, sep));
+  auto libName = getLibName("hc-" + runtimeName + "-runtime");
 
-  return device.release();
+  if (runtimeSearchPaths) {
+    for (int i = 0;; ++i) {
+      auto &str = runtimeSearchPaths[i];
+      if (!str)
+        break;
+
+      auto path = str.get() + ("/" + libName);
+      auto device = std::make_unique<LoaderDevice>(path.c_str(), desc, errCtx);
+      if (device->isValid())
+        return device.release();
+    }
+  }
+
+  auto device = std::make_unique<LoaderDevice>(libName.c_str(), desc, errCtx);
+  if (device->isValid())
+    return device.release();
+
+  std::string str = "Runtime not found: " + std::string(runtimeName);
+  errCtx.reportError(str.c_str());
+  return nullptr;
 }
 void olReleaseDevice(OlDevice dev) noexcept {
   delete static_cast<LoaderDevice *>(dev);

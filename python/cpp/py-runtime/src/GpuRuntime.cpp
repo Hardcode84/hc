@@ -8,8 +8,10 @@
 
 #include "offload_api.h"
 
-static void errCallback(void * /*ctx*/, OlSeverity /*sev*/, const char *desc) {
-  fprintf(stderr, "Offload error: %s\n", desc);
+static void errCallback(void * /*ctx*/, OlSeverity sev, const char *desc) {
+  const char *types[]{"error", "warning", "message"};
+  const char *type = types[static_cast<int>(sev)];
+  fprintf(stderr, "Offload %s: %s\n", type, desc);
   fflush(stderr);
 }
 

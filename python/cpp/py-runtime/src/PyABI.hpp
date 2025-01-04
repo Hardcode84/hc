@@ -5,3 +5,5 @@
 #pragma once
 
 void convertPyArrayImpl(void *obj, int rank, void *ret);
+
+void setRuntimeSearchPathsImpl(void *obj);

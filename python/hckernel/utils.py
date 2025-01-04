@@ -23,7 +23,7 @@ def readenv(name, ctor, default):
         return default
 
 
-def load_lib(name):
+def get_runtime_search_paths():
     path = os.path
     runtime_search_paths = [path.join(path.dirname(__file__), "_native")]
 
@@ -31,6 +31,12 @@ def load_lib(name):
         runtime_search_paths += os.environ["PYTHONPATH"].split(os.pathsep)
     except KeyError:
         pass
+
+    return runtime_search_paths
+
+
+def load_lib(name):
+    runtime_search_paths = get_runtime_search_paths()
 
     platform = sys.platform
     if platform.startswith("linux"):

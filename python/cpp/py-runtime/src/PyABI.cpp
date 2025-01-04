@@ -4,6 +4,8 @@
 
 #include "PyABI.hpp"
 
+#include <vector>
+
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 
@@ -32,4 +34,17 @@ void convertPyArrayImpl(void *obj, int rank, void *ret) {
     desc->sizesAndStrides[i] = array.shape(i);
     desc->sizesAndStrides[i + rank] = array.stride(i);
   }
+}
+
+extern "C" void setGPULoaderSearchPaths(const char *paths[], size_t count);
+
+void setRuntimeSearchPathsImpl(void *obj) {
+  auto paths = py::cast<py::list>(py::handle(static_cast<PyObject *>(obj)));
+  std::vector<const char *> res;
+  for (auto path : paths) {
+    auto tmp = py::cast<py::bytes>(path);
+    res.emplace_back(tmp.c_str());
+  }
+
+  setGPULoaderSearchPaths(res.data(), res.size());
 }
