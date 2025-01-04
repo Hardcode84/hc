@@ -5,6 +5,7 @@
 #include "PyRuntimeShared.hpp"
 #include "hc-python-runtime_export.h"
 
+#include "GpuRuntime.hpp"
 #include "PyABI.hpp"
 
 namespace {
@@ -53,14 +54,14 @@ hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc, void *obj, int rank,
 extern "C" HC_PYTHON_RUNTIME_EXPORT void *
 hcgpuGetKernel(void **handle, const void *data, size_t dataSize) noexcept {
   LOG_FUNC();
-  abort();
+  return getKernelImpl(handle, data, dataSize);
 }
 
 extern "C" HC_PYTHON_RUNTIME_EXPORT void
 hcgpuSuggestBlockSize(void *kernel, const size_t *globalSizes,
                       size_t *blockSizesRet, size_t nDim) noexcept {
   LOG_FUNC();
-  abort();
+  return suggestBlockSizeImpl(kernel, globalSizes, blockSizesRet, nDim);
 }
 
 extern "C" HC_PYTHON_RUNTIME_EXPORT void
@@ -68,5 +69,6 @@ hcgpuLaunchKernel(void *kernel, const size_t *gridSizes,
                   const size_t *blockSizes, size_t nDim, void **args,
                   size_t nArgs, size_t sharedMemSize) noexcept {
   LOG_FUNC();
-  abort();
+  return launchKernelImpl(kernel, gridSizes, blockSizes, nDim, args, nArgs,
+                          sharedMemSize);
 }

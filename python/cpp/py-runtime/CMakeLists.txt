@@ -10,10 +10,12 @@ find_package(nanobind REQUIRED)
 include(GenerateExportHeader)
 
 set(SOURCES_LIST
-    src/PyRuntime.cpp
+    src/GpuRuntime.cpp
     src/PyABI.cpp
+    src/PyRuntime.cpp
   )
 set(HEADERS_LIST
+    src/GpuRuntime.hpp
     src/PyABI.hpp
   )
 
