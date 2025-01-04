@@ -8,8 +8,10 @@ include(GenerateExportHeader)
 
 set(SOURCES_LIST
     src/Loader.cpp
+    src/SharedLib.cpp
   )
 set(HEADERS_LIST
+    src/SharedLib.hpp
   )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES_LIST} ${HEADERS_LIST})
