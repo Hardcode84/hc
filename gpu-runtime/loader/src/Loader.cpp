@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include <memory>
+#include <string_view>
 
 #define OFFLOAD_API_EXPORT HC_GPU_RUNTIME_LOADER_EXPORT
 #include "offload_api.h"
@@ -21,6 +22,10 @@ struct ErrorContext {
     auto errCtx = static_cast<ErrorContext *>(ctx);
     errCtx->errorCallback(errCtx->ctx, OlSeverity::Error, str);
   }
+
+  void reportError(const char *str) {
+    errorCallback(ctx, OlSeverity::Error, str);
+  }
 };
 
 #define INIT_FUNC(func)                                                        \
@@ -35,6 +40,9 @@ struct ErrorContext {
 struct API {
   API(const char *libName, ErrorContext &errCtx)
       : lib(libName, &ErrorContext::reportError, &errCtx) {
+    if (!lib)
+      return;
+
     bool failed = false;
     INIT_FUNC(CreateDevice);
     INIT_FUNC(ReleaseDevice);
@@ -154,10 +162,29 @@ struct LoaderQueue {
 };
 } // namespace
 
+static std::string getLibName(std::string_view name) {
+#ifdef __linux__
+  return "lib" + std::string(name) + ".so";
+#elif defined(_WIN32) || defined(_WIN64)
+  return std::string(name) + ".dll";
+#else
+#error "Unsupported platform"
+#endif
+}
+
 OlDevice olCreateDevice(const char *desc, OlErrorCallback errCallback,
                         void *ctx) noexcept {
   ErrorContext errCtx{errCallback, ctx};
-  auto device = std::make_unique<LoaderDevice>("dummy", desc, errCtx);
+  std::string_view descStr(desc);
+  auto sep = descStr.find(':');
+  if (sep == descStr.npos) {
+    std::string str = "Invalid device desc: " + std::string(descStr);
+    errCtx.reportError(str.c_str());
+    return nullptr;
+  }
+  auto libname =
+      getLibName("hc-" + std::string(descStr.substr(0, sep)) + "-runtime");
+  auto device = std::make_unique<LoaderDevice>(libname.c_str(), desc, errCtx);
   if (!device->isValid())
     return nullptr;
 
@@ -191,8 +218,8 @@ void olReleaseKernel(OlKernel k) noexcept {
   delete static_cast<LoaderKernel *>(k);
 }
 
-bool olSuggestBlockSize(OlKernel k, const size_t *globalsSizes,
-                        size_t *blockSizesRet, size_t nDims) noexcept {
+int olSuggestBlockSize(OlKernel k, const size_t *globalsSizes,
+                       size_t *blockSizesRet, size_t nDims) noexcept {
   auto kernel = static_cast<LoaderKernel *>(k);
   return kernel->getAPI().SuggestBlockSize(kernel->kernel, globalsSizes,
                                            blockSizesRet, nDims);
@@ -220,9 +247,9 @@ void olDeallocDevice(OlQueue q, void *data) noexcept {
   queue->getAPI().DeallocDevice(queue->queue, data);
 }
 
-bool olLaunchKernel(OlQueue q, OlKernel k, const size_t *gridSizes,
-                    const size_t *blockSizes, size_t nDims, void **args,
-                    size_t nArgs, size_t sharedMemSize) noexcept {
+int olLaunchKernel(OlQueue q, OlKernel k, const size_t *gridSizes,
+                   const size_t *blockSizes, size_t nDims, void **args,
+                   size_t nArgs, size_t sharedMemSize) noexcept {
   auto queue = static_cast<LoaderQueue *>(q);
   auto kernel = static_cast<LoaderKernel *>(k);
   auto &api = queue->getAPI();

@@ -13,6 +13,11 @@ static void errCallback(void * /*ctx*/, OlSeverity /*sev*/, const char *desc) {
   fflush(stderr);
 }
 
+[[noreturn]] static void fatal(const char *desc) {
+  errCallback(nullptr, OlSeverity::Error, desc);
+  abort();
+}
+
 static OlDevice device = nullptr;
 static OlQueue queue = nullptr;
 
@@ -24,20 +29,20 @@ void *getKernelImpl(void **handle, const void *data, size_t dataSize,
   if (!device) {
     device = olCreateDevice("hip:0", &errCallback, nullptr);
     if (!device)
-      abort();
+      fatal("olCreateDevice failed");
 
     queue = olCreateSyncQueue(device);
     if (!queue)
-      abort();
+      fatal("olCreateSyncQueue failed");
   }
 
   OlModule module = olCreateModule(device, data, dataSize);
   if (!module)
-    abort();
+    fatal("olCreateModule failed");
 
   OlKernel kernel = olGetKernel(module, kenrnelName);
   if (!kernel)
-    abort();
+    fatal("olGetKernel failed");
 
   *handle = kernel;
   return kernel;
@@ -47,7 +52,7 @@ void suggestBlockSizeImpl(void *kernel, const size_t *globalSizes,
                           size_t *blockSizesRet, size_t nDim) noexcept {
   if (olSuggestBlockSize(static_cast<OlKernel>(kernel), globalSizes,
                          blockSizesRet, nDim))
-    abort();
+    fatal("olSuggestBlockSize failed");
 }
 
 void launchKernelImpl(void *kernel, const size_t *gridSizes,
@@ -55,5 +60,5 @@ void launchKernelImpl(void *kernel, const size_t *gridSizes,
                       size_t nArgs, size_t sharedMemSize) noexcept {
   if (olLaunchKernel(queue, kernel, gridSizes, blockSizes, nDim, args, nArgs,
                      sharedMemSize))
-    abort();
+    fatal("olLaunchKernel failed");
 }

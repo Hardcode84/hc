@@ -32,6 +32,8 @@ DynamicLibHelper::DynamicLibHelper(const char *libName,
   if (!_handle)
     reportError(ctx,
                 ("Could not load library " + std::string(libName)).c_str());
+#else
+#error "Unsupported platform"
 #endif
 }
 

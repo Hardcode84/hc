@@ -44,10 +44,10 @@ OFFLOAD_API_EXPORT OlKernel olGetKernel(OlModule mod,
                                         const char *name) OFFLOAD_NOEXEPT;
 OFFLOAD_API_EXPORT void olReleaseKernel(OlKernel k) OFFLOAD_NOEXEPT;
 
-OFFLOAD_API_EXPORT bool olSuggestBlockSize(OlKernel k,
-                                           const size_t *globalsSizes,
-                                           size_t *blockSizesRet,
-                                           size_t nDims) OFFLOAD_NOEXEPT;
+OFFLOAD_API_EXPORT int olSuggestBlockSize(OlKernel k,
+                                          const size_t *globalsSizes,
+                                          size_t *blockSizesRet,
+                                          size_t nDims) OFFLOAD_NOEXEPT;
 
 // Sync API
 OFFLOAD_API_EXPORT OlQueue olCreateSyncQueue(OlDevice dev) OFFLOAD_NOEXEPT;
@@ -57,9 +57,9 @@ OFFLOAD_API_EXPORT void *olAllocDevice(OlQueue q, size_t size,
                                        size_t align) OFFLOAD_NOEXEPT;
 OFFLOAD_API_EXPORT void olDeallocDevice(OlQueue q, void *data) OFFLOAD_NOEXEPT;
 
-OFFLOAD_API_EXPORT bool olLaunchKernel(OlQueue q, OlKernel k,
-                                       const size_t *gridSizes,
-                                       const size_t *blockSizes, size_t nDims,
-                                       void **args, size_t nArgs,
-                                       size_t sharedMemSize) OFFLOAD_NOEXEPT;
+OFFLOAD_API_EXPORT int olLaunchKernel(OlQueue q, OlKernel k,
+                                      const size_t *gridSizes,
+                                      const size_t *blockSizes, size_t nDims,
+                                      void **args, size_t nArgs,
+                                      size_t sharedMemSize) OFFLOAD_NOEXEPT;
 }
