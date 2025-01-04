@@ -52,8 +52,7 @@ private:
   struct ArgDesc {
     llvm::StringRef name;
     std::function<void(mlir::MLIRContext &, nanobind::handle,
-                       llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &,
-                       llvm::SmallVectorImpl<PyObject *> &)>
+                       llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &)>
         handler;
   };
   llvm::SmallVector<ArgDesc> argsHandlers;

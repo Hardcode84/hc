@@ -279,8 +279,7 @@ void DispatcherBase::invokeFunc(const py::args &args,
 
 using HandlerT =
     std::function<void(mlir::MLIRContext &, py::handle,
-                       llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &,
-                       llvm::SmallVectorImpl<PyObject *> &)>;
+                       llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &)>;
 
 template <typename T> static std::string toStr(T &&val) {
   std::string ret;
@@ -358,8 +357,7 @@ struct DispatcherBase::ArgsHandlerBuilder {
     if (py::isinstance(arg, symbolType)) {
       auto sym = getSym(arg);
       return [sym](mlir::MLIRContext &ctx, py::handle obj,
-                   llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret,
-                   llvm::SmallVectorImpl<PyObject *> &args) {
+                   llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret) {
         if (py::isinstance<py::int_>(obj)) {
           updateRetMap(ret, sym, mlir::IntegerType::get(&ctx, 64));
         } else if (py::isinstance<py::float_>(obj)) {
@@ -368,7 +366,6 @@ struct DispatcherBase::ArgsHandlerBuilder {
           reportError(llvm::Twine("Unsupported type: ") +
                       toString(py::str(obj)));
         }
-        args.emplace_back(obj.ptr());
       };
     }
     if (py::isinstance<py::tuple>(arg)) {
@@ -380,10 +377,9 @@ struct DispatcherBase::ArgsHandlerBuilder {
 
       return [handlersCopy = std::move(handlers)](
                  mlir::MLIRContext &ctx, py::handle obj,
-                 llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret,
-                 llvm::SmallVectorImpl<PyObject *> &args) {
+                 llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret) {
         for (auto &&[h, elem] : llvm::zip_equal(handlersCopy, obj))
-          h(ctx, elem, ret, args);
+          h(ctx, elem, ret);
       };
     }
     if (issubclass(arg, bufferType)) {
@@ -415,8 +411,7 @@ struct DispatcherBase::ArgsHandlerBuilder {
 
       return [this, argShape = std::move(srcShape),
               dtypeSym](mlir::MLIRContext &ctx, py::handle obj,
-                        llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret,
-                        llvm::SmallVectorImpl<PyObject *> &args) {
+                        llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret) {
         auto arrInterface = py::cast<py::dict>(obj.attr("__array_interface__"));
         auto shape = py::cast<py::tuple>(arrInterface["shape"]);
         if (argShape.size() != shape.size())
@@ -445,7 +440,6 @@ struct DispatcherBase::ArgsHandlerBuilder {
                         " vs " + toStr(dtype));
         }
         // TODO: layout
-        args.emplace_back(obj.ptr());
       };
     }
 
@@ -513,14 +507,16 @@ DispatcherBase::processArgs(const py::args &args, const py::kwargs &kwargs,
   for (auto &arg : argsHandlers) {
     auto name = arg.name;
     if (auto kwarg = getKWArg(name)) {
-      arg.handler(ctx, kwarg, metadata, retArgs);
+      arg.handler(ctx, kwarg, metadata);
+      retArgs.emplace_back(kwarg.ptr());
       continue;
     }
     if (idx >= srcNumArgs)
       reportError("Insufficient args");
 
     auto srcArg = args[idx++];
-    arg.handler(context.context, srcArg, metadata, retArgs);
+    arg.handler(context.context, srcArg, metadata);
+    retArgs.emplace_back(srcArg.ptr());
   }
 
   llvm::SmallVector<mlir::Attribute> array;
