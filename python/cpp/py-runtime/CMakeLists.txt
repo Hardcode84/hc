@@ -11,9 +11,10 @@ include(GenerateExportHeader)
 
 set(SOURCES_LIST
     src/PyRuntime.cpp
+    src/PyABI.cpp
   )
 set(HEADERS_LIST
-
+    src/PyABI.hpp
   )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES_LIST} ${HEADERS_LIST})

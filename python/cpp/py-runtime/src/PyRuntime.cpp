@@ -2,11 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <nanobind/nanobind.h>
-#include <nanobind/ndarray.h>
-
 #include "PyRuntimeShared.hpp"
 #include "hc-python-runtime_export.h"
+
+#include "PyABI.hpp"
 
 namespace {
 static bool traceFunctions = true;
@@ -33,36 +32,12 @@ private:
 } // namespace
 #define LOG_FUNC() FuncScope _scope(__func__)
 
-struct MemrefDescriptor {
-  void *allocated;
-  void *aligned;
-  intptr_t offset;
-  intptr_t sizesAndStrides[1];
-};
-
-namespace py = nanobind;
-
-static void convertPyArrayImpl(hc::ExceptionDesc *errorDesc, PyObject *obj,
-                               int rank, MemrefDescriptor *ret) {
-  auto array = py::cast<py::ndarray<>>(py::handle(obj));
-  if (array.ndim() != rank)
-    throw std::runtime_error("Invalid rank");
-
-  ret->allocated = array.data();
-  ret->aligned = array.data();
-  ret->offset = 0;
-  for (int i = 0; i < rank; ++i) {
-    ret->sizesAndStrides[i] = array.shape(i);
-    ret->sizesAndStrides[i + rank] = array.stride(i);
-  }
-}
-
 extern "C" HC_PYTHON_RUNTIME_EXPORT int
-hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc, PyObject *obj, int rank,
-                    MemrefDescriptor *ret) noexcept {
+hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc, void *obj, int rank,
+                    void *ret) noexcept {
   LOG_FUNC();
   try {
-    convertPyArrayImpl(errorDesc, obj, rank, ret);
+    convertPyArrayImpl(obj, rank, ret);
     return 0;
   } catch (const std::exception &e) {
     errorDesc->message = e.what();
