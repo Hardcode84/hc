@@ -38,6 +38,12 @@ hcgpuEnableTraceFunctions(int val) noexcept {
   TraceFunctions = val;
 }
 
+extern "C" HC_PYTHON_RUNTIME_EXPORT void
+hcgpuSetRuntimeSearchPaths(void *obj) noexcept {
+  LOG_FUNC();
+  setRuntimeSearchPathsImpl(obj);
+}
+
 extern "C" HC_PYTHON_RUNTIME_EXPORT int
 hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc, void *obj, int rank,
                     void *ret) noexcept {

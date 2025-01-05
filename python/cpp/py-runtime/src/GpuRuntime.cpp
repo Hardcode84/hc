@@ -8,8 +8,10 @@
 
 #include "offload_api.h"
 
-static void errCallback(void * /*ctx*/, OlSeverity /*sev*/, const char *desc) {
-  fprintf(stderr, "Offload error: %s\n", desc);
+static void errCallback(void * /*ctx*/, OlSeverity sev, const char *desc) {
+  const char *types[]{"error", "warning", "message"};
+  const char *type = types[static_cast<int>(sev)];
+  fprintf(stderr, "Offload %s: %s\n", type, desc);
   fflush(stderr);
 }
 
@@ -31,7 +33,7 @@ void *getKernelImpl(void **handle, const void *data, size_t dataSize,
     if (!device)
       fatal("olCreateDevice failed");
 
-    queue = olCreateSyncQueue(device);
+    queue = olCreateQueue(device);
     if (!queue)
       fatal("olCreateSyncQueue failed");
   }
@@ -61,4 +63,7 @@ void launchKernelImpl(void *kernel, const size_t *gridSizes,
   if (olLaunchKernel(queue, kernel, gridSizes, blockSizes, nDim, args, nArgs,
                      sharedMemSize))
     fatal("olLaunchKernel failed");
+
+  if (olSyncQueue(queue))
+    fatal("olSyncQueue failed");
 }

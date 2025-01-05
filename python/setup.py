@@ -60,21 +60,26 @@ def invoke_cmake(args):
 nanobind_dir = nanobind.cmake_dir()
 print("Nanobind dir", nanobind_dir)
 
-invoke_cmake(
-    [
-        cmake_dir,
-        "-GNinja",
-        "-DCMAKE_INSTALL_PREFIX=" + install_dir,
-        "-DCMAKE_BUILD_TYPE=Release",
-        "-DLLVM_DIR=" + LLVM_DIR,
-        "-DMLIR_DIR=" + MLIR_DIR,
-        "-Dnanobind_DIR=" + nanobind_dir,
-        "-DHC_ENABLE_PYTHON=ON",
-        "-DHC_ENABLE_TOOLS=ON",  # need hc-opt to convert mlir files to bytecode
-        "-DHC_ENABLE_TESTS=OFF",
-        "-DHC_ENABLE_GPU_LOADER=ON",
+cmake_args = [
+    cmake_dir,
+    "-GNinja",
+    "-DCMAKE_INSTALL_PREFIX=" + install_dir,
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DLLVM_DIR=" + LLVM_DIR,
+    "-DMLIR_DIR=" + MLIR_DIR,
+    "-Dnanobind_DIR=" + nanobind_dir,
+    "-DHC_ENABLE_PYTHON=ON",
+    "-DHC_ENABLE_TOOLS=ON",  # need hc-opt to convert mlir files to bytecode
+    "-DHC_ENABLE_TESTS=OFF",
+    "-DHC_ENABLE_GPU_LOADER=ON",
+]
+
+if env.get("HC_ENABLE_HIP", False):
+    cmake_args += [
+        "-DHC_ENABLE_HIP_RUNTIME=ON",
     ]
-)
+
+invoke_cmake(cmake_args)
 invoke_cmake(["--build", ".", "--config", "Release"])
 invoke_cmake(["--install", ".", "--config", "Release"])
 

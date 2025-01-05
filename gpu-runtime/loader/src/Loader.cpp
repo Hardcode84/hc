@@ -4,6 +4,7 @@
 
 #include "hc-gpu-runtime-loader_export.h"
 
+#include <algorithm>
 #include <cassert>
 #include <memory>
 #include <string>
@@ -14,6 +15,27 @@
 
 #include "SharedLib.hpp"
 
+static const std::unique_ptr<char[]> *runtimeSearchPaths = nullptr;
+extern "C" HC_GPU_RUNTIME_LOADER_EXPORT void
+setGPULoaderSearchPaths(const char *paths[], size_t count) {
+  delete[] runtimeSearchPaths;
+  runtimeSearchPaths = nullptr;
+
+  if (count == 0)
+    return;
+
+  auto temp = std::make_unique<std::unique_ptr<char[]>[]>(count + 1);
+  for (size_t i = 0; i < count; ++i) {
+    std::string_view str(paths[i]);
+    auto buff = std::make_unique<char[]>(str.size() + 1);
+    std::copy_n(str.data(), str.size(), buff.get());
+    buff[str.size()] = '\0';
+    temp[i] = std::move(buff);
+  }
+
+  runtimeSearchPaths = temp.release();
+}
+
 namespace {
 struct ErrorContext {
   OlErrorCallback errorCallback = nullptr;
@@ -21,10 +43,24 @@ struct ErrorContext {
 
   static void reportError(void *ctx, const char *str) {
     auto errCtx = static_cast<ErrorContext *>(ctx);
+    if (!errCtx->errorCallback)
+      return;
+
     errCtx->errorCallback(errCtx->ctx, OlSeverity::Error, str);
   }
 
+  static void reportMessage(void *ctx, const char *str) {
+    auto errCtx = static_cast<ErrorContext *>(ctx);
+    if (!errCtx->errorCallback)
+      return;
+
+    errCtx->errorCallback(errCtx->ctx, OlSeverity::Message, str);
+  }
+
   void reportError(const char *str) {
+    if (!errorCallback)
+      return;
+
     errorCallback(ctx, OlSeverity::Error, str);
   }
 };
@@ -32,7 +68,7 @@ struct ErrorContext {
 #define INIT_FUNC(func)                                                        \
   do {                                                                         \
     this->func = this->lib.getSymbol<decltype(this->func)>(                    \
-        #func, &ErrorContext::reportError, &errCtx);                           \
+        "ol" #func, &ErrorContext::reportError, &errCtx);                      \
     if (!this->func)                                                           \
       failed = true;                                                           \
   } while (false)
@@ -40,7 +76,7 @@ struct ErrorContext {
 
 struct API {
   API(const char *libName, ErrorContext &errCtx)
-      : lib(libName, &ErrorContext::reportError, &errCtx) {
+      : lib(libName, &ErrorContext::reportMessage, &errCtx) {
     if (!lib)
       return;
 
@@ -52,8 +88,9 @@ struct API {
     INIT_FUNC(GetKernel);
     INIT_FUNC(ReleaseKernel);
     INIT_FUNC(SuggestBlockSize);
-    INIT_FUNC(CreateSyncQueue);
+    INIT_FUNC(CreateQueue);
     INIT_FUNC(ReleaseQueue);
+    INIT_FUNC(SyncQueue);
     INIT_FUNC(AllocDevice);
     INIT_FUNC(DeallocDevice);
     INIT_FUNC(LaunchKernel);
@@ -74,8 +111,9 @@ struct API {
   DECL_FUNC(GetKernel);
   DECL_FUNC(ReleaseKernel);
   DECL_FUNC(SuggestBlockSize);
-  DECL_FUNC(CreateSyncQueue);
+  DECL_FUNC(CreateQueue);
   DECL_FUNC(ReleaseQueue);
+  DECL_FUNC(SyncQueue);
   DECL_FUNC(AllocDevice);
   DECL_FUNC(DeallocDevice);
   DECL_FUNC(LaunchKernel);
@@ -146,7 +184,7 @@ struct LoaderKernel {
 struct LoaderQueue {
   LoaderQueue(LoaderDevice *dev) : device(dev) {
     assert(device);
-    queue = getAPI().CreateSyncQueue(device->device);
+    queue = getAPI().CreateQueue(device->device);
   }
 
   ~LoaderQueue() {
@@ -183,13 +221,29 @@ OlDevice olCreateDevice(const char *desc, OlErrorCallback errCallback,
     errCtx.reportError(str.c_str());
     return nullptr;
   }
-  auto libname =
-      getLibName("hc-" + std::string(descStr.substr(0, sep)) + "-runtime");
-  auto device = std::make_unique<LoaderDevice>(libname.c_str(), desc, errCtx);
-  if (!device->isValid())
-    return nullptr;
+  auto runtimeName = std::string(descStr.substr(0, sep));
+  auto libName = getLibName("hc-" + runtimeName + "-runtime");
 
-  return device.release();
+  if (runtimeSearchPaths) {
+    for (int i = 0;; ++i) {
+      auto &str = runtimeSearchPaths[i];
+      if (!str)
+        break;
+
+      auto path = str.get() + ("/" + libName);
+      auto device = std::make_unique<LoaderDevice>(path.c_str(), desc, errCtx);
+      if (device->isValid())
+        return device.release();
+    }
+  }
+
+  auto device = std::make_unique<LoaderDevice>(libName.c_str(), desc, errCtx);
+  if (device->isValid())
+    return device.release();
+
+  std::string str = "Runtime not found: " + std::string(runtimeName);
+  errCtx.reportError(str.c_str());
+  return nullptr;
 }
 void olReleaseDevice(OlDevice dev) noexcept {
   delete static_cast<LoaderDevice *>(dev);
@@ -226,7 +280,7 @@ int olSuggestBlockSize(OlKernel k, const size_t *globalsSizes,
                                            blockSizesRet, nDims);
 }
 
-OlQueue olCreateSyncQueue(OlDevice dev) noexcept {
+OlQueue olCreateQueue(OlDevice dev) noexcept {
   auto device = static_cast<LoaderDevice *>(dev);
   auto queue = std::make_unique<LoaderQueue>(device);
   if (!queue->isValid())
@@ -236,6 +290,11 @@ OlQueue olCreateSyncQueue(OlDevice dev) noexcept {
 }
 void olReleaseQueue(OlQueue q) noexcept {
   delete static_cast<LoaderQueue *>(q);
+}
+
+int olSyncQueue(OlQueue q) noexcept {
+  auto queue = static_cast<LoaderQueue *>(q);
+  return queue->getAPI().SyncQueue(queue->queue);
 }
 
 void *olAllocDevice(OlQueue q, size_t size, size_t align) noexcept {

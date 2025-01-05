@@ -28,12 +28,14 @@ endif()
 option(HC_ENABLE_TOOLS "Enable Tools" ON)
 option(HC_ENABLE_PYTHON "Enable Python" OFF)
 option(HC_ENABLE_TESTS "Enable Tests" OFF)
-option(HC_ENABLE_GPU_LOADER "Enable Tests" OFF)
+option(HC_ENABLE_GPU_LOADER "Enable GPU loader" OFF)
+option(HC_ENABLE_HIP_RUNTIME "Enable GPU HIP runtime" OFF)
 
 message(STATUS "HC_ENABLE_TOOLS ${HC_ENABLE_TOOLS}")
 message(STATUS "HC_ENABLE_PYTHON ${HC_ENABLE_PYTHON}")
 message(STATUS "HC_ENABLE_TESTS ${HC_ENABLE_TESTS}")
 message(STATUS "HC_ENABLE_GPU_LOADER ${HC_ENABLE_GPU_LOADER}")
+message(STATUS "HC_ENABLE_HIP_RUNTIME ${HC_ENABLE_HIP_RUNTIME}")
 
 # Disable IPO to speed up pybind11 linking.
 # TODO: Enable for non-develop builds
@@ -53,6 +55,10 @@ add_subdirectory(frontend)
 
 if (HC_ENABLE_GPU_LOADER)
   add_subdirectory(gpu-runtime/loader)
+endif()
+
+if (HC_ENABLE_HIP_RUNTIME)
+  add_subdirectory(gpu-runtime/hip-runtime)
 endif()
 
 if (HC_ENABLE_PYTHON)
