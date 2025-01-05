@@ -20,3 +20,9 @@ dependencies:
   - pybind11
   - numpy
   - sympy
+  - hip-devel
+  - hipcc
+  - hip-runtime-amd
+  - rocm-opencl
+  - rocm-opencl-runtime
+  - rocm-device-libs

@@ -493,6 +493,7 @@ jobs:
         run: |
           cd python
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
+          export HC_ENABLE_HIP=1
           python setup.py develop
 
       - name: Test HC
