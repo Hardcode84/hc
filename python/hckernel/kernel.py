@@ -114,7 +114,9 @@ def _get_symbol_attr(sym):
     return typing.TypeAttr.get(sym)
 
 
-def _get_global_attrs(work_shape, group_shape, subgroup_size, literals):
+def _get_global_attrs(
+    work_shape, group_shape, subgroup_size, literals, backend, device
+):
     ret = {}
     n = len(work_shape)
     if group_shape is None:
@@ -143,6 +145,9 @@ def _get_global_attrs(work_shape, group_shape, subgroup_size, literals):
 
     ret["kernel.local_id"] = _get_shape_attr(local_id)
 
+    ret["kernel.backend"] = backend
+    ret["kernel.device"] = device
+
     return ret
 
 
@@ -152,6 +157,8 @@ def kernel(
     subgroup_size=None,
     literals=(),
     tunables=(),
+    backend="rocm",
+    device="hip:0",
 ):
     _verify_kernel_params(work_shape, group_shape, subgroup_size, literals, tunables)
 
@@ -160,7 +167,14 @@ def kernel(
         new_current_group = [CurrentGroup1, CurrentGroup2, CurrentGroup3][gr_index]
         mapping = {CurrentGroup: new_current_group}
         new_func = _resolve_globals(func, mapping)
-        attrs = _get_global_attrs(work_shape, group_shape, subgroup_size, literals)
+        attrs = _get_global_attrs(
+            work_shape=work_shape,
+            group_shape=group_shape,
+            subgroup_size=subgroup_size,
+            literals=literals,
+            backend=backend,
+            device=device,
+        )
         return create_dispatcher(
             new_func, prelink_module=_get_typing_module, global_attrs=attrs
         )
