@@ -264,6 +264,7 @@ jobs:
         run: |
           cd python
           $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
+          $env:HC_ENABLE_CUDA=1
           python setup.py develop
 
       - name: Test HC
@@ -494,6 +495,7 @@ jobs:
           cd python
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
           export HC_ENABLE_HIP=1
+          export HC_ENABLE_CUDA=1
           python setup.py develop
 
       - name: Test HC

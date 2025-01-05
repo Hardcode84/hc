@@ -24,7 +24,7 @@ void Dispatcher::definePyClass(py::module_ &m) {
 }
 
 void Dispatcher::call(py::args args, py::kwargs kwargs) {
-  runFrontend()->dump();
+  runFrontend();
   invokeFunc(args, kwargs);
 }
 
