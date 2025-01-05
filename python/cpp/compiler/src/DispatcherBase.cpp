@@ -258,7 +258,6 @@ void DispatcherBase::invokeFunc(const py::args &args,
     newMod->setAttr(hc::hk::getKernelMetadataAttrName(), key);
     runPipeline(context, newMod.get(),
                 [this](mlir::PassManager &pm) { populateInvokePipeline(pm); });
-    newMod.get()->dump();
 
     auto &ee = context.executionEngine;
     auto res = ee.loadModule(mlir::cast<mlir::ModuleOp>(newMod.get()));

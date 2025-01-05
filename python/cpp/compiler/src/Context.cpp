@@ -57,10 +57,10 @@ getExecutionEngineOpts(const py::dict &settings) {
   };
   opts.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
-  opts.lateTransformer = [](llvm::Module &m) -> llvm::Error {
-    m.dump();
-    return llvm::Error::success();
-  };
+  //  opts.lateTransformer = [](llvm::Module &m) -> llvm::Error {
+  //    m.dump();
+  //    return llvm::Error::success();
+  //  };
   //    auto llvmPrinter = settings["llvm_printer"];
   //    if (!llvmPrinter.is_none())
   //      opts.transformer = getLLModulePrinter(llvmPrinter);
