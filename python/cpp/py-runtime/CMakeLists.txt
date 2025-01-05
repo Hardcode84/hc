@@ -7,6 +7,10 @@ project(hc-python-runtime LANGUAGES CXX C)
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(nanobind REQUIRED)
 
+if(UNIX)
+  set(CMAKE_INSTALL_RPATH "$ORIGIN/")
+endif()
+
 include(GenerateExportHeader)
 
 set(SOURCES_LIST
