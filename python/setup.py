@@ -74,7 +74,7 @@ cmake_args = [
     "-DHC_ENABLE_GPU_LOADER=ON",
 ]
 
-if "ROCM_PATH" in env:
+if env.get("HC_ENABLE_HIP", False):
     cmake_args += [
         "-DHC_ENABLE_HIP_RUNTIME=ON",
     ]
