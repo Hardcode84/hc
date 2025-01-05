@@ -6,6 +6,10 @@ project(hc-gpu-runtime-loader LANGUAGES CXX C)
 
 include(GenerateExportHeader)
 
+if(UNIX)
+  set(CMAKE_INSTALL_RPATH "$ORIGIN/")
+endif()
+
 set(SOURCES_LIST
     src/Loader.cpp
     src/SharedLib.cpp
