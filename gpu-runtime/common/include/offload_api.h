@@ -10,7 +10,6 @@ using OlDevice = void *;
 using OlModule = void *;
 using OlKernel = void *;
 using OlQueue = void *;
-using OlEvent = void *;
 
 enum class OlSeverity : int {
   Error = 0,
@@ -49,7 +48,6 @@ OFFLOAD_API_EXPORT int olSuggestBlockSize(OlKernel k,
                                           size_t *blockSizesRet,
                                           size_t nDims) OFFLOAD_NOEXEPT;
 
-// Sync API
 OFFLOAD_API_EXPORT OlQueue olCreateQueue(OlDevice dev) OFFLOAD_NOEXEPT;
 OFFLOAD_API_EXPORT void olReleaseQueue(OlQueue q) OFFLOAD_NOEXEPT;
 OFFLOAD_API_EXPORT int olSyncQueue(OlQueue q) OFFLOAD_NOEXEPT;
