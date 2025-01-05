@@ -42,15 +42,24 @@ struct ErrorContext {
 
   static void reportError(void *ctx, const char *str) {
     auto errCtx = static_cast<ErrorContext *>(ctx);
+    if (!errCtx->errorCallback)
+      return;
+
     errCtx->errorCallback(errCtx->ctx, OlSeverity::Error, str);
   }
 
   static void reportMessage(void *ctx, const char *str) {
     auto errCtx = static_cast<ErrorContext *>(ctx);
+    if (!errCtx->errorCallback)
+      return;
+
     errCtx->errorCallback(errCtx->ctx, OlSeverity::Message, str);
   }
 
   void reportError(const char *str) {
+    if (!errorCallback)
+      return;
+
     errorCallback(ctx, OlSeverity::Error, str);
   }
 };
