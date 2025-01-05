@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #define OFFLOAD_API_EXPORT HC_HIP_RUNTIME_EXPORT
 #include "offload_api.h"
@@ -28,6 +29,21 @@ struct Device {
   void *ctx = nullptr;
   int index = 0;
 
+  template <typename... Args>
+  void printf(OlSeverity sev, const char *fmt, Args... args) {
+    if (!errCallback)
+      return;
+
+    char buffer[256] = {0};
+    auto len = std::size(buffer);
+    snprintf(buffer, len - 1, fmt, args...);
+    errCallback(ctx, OlSeverity::Error, buffer);
+  }
+
+  template <typename... Args> void printfErr(const char *fmt, Args... args) {
+    printf(OlSeverity::Error, fmt, std::forward<Args>(args)...);
+  }
+
   int checkHipStatus(const char *expr, hipError_t result) {
     if (!result)
       return 0;
@@ -37,10 +53,7 @@ struct Device {
       if (!name)
         name = "<unknown>";
 
-      char buffer[128] = {0};
-      snprintf(buffer, std::size(buffer) - 1, "'%s' failed with '%s'\n", expr,
-               name);
-      errCallback(ctx, OlSeverity::Error, buffer);
+      printfErr("'%s' failed with '%s'\n", expr, name);
     }
     return 1;
   }
@@ -224,10 +237,7 @@ int olLaunchKernel(OlQueue q, OlKernel k, const size_t *gridSizes,
   auto queue = static_cast<Queue *>(q);
   auto device = queue->device;
   if (nDims != 3) {
-    auto callback = device->errCallback;
-    if (callback)
-      callback(device->ctx, OlSeverity::Error, "Invalid launch dims");
-
+    device->printfErr("Invalid launch dims: %d", static_cast<int>(nDims));
     return 1;
   }
 
