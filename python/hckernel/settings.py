@@ -5,6 +5,7 @@
 
 from .utils import readenv as _readenv_orig
 from os import path
+from os import environ as env
 import ctypes
 
 settings = {}
@@ -23,7 +24,6 @@ def _split_str(src):
 DUMP_AST = _readenv("HC_DUMP_AST", int, 0)
 DUMP_IR = _readenv("HC_DUMP_IR", int, 0)
 DEBUG_TYPE = _readenv("HC_DEBUG_TYPE", _split_str, [])
-settings["LLVM_BIN_PATH"] = path.join(path.dirname(__file__), "_native")
 settings["JIT_SYMBOLS"] = {}
 
 
@@ -31,3 +31,10 @@ def register_cfunc(lib, name):
     cfunc = getattr(lib, name)
     ptr = ctypes.cast(cfunc, ctypes.c_void_p)
     settings["JIT_SYMBOLS"][name] = int(ptr.value)
+
+
+_llvm_bin_path = path.join(path.dirname(__file__), "_native")
+settings["LLVM_BIN_PATH"] = _llvm_bin_path
+
+if "ROCM_PATH" not in env:
+    env["ROCM_PATH"] = _llvm_bin_path

@@ -38,5 +38,5 @@ void Dispatcher::populateFrontendPipeline(mlir::PassManager &pm) {
 
 void Dispatcher::populateInvokePipeline(mlir::PassManager &pm) {
   hc::populateMiddleendPipeline(pm);
-  hc::populateBackendPipeline(pm, context.llvmBinPath);
+  hc::populateBackendPipeline(pm);
 }

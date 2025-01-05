@@ -56,6 +56,7 @@ set(SOURCES_LIST
     lib/Transforms/DropTypeResolvers.cpp
     lib/Transforms/ExpandTuple.cpp
     lib/Transforms/GpuToGpuRuntime.cpp
+    lib/Transforms/GpuToNVVM.cpp
     lib/Transforms/GpuToROCDL.cpp
     lib/Transforms/LegalizeBoolMemrefs.cpp
     lib/Transforms/LegalizeLLVMABI.cpp

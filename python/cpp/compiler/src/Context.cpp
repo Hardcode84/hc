@@ -10,6 +10,7 @@
 #include "PyWrappers.hpp"
 
 #include <mlir/InitAllExtensions.h>
+#include <mlir/Target/LLVM/NVVM/Target.h>
 #include <mlir/Target/LLVM/ROCDL/Target.h>
 #include <mlir/Target/LLVMIR/Dialect/All.h>
 
@@ -25,6 +26,7 @@ static mlir::DialectRegistry createRegistry() {
   mlir::registerAllExtensions(registry);
   hc::registerAllExtensions(registry);
   mlir::ROCDL::registerROCDLTargetInterfaceExternalModels(registry);
+  mlir::NVVM::registerNVVMTargetInterfaceExternalModels(registry);
   mlir::registerAllToLLVMIRTranslations(registry);
   return registry;
 }
@@ -55,6 +57,10 @@ getExecutionEngineOpts(const py::dict &settings) {
   };
   opts.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
+  opts.lateTransformer = [](llvm::Module &m) -> llvm::Error {
+    m.dump();
+    return llvm::Error::success();
+  };
   //    auto llvmPrinter = settings["llvm_printer"];
   //    if (!llvmPrinter.is_none())
   //      opts.transformer = getLLModulePrinter(llvmPrinter);
@@ -81,7 +87,7 @@ Context::Context(nanobind::dict settings_)
   context.loadDialect<hc::py_ir::PyIRDialect, hc::typing::TypingDialect>();
 
   readSettings(settings, settings_);
-  llvmBinPath = toString(settings_["LLVM_BIN_PATH"]);
+  //  llvmBinPath = toString(settings_["LLVM_BIN_PATH"]);
   pushContext(&context);
 }
 

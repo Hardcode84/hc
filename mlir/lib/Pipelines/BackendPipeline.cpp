@@ -26,8 +26,7 @@ static void populateOptPasses(mlir::OpPassManager &pm) {
       }));
 }
 
-void hc::populateBackendPipeline(mlir::PassManager &pm,
-                                 llvm::StringRef llvmBinDir) {
+void hc::populateBackendPipeline(mlir::PassManager &pm) {
   pm.addPass(hc::createLegalizeMemrefABIPass());
   pm.addPass(hc::createCreatePyWrapperPass());
   pm.addPass(hc::createDecomposeMemrefsPass());
@@ -39,20 +38,26 @@ void hc::populateBackendPipeline(mlir::PassManager &pm,
 
   using FuncT = std::function<void(mlir::OpPassManager &)>;
   std::pair<mlir::StringRef, FuncT> lowerings[] = {
-      {"rocm", [](mlir::OpPassManager &pm) {
+      {"rocm",
+       [](mlir::OpPassManager &pm) {
          auto &gpuPm = pm.nest<mlir::gpu::GPUModuleOp>();
          gpuPm.addPass(hc::createConvertGpuOpsToROCDLOps());
          populateOptPasses(gpuPm);
 
          pm.addPass(mlir::createGpuROCDLAttachTarget());
+       }},
+      {"nvvm", [](mlir::OpPassManager &pm) {
+         auto &gpuPm = pm.nest<mlir::gpu::GPUModuleOp>();
+         gpuPm.addPass(hc::createConvertGpuOpsToNVVMOps());
+         populateOptPasses(gpuPm);
+
+         pm.addPass(mlir::createGpuNVVMAttachTarget());
        }}};
 
   pm.addPass(hc::createSelectPass(
       "KernelLowering", hc::hk::getKernelBackendAttrName().str(), lowerings));
 
-  mlir::GpuModuleToBinaryPassOptions toBinaryOpts;
-  toBinaryOpts.toolkitPath = llvmBinDir;
-  pm.addPass(mlir::createGpuModuleToBinaryPass(toBinaryOpts));
+  pm.addPass(mlir::createGpuModuleToBinaryPass());
 
   pm.addPass(hc::createGPUToGPURuntimePass());
   pm.addPass(mlir::createConvertToLLVMPass());
