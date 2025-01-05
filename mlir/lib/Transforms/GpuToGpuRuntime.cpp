@@ -131,6 +131,11 @@ struct ConvertGpuLaunch final
     if (!mod)
       return rewriter.notifyMatchFailure(op, "No parent module");
 
+    auto deviceName =
+        mod->getAttrOfType<mlir::StringAttr>(hc::hk::getKernelDeviceAttrName());
+    if (!deviceName)
+      return rewriter.notifyMatchFailure(op, "No device name");
+
     if (op->getNumResults() != 0)
       return rewriter.notifyMatchFailure(op, "Cannot replace op with results");
 
@@ -163,15 +168,22 @@ struct ConvertGpuLaunch final
       mlir::Value dataSize = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmIndexType, objData.size());
 
-      auto entrypointName = op.getKernelName().getValue().str();
-      entrypointName.append(std::string_view("\0", 1));
-      mlir::Value kernelName = mlir::LLVM::createGlobalString(
-          loc, rewriter, getUniqueLLVMGlobalName(mod, "kernel_name"),
-          entrypointName, mlir::LLVM::Linkage::Internal);
-      kernel =
-          getKernelBuilder
-              .create(loc, rewriter, {handlePtr, dataPtr, dataSize, kernelName})
-              .getResult();
+      auto getStr = [&](mlir::StringRef varName,
+                        mlir::StringRef str) -> mlir::Value {
+        auto strVal = str.str();
+        strVal.append(std::string_view("\0", 1));
+        return mlir::LLVM::createGlobalString(
+            loc, rewriter, getUniqueLLVMGlobalName(mod, varName), strVal,
+            mlir::LLVM::Linkage::Internal);
+      };
+
+      mlir::Value deviceNameVal = getStr("device_name", deviceName);
+      mlir::Value kernelNameVal = getStr("kernel_name", op.getKernelName());
+      kernel = getKernelBuilder
+                   .create(loc, rewriter,
+                           {handlePtr, deviceNameVal, dataPtr, dataSize,
+                            kernelNameVal})
+                   .getResult();
     }
 
     mlir::SmallVector<mlir::Value> suggestedBlockSizes;
@@ -306,6 +318,7 @@ private:
                                           llvmPointerType,
                                           {
                                               llvmPointerType, // globalHandle
+                                              llvmPointerType, // deviceDesc
                                               llvmPointerType, // data
                                               llvmIndexType,   // data size
                                               llvmPointerType, // entrypointName

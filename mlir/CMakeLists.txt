@@ -65,6 +65,7 @@ set(SOURCES_LIST
     lib/Transforms/PyIRPromoteFuncsToStatic.cpp
     lib/Transforms/PyTypeInference.cpp
     lib/Transforms/ReconstructPySSA.cpp
+    lib/Transforms/SelectPass.cpp
     lib/Transforms/SimplifyAST.cpp
     lib/Transforms/Utils.cpp
   )

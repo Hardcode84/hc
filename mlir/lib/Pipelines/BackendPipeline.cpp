@@ -5,6 +5,8 @@
 
 #include "hc/Pipelines/BackendPipeline.hpp"
 
+#include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
+
 #include <mlir/Conversion/AffineToStandard/AffineToStandard.h>
 #include <mlir/Conversion/Passes.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
@@ -35,11 +37,18 @@ void hc::populateBackendPipeline(mlir::PassManager &pm,
   pm.addPass(mlir::createGpuLauchSinkIndexComputationsPass());
   pm.addPass(mlir::createGpuKernelOutliningPass());
 
-  auto &gpuPm = pm.nest<mlir::gpu::GPUModuleOp>();
-  gpuPm.addPass(hc::createConvertGpuOpsToROCDLOps());
-  populateOptPasses(gpuPm);
+  using FuncT = std::function<void(mlir::OpPassManager &)>;
+  std::pair<mlir::StringRef, FuncT> lowerings[] = {
+      {"rocm", [](mlir::OpPassManager &pm) {
+         auto &gpuPm = pm.nest<mlir::gpu::GPUModuleOp>();
+         gpuPm.addPass(hc::createConvertGpuOpsToROCDLOps());
+         populateOptPasses(gpuPm);
 
-  pm.addPass(mlir::createGpuROCDLAttachTarget());
+         pm.addPass(mlir::createGpuROCDLAttachTarget());
+       }}};
+
+  pm.addPass(hc::createSelectPass(
+      "KernelLowering", hc::hk::getKernelBackendAttrName().str(), lowerings));
 
   mlir::GpuModuleToBinaryPassOptions toBinaryOpts;
   toBinaryOpts.toolkitPath = llvmBinDir;
@@ -50,5 +59,5 @@ void hc::populateBackendPipeline(mlir::PassManager &pm,
   pm.addPass(mlir::createReconcileUnrealizedCastsPass());
   pm.addPass(mlir::createSymbolDCEPass());
   pm.addPass(hc::createLegalizeLLVMABIPass());
-  populateOptPasses(gpuPm);
+  populateOptPasses(pm.nest<mlir::gpu::GPUModuleOp>());
 }

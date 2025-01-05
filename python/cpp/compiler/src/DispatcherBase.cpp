@@ -119,7 +119,12 @@ importImpl(Context &context, py::handle desc) {
   if (!globalAttrs.is_none()) {
     for (auto &&[key, val] : py::cast<py::dict>(globalAttrs)) {
       auto keyAttr = mlir::StringAttr::get(mlirContext, toString(key));
-      auto attr = unwrap(py::cast<mlir::python::PyAttribute>(val));
+      mlir::Attribute attr;
+      if (py::isinstance<py::str>(val)) {
+        attr = mlir::StringAttr::get(mlirContext, py::str(val).c_str());
+      } else {
+        attr = unwrap(py::cast<mlir::python::PyAttribute>(val));
+      }
       newMod->setAttr(keyAttr, attr);
     }
   }

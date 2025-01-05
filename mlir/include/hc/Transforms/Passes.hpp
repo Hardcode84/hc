@@ -37,4 +37,10 @@ void populateSimplifyASTPatterns(mlir::RewritePatternSet &patterns);
 void populateConvertPyASTToIRPatterns(mlir::RewritePatternSet &patterns);
 void populatePyIRPromoteFuncsToStaticPatterns(
     mlir::RewritePatternSet &patterns);
+
+std::unique_ptr<mlir::Pass> createSelectPass(
+    std::string name, std::string selectCondName,
+    mlir::ArrayRef<
+        std::pair<mlir::StringRef, std::function<void(mlir::OpPassManager &)>>>
+        populateFuncs);
 } // namespace hc

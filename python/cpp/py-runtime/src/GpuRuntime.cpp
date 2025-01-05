@@ -23,13 +23,13 @@ static void errCallback(void * /*ctx*/, OlSeverity sev, const char *desc) {
 static OlDevice device = nullptr;
 static OlQueue queue = nullptr;
 
-void *getKernelImpl(void **handle, const void *data, size_t dataSize,
-                    const char *kenrnelName) noexcept {
+void *getKernelImpl(void **handle, const char *deviceDesc, const void *data,
+                    size_t dataSize, const char *kenrnelName) noexcept {
   if (void *cached = *handle)
     return cached;
 
   if (!device) {
-    device = olCreateDevice("hip:0", &errCallback, nullptr);
+    device = olCreateDevice(deviceDesc, &errCallback, nullptr);
     if (!device)
       fatal("olCreateDevice failed");
 

@@ -243,6 +243,20 @@ def LegalizeLLVMABIPass : Pass<"hc-legalize-llvm-abi-pass", "::mlir::ModuleOp"> 
   ];
 }
 
+def SelectPass : Pass<"hc-select-pass"> {
+  let options = [
+    Option<"name", "name", "std::string", /*default=*/"\"SelectPass\"",
+           "Select pass display name">,
+    Option<"selectCondName", "select-cond-name", "std::string", "\"select\"",
+           "Attribute name used for condition">,
+    ListOption<"selectValues", "select-values", "std::string",
+               "Values used to check select condition">,
+    ListOption<"selectPipelines", "select-pipelines", "std::string",
+               "Pipelines, assotiated with corresponding select values">,
+  ];
+}
+
+
 // TODO: Fix upstream
 def ConvertGpuOpsToROCDLOps : Pass<"hc-convert-gpu-to-rocdl", "::mlir::gpu::GPUModuleOp"> {
   let summary = "Generate ROCDL operations for gpu operations";

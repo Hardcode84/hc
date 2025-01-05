@@ -6,7 +6,7 @@
 //       CHECK:   llvm.call @hcgpuLaunchKernel
 //   CHECK-NOT:  gpu.binary
 
-module attributes {gpu.container_module} {
+module attributes {gpu.container_module, kernel.device = "hip:0"} {
   func.func @copy_kernel(%arg0: !hkernel<current_group 2>, %arg1: !hkernel.memref_descriptor<memref<?x?xi32, strided<[?, ?], offset: ?>>>, %arg2: !hkernel.memref_descriptor<memref<?x?xi32, strided<[?, ?], offset: ?>>>) attributes {kernel.entrypoint} {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
