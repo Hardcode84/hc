@@ -17,11 +17,12 @@ namespace {
 struct SelectPass final : public hc::impl::SelectPassBase<SelectPass> {
   using SelectPassBase::SelectPassBase;
 
-  SelectPass(std::string name_,
+  SelectPass(std::string name_, std::string selectCondName_,
              mlir::ArrayRef<std::pair<
                  mlir::StringRef, std::function<void(mlir::OpPassManager &)>>>
                  populateFuncs) {
     name = std::move(name_);
+    selectCondName = std::move(selectCondName_);
 
     SmallVector<std::string> selectVals;
     SmallVector<std::string> selectPpls;
@@ -83,7 +84,7 @@ struct SelectPass final : public hc::impl::SelectPassBase<SelectPass> {
     Operation *op = getOperation();
     Attribute condAttrValue = op->getAttr(condAttrName);
     if (!condAttrValue) {
-      op->emitError("Condition attribute not present");
+      op->emitError("Condition attribute not present: ") << condAttrName;
       return signalPassFailure();
     }
 
@@ -113,9 +114,10 @@ private:
 } // namespace
 
 std::unique_ptr<mlir::Pass> hc::createSelectPass(
-    std::string name,
+    std::string name, std::string selectCondName,
     mlir::ArrayRef<
         std::pair<mlir::StringRef, std::function<void(mlir::OpPassManager &)>>>
         populateFuncs) {
-  return std::make_unique<SelectPass>(std::move(name), populateFuncs);
+  return std::make_unique<SelectPass>(std::move(name),
+                                      std::move(selectCondName), populateFuncs);
 }

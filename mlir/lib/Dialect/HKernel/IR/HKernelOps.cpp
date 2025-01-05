@@ -996,3 +996,7 @@ llvm::StringRef hc::hk::getKernelSubgroupIdAttrName() {
 llvm::StringRef hc::hk::getKernelMetadataAttrName() {
   return "kernel.metadata";
 }
+
+llvm::StringRef hc::hk::getKernelBackendAttrName() { return "kernel.backend"; }
+
+llvm::StringRef hc::hk::getKernelDeviceAttrName() { return "kernel.device"; }
