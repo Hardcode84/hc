@@ -25,3 +25,4 @@ dependencies:
   - hip-runtime-amd
   - rocm-opencl
   - rocm-opencl-runtime
+  - rocm-device-libs
