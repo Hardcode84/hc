@@ -75,9 +75,10 @@ cmake_args = [
 ]
 
 if env.get("HC_ENABLE_HIP", False):
-    cmake_args += [
-        "-DHC_ENABLE_HIP_RUNTIME=ON",
-    ]
+    cmake_args.append("-DHC_ENABLE_HIP_RUNTIME=ON")
+
+if env.get("HC_ENABLE_CUDA", False):
+    cmake_args.append("-DHC_ENABLE_CUDA_RUNTIME=ON")
 
 invoke_cmake(cmake_args)
 invoke_cmake(["--build", ".", "--config", "Release"])
