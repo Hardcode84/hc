@@ -112,7 +112,7 @@ OlDevice olCreateDevice(const char *desc, OlErrorCallback errCallback,
   if (descStr.substr(0, start.size()) != start)
     return reportError("Invalid device desc");
 
-  descStr = descStr.substr(start.size() + 1);
+  descStr = descStr.substr(start.size());
 
   int deviceId = 0;
   if (std::from_chars(descStr.data(), descStr.data() + descStr.size(), deviceId)
@@ -120,7 +120,7 @@ OlDevice olCreateDevice(const char *desc, OlErrorCallback errCallback,
     return reportError("Invalid device id");
 
   auto device = std::make_unique<Device>(deviceId, errCallback, ctx);
-  if (device->setCurrent() != 0)
+  if (device->setCurrent())
     return nullptr;
 
   return device.release();

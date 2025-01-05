@@ -122,7 +122,7 @@ struct Queue {
 
 OlDevice olCreateDevice(const char *desc, OlErrorCallback errCallback,
                         void *ctx) noexcept {
-  std::string_view start("hip:");
+  std::string_view start("cuda:");
   std::string_view descStr(desc);
 
   auto reportError = [&](const char *err) -> void * {
@@ -134,7 +134,7 @@ OlDevice olCreateDevice(const char *desc, OlErrorCallback errCallback,
   if (descStr.substr(0, start.size()) != start)
     return reportError("Invalid device desc");
 
-  descStr = descStr.substr(start.size() + 1);
+  descStr = descStr.substr(start.size());
 
   int deviceId = 0;
   if (std::from_chars(descStr.data(), descStr.data() + descStr.size(), deviceId)
