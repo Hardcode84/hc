@@ -178,7 +178,7 @@ int olSuggestBlockSize(OlKernel k, const size_t *globalsSizes,
   return 0;
 }
 
-OlQueue olCreateSyncQueue(OlDevice dev) noexcept {
+OlQueue olCreateQueue(OlDevice dev) noexcept {
   auto device = static_cast<Device *>(dev);
   if (device->setCurrent())
     return nullptr;
@@ -192,6 +192,12 @@ OlQueue olCreateSyncQueue(OlDevice dev) noexcept {
 }
 
 void olReleaseQueue(OlQueue q) noexcept { delete static_cast<Queue *>(q); }
+
+int olSyncQueue(OlQueue q) noexcept {
+  auto queue = static_cast<Queue *>(q);
+  auto device = queue->device;
+  return HIP_REPORT_IF_ERROR(hipStreamSynchronize(queue->stream));
+}
 
 void *olAllocDevice(OlQueue q, size_t size, size_t /*align*/) noexcept {
   auto queue = static_cast<Queue *>(q);

@@ -87,8 +87,9 @@ struct API {
     INIT_FUNC(GetKernel);
     INIT_FUNC(ReleaseKernel);
     INIT_FUNC(SuggestBlockSize);
-    INIT_FUNC(CreateSyncQueue);
+    INIT_FUNC(CreateQueue);
     INIT_FUNC(ReleaseQueue);
+    INIT_FUNC(SyncQueue);
     INIT_FUNC(AllocDevice);
     INIT_FUNC(DeallocDevice);
     INIT_FUNC(LaunchKernel);
@@ -109,8 +110,9 @@ struct API {
   DECL_FUNC(GetKernel);
   DECL_FUNC(ReleaseKernel);
   DECL_FUNC(SuggestBlockSize);
-  DECL_FUNC(CreateSyncQueue);
+  DECL_FUNC(CreateQueue);
   DECL_FUNC(ReleaseQueue);
+  DECL_FUNC(SyncQueue);
   DECL_FUNC(AllocDevice);
   DECL_FUNC(DeallocDevice);
   DECL_FUNC(LaunchKernel);
@@ -181,7 +183,7 @@ struct LoaderKernel {
 struct LoaderQueue {
   LoaderQueue(LoaderDevice *dev) : device(dev) {
     assert(device);
-    queue = getAPI().CreateSyncQueue(device->device);
+    queue = getAPI().CreateQueue(device->device);
   }
 
   ~LoaderQueue() {
@@ -277,7 +279,7 @@ int olSuggestBlockSize(OlKernel k, const size_t *globalsSizes,
                                            blockSizesRet, nDims);
 }
 
-OlQueue olCreateSyncQueue(OlDevice dev) noexcept {
+OlQueue olCreateQueue(OlDevice dev) noexcept {
   auto device = static_cast<LoaderDevice *>(dev);
   auto queue = std::make_unique<LoaderQueue>(device);
   if (!queue->isValid())
@@ -287,6 +289,11 @@ OlQueue olCreateSyncQueue(OlDevice dev) noexcept {
 }
 void olReleaseQueue(OlQueue q) noexcept {
   delete static_cast<LoaderQueue *>(q);
+}
+
+int olSyncQueue(OlQueue q) noexcept {
+  auto queue = static_cast<LoaderQueue *>(q);
+  return queue->getAPI().SyncQueue(queue->queue);
 }
 
 void *olAllocDevice(OlQueue q, size_t size, size_t align) noexcept {

@@ -33,7 +33,7 @@ void *getKernelImpl(void **handle, const void *data, size_t dataSize,
     if (!device)
       fatal("olCreateDevice failed");
 
-    queue = olCreateSyncQueue(device);
+    queue = olCreateQueue(device);
     if (!queue)
       fatal("olCreateSyncQueue failed");
   }
@@ -63,4 +63,7 @@ void launchKernelImpl(void *kernel, const size_t *gridSizes,
   if (olLaunchKernel(queue, kernel, gridSizes, blockSizes, nDim, args, nArgs,
                      sharedMemSize))
     fatal("olLaunchKernel failed");
+
+  if (olSyncQueue(queue))
+    fatal("olSyncQueue failed");
 }

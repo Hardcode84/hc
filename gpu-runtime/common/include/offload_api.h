@@ -50,8 +50,9 @@ OFFLOAD_API_EXPORT int olSuggestBlockSize(OlKernel k,
                                           size_t nDims) OFFLOAD_NOEXEPT;
 
 // Sync API
-OFFLOAD_API_EXPORT OlQueue olCreateSyncQueue(OlDevice dev) OFFLOAD_NOEXEPT;
+OFFLOAD_API_EXPORT OlQueue olCreateQueue(OlDevice dev) OFFLOAD_NOEXEPT;
 OFFLOAD_API_EXPORT void olReleaseQueue(OlQueue q) OFFLOAD_NOEXEPT;
+OFFLOAD_API_EXPORT int olSyncQueue(OlQueue q) OFFLOAD_NOEXEPT;
 
 OFFLOAD_API_EXPORT void *olAllocDevice(OlQueue q, size_t size,
                                        size_t align) OFFLOAD_NOEXEPT;
