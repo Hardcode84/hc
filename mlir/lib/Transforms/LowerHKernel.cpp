@@ -309,7 +309,7 @@ createLauncOp(mlir::OpBuilder &builder, mlir::Location loc,
                                                 gridSize[2], blockSize[0],
                                                 blockSize[1], blockSize[2]);
   auto dim3 = [](const mlir::gpu::KernelDim3 &k) -> std::array<mlir::Value, 3> {
-    return {k.z, k.y, k.z};
+    return {k.x, k.y, k.z};
   };
   auto launchGrIds = dim3(op.getBlockIds());
   auto launchLocIds = dim3(op.getThreadIds());
