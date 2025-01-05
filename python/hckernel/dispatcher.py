@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import inspect
+import textwrap
 from types import FunctionType
 from typing import Callable
 from collections import namedtuple, OrderedDict
@@ -111,7 +112,7 @@ def _get_desc(func, dispatcher_cls, prelink_module, global_attrs):
                 dispatcher_deps[name] = obj
 
         return FuncDesc(
-            source=inspect.getsource(func),
+            source=textwrap.dedent(inspect.getsource(func)),
             name=func.__name__,
             args=args_types,
             imported_symbols=imported_symbols,
