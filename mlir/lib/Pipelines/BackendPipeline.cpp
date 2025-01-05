@@ -26,8 +26,7 @@ static void populateOptPasses(mlir::OpPassManager &pm) {
       }));
 }
 
-void hc::populateBackendPipeline(mlir::PassManager &pm,
-                                 llvm::StringRef llvmBinDir) {
+void hc::populateBackendPipeline(mlir::PassManager &pm) {
   pm.addPass(hc::createLegalizeMemrefABIPass());
   pm.addPass(hc::createCreatePyWrapperPass());
   pm.addPass(hc::createDecomposeMemrefsPass());
@@ -58,9 +57,7 @@ void hc::populateBackendPipeline(mlir::PassManager &pm,
   pm.addPass(hc::createSelectPass(
       "KernelLowering", hc::hk::getKernelBackendAttrName().str(), lowerings));
 
-  mlir::GpuModuleToBinaryPassOptions toBinaryOpts;
-  toBinaryOpts.toolkitPath = llvmBinDir;
-  pm.addPass(mlir::createGpuModuleToBinaryPass(toBinaryOpts));
+  pm.addPass(mlir::createGpuModuleToBinaryPass());
 
   pm.addPass(hc::createGPUToGPURuntimePass());
   pm.addPass(mlir::createConvertToLLVMPass());

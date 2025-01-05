@@ -14,5 +14,5 @@ class PassManager;
 }
 
 namespace hc {
-void populateBackendPipeline(mlir::PassManager &pm, llvm::StringRef llvmBinDir);
+void populateBackendPipeline(mlir::PassManager &pm);
 }
