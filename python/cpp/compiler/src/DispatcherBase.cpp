@@ -350,6 +350,17 @@ struct DispatcherBase::ArgsHandlerBuilder {
 
       dst = std::pair(py::cast<py::object>(np.attr(name.data())), func(&ctx));
     }
+
+    try {
+      auto np = py::module_::import_("torch");
+      for (auto &&[src, dst] : llvm::zip_equal(TorchDTypes, torchDTypes)) {
+        auto &&[name, func] = src;
+
+        dst = std::pair(py::cast<py::object>(np.attr(name.data())), func(&ctx));
+      }
+    } catch (const py::builtin_exception &) {
+      // Nothing
+    }
   }
 
   HandlerT getArgHandler(py::handle arg) {
@@ -415,8 +426,7 @@ struct DispatcherBase::ArgsHandlerBuilder {
       return [this, argShape = std::move(srcShape),
               dtypeSym](mlir::MLIRContext &ctx, py::handle obj,
                         llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret) {
-        auto arrInterface = py::cast<py::dict>(obj.attr("__array_interface__"));
-        auto shape = py::cast<py::tuple>(arrInterface["shape"]);
+        auto shape = py::cast<py::tuple>(obj.attr("shape"));
         if (argShape.size() != shape.size())
           reportError("Invalid buffer rank: " + llvm::Twine(argShape.size()) +
                       " vs " + llvm::Twine(shape.size()));
@@ -460,15 +470,32 @@ private:
       {"float64", &getFloatType<64>},
   };
 
+  constexpr static const std::pair<llvm::StringRef, fptr_t> TorchDTypes[] = {
+      {"int8", &getIntType<8, true>},   {"uint8", &getIntType<8, false>},
+      {"int16", &getIntType<16, true>}, {"int32", &getIntType<32, true>},
+      {"int64", &getIntType<64, true>}, {"float16", &getFloatType<16>},
+      {"float32", &getFloatType<32>},   {"float64", &getFloatType<64>},
+  };
+
   mlir::MLIRContext &ctx;
   py::object symbolType;
   py::object typenameType;
   py::object bufferType;
   std::array<std::pair<py::object, mlir::Type>, std::size(NumpyDTypes)>
       numpyDTypes;
+  std::array<std::pair<py::object, mlir::Type>, std::size(TorchDTypes)>
+      torchDTypes;
 
   mlir::Type translateDtype(py::handle obj) const {
     for (auto &&[dtype, type] : numpyDTypes) {
+      if (obj.equal(dtype))
+        return type;
+    }
+
+    if (!torchDTypes.front().second)
+      return nullptr;
+
+    for (auto &&[dtype, type] : torchDTypes) {
       if (obj.equal(dtype))
         return type;
     }
