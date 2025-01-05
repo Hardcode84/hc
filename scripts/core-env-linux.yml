@@ -20,6 +20,7 @@ dependencies:
   - pybind11
   - numpy
   - sympy
+  - cudatoolkit-dev
   - hip-devel
   - hipcc
   - hip-runtime-amd
