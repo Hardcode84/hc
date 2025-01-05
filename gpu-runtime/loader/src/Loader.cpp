@@ -4,6 +4,7 @@
 
 #include "hc-gpu-runtime-loader_export.h"
 
+#include <algorithm>
 #include <cassert>
 #include <memory>
 #include <string>
