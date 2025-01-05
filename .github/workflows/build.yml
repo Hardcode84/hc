@@ -17,7 +17,7 @@ concurrency:
 
 env:
   LLVM_SHA_FILE: llvm-sha.txt
-  LLVM_CACHE_NUMBER: 2  # Increase to reset cache
+  LLVM_CACHE_NUMBER: 1  # Increase to reset cache
   CONDA_CACHE_NUMBER: 1  # Increase to reset cache
 
 jobs:
@@ -101,7 +101,7 @@ jobs:
             -DLLVM_ENABLE_ASSERTIONS=ON                                        `
             -DLLVM_ENABLE_RTTI=ON                                              `
             -DLLVM_INSTALL_UTILS=ON                                            `
-            -DLLVM_TARGETS_TO_BUILD="X86;AMDGPU"                               `
+            -DLLVM_TARGETS_TO_BUILD="X86;AMDGPU;NVPTX"                         `
             -DLLVM_ENABLE_BINDINGS=OFF                                         `
             -DLLVM_ENABLE_ZSTD=OFF                                             `
             -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   `
@@ -345,7 +345,7 @@ jobs:
             -DLLVM_ENABLE_ASSERTIONS=ON                                        \
             -DLLVM_ENABLE_RTTI=ON                                              \
             -DLLVM_INSTALL_UTILS=ON                                            \
-            -DLLVM_TARGETS_TO_BUILD="X86;AMDGPU"                               \
+            -DLLVM_TARGETS_TO_BUILD="X86;AMDGPU;NVPTX"                         \
             -DLLVM_ENABLE_BINDINGS=OFF                                         \
             -DLLVM_ENABLE_ZSTD=OFF                                             \
             -DMLIR_ENABLE_BINDINGS_PYTHON=ON                                   \
