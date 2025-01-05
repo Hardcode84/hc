@@ -15,7 +15,7 @@ except ImportError:
     _has_torch = False
 
 require_e2e = pytest.mark.skipif(
-    not _has_torch and torch.cuda.is_available(), reason="e2e tests are disabled"
+    not (_has_torch and torch.cuda.is_available()), reason="e2e tests are disabled"
 )
 
 
