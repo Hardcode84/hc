@@ -21,6 +21,10 @@ namespace ROCDL {
 class ROCDLDialect;
 }
 
+namespace NVVM {
+class NVVMDialect;
+}
+
 namespace gpu {
 class GPUModuleOp;
 }

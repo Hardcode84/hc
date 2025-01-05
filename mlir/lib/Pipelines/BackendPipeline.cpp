@@ -39,12 +39,20 @@ void hc::populateBackendPipeline(mlir::PassManager &pm,
 
   using FuncT = std::function<void(mlir::OpPassManager &)>;
   std::pair<mlir::StringRef, FuncT> lowerings[] = {
-      {"rocm", [](mlir::OpPassManager &pm) {
+      {"rocm",
+       [](mlir::OpPassManager &pm) {
          auto &gpuPm = pm.nest<mlir::gpu::GPUModuleOp>();
          gpuPm.addPass(hc::createConvertGpuOpsToROCDLOps());
          populateOptPasses(gpuPm);
 
          pm.addPass(mlir::createGpuROCDLAttachTarget());
+       }},
+      {"nvvm", [](mlir::OpPassManager &pm) {
+         auto &gpuPm = pm.nest<mlir::gpu::GPUModuleOp>();
+         gpuPm.addPass(hc::createConvertGpuOpsToNVVMOps());
+         populateOptPasses(gpuPm);
+
+         pm.addPass(mlir::createGpuNVVMAttachTarget());
        }}};
 
   pm.addPass(hc::createSelectPass(

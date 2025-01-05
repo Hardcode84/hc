@@ -164,7 +164,6 @@ struct LowerGpuOpsToROCDLOpsPass
     populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns,
                                             *maybeChipset);
     populateGpuToROCDLConversionPatterns(converter, llvmPatterns, runtime);
-    populateFinalizeMemRefToLLVMConversionPatterns(converter, llvmPatterns);
     configureGpuToROCDLConversionLegality(target);
     if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
       signalPassFailure();
