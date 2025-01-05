@@ -21,3 +21,4 @@ dependencies:
   - numpy
   - sympy
   - hip-devel
+  - hipcc
