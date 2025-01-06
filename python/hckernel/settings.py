@@ -23,6 +23,7 @@ def _split_str(src):
 
 DUMP_AST = _readenv("HC_DUMP_AST", int, 0)
 DUMP_IR = _readenv("HC_DUMP_IR", int, 0)
+DUMP_TYPING_IR = _readenv("HC_DUMP_TYPING_IR", int, 0)
 DEBUG_TYPE = _readenv("HC_DEBUG_TYPE", _split_str, [])
 settings["JIT_SYMBOLS"] = {}
 

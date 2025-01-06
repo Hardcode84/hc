@@ -4,15 +4,22 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from .typing import *
-from .mlir import ir
-from .mlir import typing
+from .mlir import ir, typing
+from .compiler import enable_dump_ir
+from .settings import DUMP_TYPING_IR
+
 
 _registry = TypingRegistry()
 
 
 def get_typing_module():
     global _registry
-    _registry.compile_type_resolvers()
+    prev = enable_dump_ir(bool(DUMP_TYPING_IR))
+    try:
+        _registry.compile_type_resolvers()
+    finally:
+        enable_dump_ir(prev)
+
     return _registry.module
 
 

@@ -26,3 +26,7 @@ struct Context {
 };
 
 nanobind::capsule createContext(nanobind::dict settings);
+
+nanobind::bool_ enableDumpAST(nanobind::capsule context,
+                              nanobind::bool_ enable);
+nanobind::bool_ enableDumpIR(nanobind::capsule context, nanobind::bool_ enable);

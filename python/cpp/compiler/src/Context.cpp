@@ -76,18 +76,11 @@ getExecutionEngineOpts(const py::dict &settings) {
   return opts;
 }
 
-static void readSettings(Settings &ret, py::dict &settings) {
-  ret.dumpAST = py::cast<int>(settings["DUMP_AST"]);
-  ret.dumpIR = py::cast<int>(settings["DUMP_IR"]);
-}
-
 Context::Context(nanobind::dict settings_)
     : context(createRegistry()),
       executionEngine(getExecutionEngineOpts(settings_)) {
   context.loadDialect<hc::py_ir::PyIRDialect, hc::typing::TypingDialect>();
 
-  readSettings(settings, settings_);
-  //  llvmBinPath = toString(settings_["LLVM_BIN_PATH"]);
   pushContext(&context);
 }
 
@@ -115,4 +108,18 @@ py::capsule createContext(py::dict settings) {
   py::capsule ret(ctx.get(), dtor);
   ctx.release();
   return ret;
+}
+
+py::bool_ enableDumpAST(py::capsule context, py::bool_ enable) {
+  auto *ctx = static_cast<Context *>(context.data());
+  bool prev = ctx->settings.dumpAST;
+  ctx->settings.dumpAST = static_cast<bool>(enable);
+  return py::bool_(prev);
+}
+
+py::bool_ enableDumpIR(py::capsule context, py::bool_ enable) {
+  auto *ctx = static_cast<Context *>(context.data());
+  bool prev = ctx->settings.dumpIR;
+  ctx->settings.dumpIR = static_cast<bool>(enable);
+  return py::bool_(prev);
 }

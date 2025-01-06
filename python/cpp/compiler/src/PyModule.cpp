@@ -14,6 +14,8 @@ namespace py = nanobind;
 
 NB_MODULE(compiler, m) {
   m.def("create_context", &createContext);
+  m.def("enable_dump_ast", &enableDumpAST);
+  m.def("enable_dump_ir", &enableDumpIR);
 
   DispatcherBase::definePyClass(m);
   Dispatcher::definePyClass(m);
