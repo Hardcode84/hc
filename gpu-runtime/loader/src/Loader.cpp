@@ -57,7 +57,7 @@ struct FuncScope {
   FuncScope(const char *funcName, bool e, const char *fmt, Args &&...args)
       : name(funcName), enable(e) {
     if (enable) {
-      fprintf(stdout, "%s enter ", name);
+      fprintf(stdout, "%s ", name);
       fprintf(stdout, fmt, args...);
       fprintf(stdout, "\n");
       fflush(stdout);
