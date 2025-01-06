@@ -5,7 +5,7 @@
 
 from .typing import *
 from .mlir import ir, typing
-from .compiler import enable_dump_ir
+from .compiler import EnableDumpIR
 from .settings import DUMP_TYPING_IR
 
 
@@ -14,11 +14,8 @@ _registry = TypingRegistry()
 
 def get_typing_module():
     global _registry
-    prev = enable_dump_ir(DUMP_TYPING_IR)
-    try:
+    with EnableDumpIR(DUMP_TYPING_IR):
         _registry.compile_type_resolvers()
-    finally:
-        enable_dump_ir(prev)
 
     return _registry.module
 

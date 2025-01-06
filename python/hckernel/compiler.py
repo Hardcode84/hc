@@ -26,3 +26,14 @@ def enable_dump_ir(enable):
 
 enable_dump_ast(DUMP_AST)
 enable_dump_ir(DUMP_IR)
+
+
+class EnableDumpIR:
+    def __init__(self, enable):
+        self._prev = enable_dump_ir(enable)
+
+    def __enter__(self):
+        return None
+
+    def __exit__(self, type, value, traceback):
+        enable_dump_ir(self._prev)
