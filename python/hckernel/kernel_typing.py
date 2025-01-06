@@ -14,7 +14,7 @@ _registry = TypingRegistry()
 
 def get_typing_module():
     global _registry
-    prev = enable_dump_ir(bool(DUMP_TYPING_IR))
+    prev = enable_dump_ir(DUMP_TYPING_IR)
     try:
         _registry.compile_type_resolvers()
     finally:
