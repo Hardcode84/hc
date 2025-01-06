@@ -24,9 +24,9 @@ def _split_str(src):
 DUMP_AST = _readenv("HC_DUMP_AST", int, 0)
 DUMP_IR = _readenv("HC_DUMP_IR", int, 0)
 DUMP_TYPING_IR = _readenv("HC_DUMP_TYPING_IR", int, 0)
-DUMP_LLVM = readenv("HC_DUMP_LLVM", int, 0)
-DUMP_OPTIMIZED = readenv("HC_DUMP_OPTIMIZED", int, 0)
-DUMP_ASSEMBLY = readenv("HC_DUMP_ASSEMBLY", int, 0)
+DUMP_LLVM = _readenv("HC_DUMP_LLVM", int, 0)
+DUMP_OPTIMIZED = _readenv("HC_DUMP_OPTIMIZED", int, 0)
+DUMP_ASSEMBLY = _readenv("HC_DUMP_ASSEMBLY", int, 0)
 DEBUG_TYPE = _readenv("HC_DEBUG_TYPE", _split_str, [])
 settings["JIT_SYMBOLS"] = {}
 
