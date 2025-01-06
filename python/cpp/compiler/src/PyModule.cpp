@@ -16,6 +16,9 @@ NB_MODULE(compiler, m) {
   m.def("create_context", &createContext);
   m.def("enable_dump_ast", &enableDumpAST);
   m.def("enable_dump_ir", &enableDumpIR);
+  m.def("enable_dump_llvm", &enableDumpLLVM);
+  m.def("enable_dump_opt_llvm", &enableDumpOptLLVM);
+  m.def("enable_dump_asm", &enableDumpASM);
 
   DispatcherBase::definePyClass(m);
   Dispatcher::definePyClass(m);

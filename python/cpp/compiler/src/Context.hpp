@@ -14,6 +14,9 @@
 struct Settings {
   bool dumpAST = false;
   bool dumpIR = false;
+  bool dumpLLVM = false;
+  bool dumpOptLLVM = false;
+  bool dumpASM = false;
 };
 
 struct Context {
@@ -30,3 +33,10 @@ nanobind::capsule createContext(nanobind::dict settings);
 nanobind::bool_ enableDumpAST(nanobind::capsule context,
                               nanobind::bool_ enable);
 nanobind::bool_ enableDumpIR(nanobind::capsule context, nanobind::bool_ enable);
+
+nanobind::bool_ enableDumpLLVM(nanobind::capsule context,
+                               nanobind::bool_ enable);
+nanobind::bool_ enableDumpOptLLVM(nanobind::capsule context,
+                                  nanobind::bool_ enable);
+nanobind::bool_ enableDumpASM(nanobind::capsule context,
+                              nanobind::bool_ enable);

@@ -32,7 +32,7 @@ static mlir::DialectRegistry createRegistry() {
 }
 
 static hc::ExecutionEngineOptions
-getExecutionEngineOpts(const py::dict &settings) {
+getExecutionEngineOpts(Settings &ctxSettings, const py::dict &settings) {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
@@ -57,28 +57,29 @@ getExecutionEngineOpts(const py::dict &settings) {
   };
   opts.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
-  //  opts.lateTransformer = [](llvm::Module &m) -> llvm::Error {
-  //    m.dump();
-  //    return llvm::Error::success();
-  //  };
-  //    auto llvmPrinter = settings["llvm_printer"];
-  //    if (!llvmPrinter.is_none())
-  //      opts.transformer = getLLModulePrinter(llvmPrinter);
+  opts.transformer = [&](llvm::Module &m) -> llvm::Error {
+    if (ctxSettings.dumpLLVM)
+      m.dump();
+    return llvm::Error::success();
+  };
 
-  //    auto optimizedPrinter = settings["optimized_printer"];
-  //    if (!optimizedPrinter.is_none())
-  //      opts.lateTransformer = getLLModulePrinter(optimizedPrinter);
+  opts.lateTransformer = [&](llvm::Module &m) -> llvm::Error {
+    if (ctxSettings.dumpOptLLVM)
+      m.dump();
+    return llvm::Error::success();
+  };
 
-  //    auto asmPrinter = settings["asm_printer"];
-  //    if (!asmPrinter.is_none())
-  //      opts.asmPrinter = getPrinter(asmPrinter);
+  opts.asmPrinter = [&](mlir::StringRef str) {
+    if (ctxSettings.dumpASM)
+      llvm::errs() << str;
+  };
 
   return opts;
 }
 
 Context::Context(nanobind::dict settings_)
     : context(createRegistry()),
-      executionEngine(getExecutionEngineOpts(settings_)) {
+      executionEngine(getExecutionEngineOpts(settings, settings_)) {
   context.loadDialect<hc::py_ir::PyIRDialect, hc::typing::TypingDialect>();
 
   pushContext(&context);
@@ -121,5 +122,24 @@ py::bool_ enableDumpIR(py::capsule context, py::bool_ enable) {
   auto *ctx = static_cast<Context *>(context.data());
   bool prev = ctx->settings.dumpIR;
   ctx->settings.dumpIR = static_cast<bool>(enable);
+  return py::bool_(prev);
+}
+
+py::bool_ enableDumpLLVM(py::capsule context, py::bool_ enable) {
+  auto *ctx = static_cast<Context *>(context.data());
+  bool prev = ctx->settings.dumpLLVM;
+  ctx->settings.dumpLLVM = static_cast<bool>(enable);
+  return py::bool_(prev);
+}
+py::bool_ enableDumpOptLLVM(py::capsule context, py::bool_ enable) {
+  auto *ctx = static_cast<Context *>(context.data());
+  bool prev = ctx->settings.dumpOptLLVM;
+  ctx->settings.dumpOptLLVM = static_cast<bool>(enable);
+  return py::bool_(prev);
+}
+py::bool_ enableDumpASM(py::capsule context, py::bool_ enable) {
+  auto *ctx = static_cast<Context *>(context.data());
+  bool prev = ctx->settings.dumpASM;
+  ctx->settings.dumpASM = static_cast<bool>(enable);
   return py::bool_(prev);
 }
