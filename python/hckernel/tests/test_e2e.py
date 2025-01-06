@@ -42,14 +42,13 @@ def get_device(backend):
     assert False, f"Invalid backend: {backend}"
 
 
-W = sym.W
-H = sym.H
-DT = typename.DT
-
-
 @require_e2e
 def test_copy():
     backend = get_backend()
+
+    W = sym.W
+    H = sym.H
+    DT = typename.DT
 
     @kernel(work_shape=(W, H), backend=backend, device=get_device(backend))
     def copy_kernel(group: CurrentGroup, src: Buffer[W, H, DT], dst: Buffer[W, H, DT]):

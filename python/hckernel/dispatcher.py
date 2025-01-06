@@ -5,6 +5,7 @@
 
 import inspect
 import textwrap
+import functools
 from types import FunctionType
 from typing import Callable
 from collections import namedtuple, OrderedDict
@@ -74,11 +75,11 @@ def _process_annotation(ann):
         assert False, f"Unsupported annotation: {type(ann)} {ann}"
 
 
-def _get_desc(func, dispatcher_cls, prelink_module, global_attrs):
+def _get_desc(func, dispatcher_cls, prelink_module, global_attrs, caller_vars=None):
     if not isinstance(func, FunctionType):
         raise RuntimeError(f"Unsupported object {type(func)}")
 
-    def _wrapper():
+    def _wrapper(caller_vars):
         if isinstance(prelink_module, Callable):
             prelink_mod = prelink_module()
         else:
@@ -100,7 +101,10 @@ def _get_desc(func, dispatcher_cls, prelink_module, global_attrs):
         imported_symbols = {}
         literals = {}
         dispatcher_deps = {}
-        for name, obj in func.__globals__.items():
+        if caller_vars is None:
+            caller_vars = func.__globals__
+
+        for name, obj in caller_vars.items():
             mod = get_module_for_symbol(obj)
             if mod:
                 imported_symbols[name] = mod
@@ -122,11 +126,15 @@ def _get_desc(func, dispatcher_cls, prelink_module, global_attrs):
             global_attrs=global_attrs,
         )
 
-    return _wrapper
+    return functools.partial(_wrapper, caller_vars)
 
 
 def create_dispatcher(
-    func, prelink_module=None, dispatcher=Dispatcher, global_attrs=None
+    func,
+    prelink_module=None,
+    dispatcher=Dispatcher,
+    global_attrs=None,
+    caller_vars=None,
 ):
     return dispatcher(
         mlir_context,
@@ -135,5 +143,6 @@ def create_dispatcher(
             dispatcher_cls=dispatcher,
             prelink_module=prelink_module,
             global_attrs=global_attrs,
+            caller_vars=caller_vars,
         ),
     )

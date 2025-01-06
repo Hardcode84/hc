@@ -4,12 +4,25 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import sympy
+import inspect
 from .kernel_api import _verify_kernel_params
 from .kernel_api import *
 from .dispatcher import create_dispatcher
 from .indexing import _index_symbol_internal
 from .mlir import ir
 from .mlir import typing
+
+
+def _get_caller_locals():
+    frame = inspect.currentframe()
+    if frame is None:
+        return {}
+
+    res = frame.f_back.f_back.f_locals
+    if res is None:
+        ret = {}
+
+    return res
 
 
 def _get_num_dims(arg):
@@ -163,9 +176,16 @@ def kernel(
     _verify_kernel_params(work_shape, group_shape, subgroup_size, literals, tunables)
 
     def _kernel_impl(func):
+        caller_vars = _get_caller_locals() | func.__globals__
+
         gr_index = _get_num_dims(work_shape) - 1
         new_current_group = [CurrentGroup1, CurrentGroup2, CurrentGroup3][gr_index]
         mapping = {CurrentGroup: new_current_group}
+        caller_vars = {
+            k: (new_current_group if v is CurrentGroup else v)
+            for k, v in caller_vars.items()
+        }
+
         new_func = _resolve_globals(func, mapping)
         attrs = _get_global_attrs(
             work_shape=work_shape,
@@ -176,7 +196,10 @@ def kernel(
             device=device,
         )
         return create_dispatcher(
-            new_func, prelink_module=_get_typing_module, global_attrs=attrs
+            new_func,
+            prelink_module=_get_typing_module,
+            global_attrs=attrs,
+            caller_vars=caller_vars,
         )
 
     return _kernel_impl
