@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <cassert>
 #include <charconv>
-#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -201,7 +200,7 @@ int olSuggestBlockSize(OlKernel k, const size_t *globalsSizes,
   if (nDims < 1 || nDims > 3)
     return 1;
 
-  size_t maxWgSize = std::numeric_limits<int>::max();
+  size_t maxWgSize = 1024;
   for (size_t i = 0; i < nDims; ++i) {
     auto gsize = globalsSizes[i];
     if (gsize > 1) {
