@@ -5,7 +5,9 @@
 #include "hc-gpu-runtime-loader_export.h"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
+#include <charconv>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -15,11 +17,11 @@
 
 #include "SharedLib.hpp"
 
-static const std::unique_ptr<char[]> *runtimeSearchPaths = nullptr;
+static const std::unique_ptr<char[]> *RuntimeSearchPaths = nullptr;
 extern "C" HC_GPU_RUNTIME_LOADER_EXPORT void
 setGPULoaderSearchPaths(const char *paths[], size_t count) {
-  delete[] runtimeSearchPaths;
-  runtimeSearchPaths = nullptr;
+  delete[] RuntimeSearchPaths;
+  RuntimeSearchPaths = nullptr;
 
   if (count == 0)
     return;
@@ -33,8 +35,118 @@ setGPULoaderSearchPaths(const char *paths[], size_t count) {
     temp[i] = std::move(buff);
   }
 
-  runtimeSearchPaths = temp.release();
+  RuntimeSearchPaths = temp.release();
 }
+
+static bool TraceFunctions = true;
+
+extern "C" HC_GPU_RUNTIME_LOADER_EXPORT void enableFuncTracing(int val) {
+  TraceFunctions = val;
+}
+
+namespace {
+struct FuncScope {
+  FuncScope(const char *funcName, bool e) : name(funcName), enable(e) {
+    if (enable) {
+      fprintf(stdout, "%s enter\n", name);
+      fflush(stdout);
+    }
+  }
+
+  template <typename... Args>
+  FuncScope(const char *funcName, bool e, const char *fmt, Args &&...args)
+      : name(funcName), enable(e) {
+    if (enable) {
+      fprintf(stdout, "%s enter ", name);
+      fprintf(stdout, fmt, args...);
+      fprintf(stdout, "\n");
+      fflush(stdout);
+    }
+  }
+
+  FuncScope(const FuncScope &) = delete;
+  FuncScope(FuncScope &&other) : name(other.name), enable(other.enable) {
+    other.enable = false;
+  }
+
+  ~FuncScope() {
+    if (enable) {
+      fprintf(stdout, "%s exit\n", name);
+      fflush(stdout);
+    }
+  }
+
+private:
+  const char *name;
+  bool enable;
+};
+
+struct Writer {
+  Writer() { buff.back() = '\0'; }
+
+  size_t available() const { return buff.size() - offset - 1; }
+
+  char *ptr() { return buff.data() + offset; }
+
+  void writeStr(std::string_view str) {
+    auto l = std::min(available(), str.size());
+    std::copy_n(str.begin(), l, ptr());
+    offset += l;
+  }
+
+  template <typename T> void write(const T &val) {
+    auto begin = ptr();
+    auto end = begin + available();
+    auto result = std::to_chars(begin, end, val);
+    if (result.ec == std::errc()) {
+      auto off = result.ptr - begin;
+      offset += off;
+    }
+  }
+
+  void term() {
+    if (!available())
+      return;
+
+    buff[offset] = '\0';
+    ++offset;
+  }
+
+  template <typename T> const char *operator()(const T *array, size_t size) {
+    auto ret = ptr();
+    writeStr("[");
+    for (size_t i = 0; i < size; ++i) {
+      if (i != 0)
+        writeStr(", ");
+
+      write(array[i]);
+    }
+    writeStr("]");
+    term();
+    return ret;
+  }
+
+  template <typename T> const char *operator()(const T &val) {
+    auto ret = ptr();
+    write(val);
+    term();
+    return ret;
+  }
+
+  std::array<char, 256> buff;
+  int offset = 0;
+};
+} // namespace
+#define LOG_FUNC() FuncScope _scope(__func__, TraceFunctions)
+#define LOG_FUNC_ARGS(fmt, ...)                                                \
+  FuncScope _scope = [&](const char *func) -> FuncScope {                      \
+    if (TraceFunctions) {                                                      \
+      Writer writer;                                                           \
+      return FuncScope(func, true, fmt, __VA_ARGS__);                          \
+    } else {                                                                   \
+      return FuncScope(func, false);                                           \
+    }                                                                          \
+  }(__func__);
 
 namespace {
 struct ErrorContext {
@@ -213,6 +325,7 @@ static std::string getLibName(std::string_view name) {
 
 OlDevice olCreateDevice(const char *desc, OlErrorCallback errCallback,
                         void *ctx) noexcept {
+  LOG_FUNC();
   ErrorContext errCtx{errCallback, ctx};
   std::string_view descStr(desc);
   auto sep = descStr.find(':');
@@ -224,9 +337,9 @@ OlDevice olCreateDevice(const char *desc, OlErrorCallback errCallback,
   auto runtimeName = std::string(descStr.substr(0, sep));
   auto libName = getLibName("hc-" + runtimeName + "-runtime");
 
-  if (runtimeSearchPaths) {
+  if (RuntimeSearchPaths) {
     for (int i = 0;; ++i) {
-      auto &str = runtimeSearchPaths[i];
+      auto &str = RuntimeSearchPaths[i];
       if (!str)
         break;
 
@@ -246,10 +359,12 @@ OlDevice olCreateDevice(const char *desc, OlErrorCallback errCallback,
   return nullptr;
 }
 void olReleaseDevice(OlDevice dev) noexcept {
+  LOG_FUNC();
   delete static_cast<LoaderDevice *>(dev);
 }
 
 OlModule olCreateModule(OlDevice dev, const void *data, size_t len) noexcept {
+  LOG_FUNC();
   auto device = static_cast<LoaderDevice *>(dev);
   auto module = std::make_unique<LoaderModule>(device, data, len);
   if (!module->isValid())
@@ -262,6 +377,7 @@ void olReleaseModule(OlModule mod) noexcept {
 }
 
 OlKernel olGetKernel(OlModule mod, const char *name) noexcept {
+  LOG_FUNC();
   auto module = static_cast<LoaderModule *>(mod);
   auto kernel = std::make_unique<LoaderKernel>(module, name);
   if (!kernel->isValid())
@@ -270,17 +386,20 @@ OlKernel olGetKernel(OlModule mod, const char *name) noexcept {
   return kernel.release();
 }
 void olReleaseKernel(OlKernel k) noexcept {
+  LOG_FUNC();
   delete static_cast<LoaderKernel *>(k);
 }
 
 int olSuggestBlockSize(OlKernel k, const size_t *globalsSizes,
                        size_t *blockSizesRet, size_t nDims) noexcept {
+  LOG_FUNC();
   auto kernel = static_cast<LoaderKernel *>(k);
   return kernel->getAPI().SuggestBlockSize(kernel->kernel, globalsSizes,
                                            blockSizesRet, nDims);
 }
 
 OlQueue olCreateQueue(OlDevice dev) noexcept {
+  LOG_FUNC();
   auto device = static_cast<LoaderDevice *>(dev);
   auto queue = std::make_unique<LoaderQueue>(device);
   if (!queue->isValid())
@@ -289,20 +408,24 @@ OlQueue olCreateQueue(OlDevice dev) noexcept {
   return queue.release();
 }
 void olReleaseQueue(OlQueue q) noexcept {
+  LOG_FUNC();
   delete static_cast<LoaderQueue *>(q);
 }
 
 int olSyncQueue(OlQueue q) noexcept {
+  LOG_FUNC();
   auto queue = static_cast<LoaderQueue *>(q);
   return queue->getAPI().SyncQueue(queue->queue);
 }
 
 void *olAllocDevice(OlQueue q, size_t size, size_t align) noexcept {
+  LOG_FUNC();
   auto queue = static_cast<LoaderQueue *>(q);
   return queue->getAPI().AllocDevice(queue->queue, size, align);
 }
 
 void olDeallocDevice(OlQueue q, void *data) noexcept {
+  LOG_FUNC();
   auto queue = static_cast<LoaderQueue *>(q);
   queue->getAPI().DeallocDevice(queue->queue, data);
 }
@@ -310,6 +433,9 @@ void olDeallocDevice(OlQueue q, void *data) noexcept {
 int olLaunchKernel(OlQueue q, OlKernel k, const size_t *gridSizes,
                    const size_t *blockSizes, size_t nDims, void **args,
                    size_t nArgs, size_t sharedMemSize) noexcept {
+  LOG_FUNC_ARGS("grid: %s, blocks %s, nargs %s, shMem %s",
+                writer(gridSizes, nDims), writer(blockSizes, nDims),
+                writer(nArgs), writer(sharedMemSize));
   auto queue = static_cast<LoaderQueue *>(q);
   auto kernel = static_cast<LoaderKernel *>(k);
   auto &api = queue->getAPI();
