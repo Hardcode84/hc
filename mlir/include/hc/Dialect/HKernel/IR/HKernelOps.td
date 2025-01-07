@@ -26,6 +26,8 @@ def HKernel_Dialect : Dialect {
 
   let useDefaultAttributePrinterParser = 1;
   let useDefaultTypePrinterParser = 1;
+
+  let hasCanonicalizer = 1;
 }
 
 class HKernel_Type<string name, string typeMnemonic, list<Trait> traits = [],

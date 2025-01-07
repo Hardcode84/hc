@@ -35,6 +35,7 @@ void hc::populateBackendPipeline(mlir::PassManager &pm) {
 
   pm.addPass(mlir::createGpuLauchSinkIndexComputationsPass());
   pm.addPass(mlir::createGpuKernelOutliningPass());
+  pm.addPass(mlir::createCanonicalizerPass());
 
   using FuncT = std::function<void(mlir::OpPassManager &)>;
   std::pair<mlir::StringRef, FuncT> lowerings[] = {
