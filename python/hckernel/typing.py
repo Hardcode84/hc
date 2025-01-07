@@ -36,6 +36,9 @@ class TypingRegistry:
         self._typing_dispatchers.append(disp)
 
     def compile_type_resolvers(self):
+        if self._typing_module is not None:
+            return
+
         typing_module = None
         try:
             for disp in self._typing_dispatchers:
