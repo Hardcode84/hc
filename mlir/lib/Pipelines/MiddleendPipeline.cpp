@@ -30,6 +30,7 @@ void hc::populateMiddleendPipeline(mlir::PassManager &pm) {
   populateOptPasses(pm);
   pm.addPass(hc::createLowerHKernelOpsPass());
   pm.addPass(hc::createResolveArgsPass());
+  pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(hc::createExpandSharedAllocsPass());
   pm.addPass(hc::createLegalizeBoolMemrefsPass());
 

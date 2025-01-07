@@ -7,6 +7,11 @@
 
 #include "hc/Dialect/Typing/IR/TypingOps.hpp"
 
+// TODO: Upstream canonicalizations.
+#include <mlir/Dialect/MemRef/IR/MemRef.h>
+#include <mlir/Dialect/Vector/IR/VectorOps.h>
+#include <mlir/IR/Dominance.h>
+
 #include <mlir/Dialect/Utils/StaticValueUtils.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/DialectImplementation.h>
@@ -29,6 +34,85 @@ void hc::hk::HKernelDialect::initialize() {
 #define GET_ATTRDEF_LIST
 #include "hc/Dialect/HKernel/IR/HKernelOpsAttributes.cpp.inc"
       >();
+}
+
+namespace {
+using namespace mlir;
+template <typename T> struct SimplifyDeadAlloc : public OpRewritePattern<T> {
+  using OpRewritePattern<T>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(T alloc,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<MemoryEffects::EffectInstance> effects;
+    if (llvm::any_of(alloc->getUses(), [&](OpOperand &use) {
+          auto iface = dyn_cast<MemoryEffectOpInterface>(use.getOwner());
+          if (!iface)
+            return true;
+
+          effects.clear();
+          iface.getEffectsOnValue(alloc, effects);
+          if (effects.size() != 1)
+            return true;
+
+          return !mlir::isa<MemoryEffects::Write, MemoryEffects::Free>(
+              effects.front().getEffect());
+        }))
+      return failure();
+
+    for (Operation *user : llvm::make_early_inc_range(alloc->getUsers()))
+      rewriter.eraseOp(user);
+
+    rewriter.eraseOp(alloc);
+    return success();
+  }
+};
+
+struct PromoteTrivialStoreToLoad
+    : public mlir::OpRewritePattern<mlir::vector::LoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::vector::LoadOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    mlir::Value mem = op.getBase();
+    if (!mlir::isa_and_present<mlir::memref::AllocOp, mlir::memref::AllocaOp>(
+            mem.getDefiningOp()))
+      return mlir::failure();
+
+    mlir::DominanceInfo dom;
+    mlir::vector::StoreOp store;
+    for (mlir::Operation *user : mem.getUsers()) {
+      auto memInterface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(user);
+      if (!memInterface)
+        return mlir::failure();
+
+      if (memInterface.onlyHasEffect<mlir::MemoryEffects::Read>() ||
+          memInterface.onlyHasEffect<mlir::MemoryEffects::Free>())
+        continue;
+
+      auto st = mlir::dyn_cast<mlir::vector::StoreOp>(user);
+      if (!st || st.getValueToStore().getType() != op.getType() ||
+          !dom.properlyDominates(st, op) || st.getIndices() != op.getIndices())
+        return mlir::failure();
+
+      if (!store || dom.properlyDominates(st, store))
+        store = st;
+    }
+
+    if (!store)
+      return mlir::failure();
+
+    rewriter.replaceOp(op, store.getValueToStore());
+    return mlir::success();
+  }
+};
+} // namespace
+
+void hc::hk::HKernelDialect::getCanonicalizationPatterns(
+    mlir::RewritePatternSet &results) const {
+  results.add<SimplifyDeadAlloc<mlir::memref::AllocOp>,
+              SimplifyDeadAlloc<mlir::memref::AllocaOp>,
+              PromoteTrivialStoreToLoad>(results.getContext());
 }
 
 hc::hk::SymbolicallyShapedType
