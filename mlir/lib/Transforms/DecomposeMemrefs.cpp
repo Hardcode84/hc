@@ -200,6 +200,7 @@ struct ConvertSubview final
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::MemRefType srcMemrefType = op.getSourceType();
     mlir::MemRefType resMemrefType = op.getType();
+
     auto resultType =
         getTypeConverter()->convertType<mlir::TupleType>(resMemrefType);
     if (!resultType)
@@ -240,9 +241,13 @@ struct ConvertSubview final
     results.emplace_back(ptr);
 
     auto droppedDims = op.getDroppedDims();
-    for (auto &&[i, dim, dynDim] :
-         llvm::enumerate(resMemrefType.getShape(), mixedSizes)) {
-      if (droppedDims[i] || !mlir::ShapedType::isDynamic(dim))
+    int j = 0;
+    for (auto &&[i, dynDim] : llvm::enumerate(mixedSizes)) {
+      if (droppedDims[i])
+        continue;
+
+      auto dim = resMemrefType.getShape()[j++];
+      if (!mlir::ShapedType::isDynamic(dim))
         continue;
 
       results.emplace_back(

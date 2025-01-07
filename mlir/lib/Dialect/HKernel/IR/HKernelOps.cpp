@@ -1000,3 +1000,7 @@ llvm::StringRef hc::hk::getKernelMetadataAttrName() {
 llvm::StringRef hc::hk::getKernelBackendAttrName() { return "kernel.backend"; }
 
 llvm::StringRef hc::hk::getKernelDeviceAttrName() { return "kernel.device"; }
+
+llvm::StringRef hc::hk::getKernelAllocExpandAttrName() {
+  return "kernel.alloc_expand";
+}
