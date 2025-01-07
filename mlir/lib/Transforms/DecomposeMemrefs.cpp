@@ -200,6 +200,10 @@ struct ConvertSubview final
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::MemRefType srcMemrefType = op.getSourceType();
     mlir::MemRefType resMemrefType = op.getType();
+    if (srcMemrefType.getRank() != resMemrefType.getRank())
+      return rewriter.notifyMatchFailure(
+          op, "Rank reduced subviews are not supported yet");
+
     auto resultType =
         getTypeConverter()->convertType<mlir::TupleType>(resMemrefType);
     if (!resultType)
