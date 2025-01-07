@@ -243,6 +243,8 @@ def LegalizeLLVMABIPass : Pass<"hc-legalize-llvm-abi-pass", "::mlir::ModuleOp"> 
   ];
 }
 
+def ExpandSharedAllocsPass : Pass<"hc-expand-shared-allocs-pass">;
+
 def SelectPass : Pass<"hc-select-pass"> {
   let options = [
     Option<"name", "name", "std::string", /*default=*/"\"SelectPass\"",

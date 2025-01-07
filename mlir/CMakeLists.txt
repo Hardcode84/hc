@@ -54,6 +54,7 @@ set(SOURCES_LIST
     lib/Transforms/DecomposeMemrefs.cpp
     lib/Transforms/DecomposePointers.cpp
     lib/Transforms/DropTypeResolvers.cpp
+    lib/Transforms/ExpandSharedAllocs.cpp
     lib/Transforms/ExpandTuple.cpp
     lib/Transforms/GpuToGpuRuntime.cpp
     lib/Transforms/GpuToNVVM.cpp
