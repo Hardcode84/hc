@@ -39,4 +39,5 @@ void hc::populateMiddleendPipeline(mlir::PassManager &pm) {
   func.addPass(mlir::createLowerAffinePass());
 
   populateOptPasses(pm);
+  pm.addPass(hc::createLegalizeDynamicSharedMemPass());
 }
