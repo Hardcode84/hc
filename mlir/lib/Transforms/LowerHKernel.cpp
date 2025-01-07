@@ -851,6 +851,11 @@ static llvm::SmallVector<mlir::Value> createAlloc(mlir::OpBuilder &builder,
     return {};
   }
 
+  auto expandAttrName =
+      builder.getStringAttr(hc::hk::getKernelAllocExpandAttrName());
+  auto unit = builder.getUnitAttr();
+  auto wgSpace = getWGAddrSpace(builder.getContext());
+
   llvm::SmallVector<mlir::Value> ret;
   llvm::SmallVector<mlir::Value> args;
   for (auto type : types) {
@@ -864,8 +869,11 @@ static llvm::SmallVector<mlir::Value> createAlloc(mlir::OpBuilder &builder,
     auto allocType = mlir::MemRefType::get(
         type.getShape(), type.getElementType(),
         mlir::MemRefLayoutAttrInterface{}, type.getMemorySpace());
-    mlir::Value mem =
-        builder.create<mlir::memref::AllocaOp>(loc, allocType, args);
+    auto op = builder.create<mlir::memref::AllocaOp>(loc, allocType, args);
+    if (type.getMemorySpace() == wgSpace)
+      op->setAttr(expandAttrName, unit);
+
+    mlir::Value mem = op.getResult();
     if (mem.getType() != type)
       mem = builder.create<mlir::memref::CastOp>(loc, type, mem);
 

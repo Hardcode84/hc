@@ -46,4 +46,6 @@ llvm::StringRef getKernelMetadataAttrName();
 
 llvm::StringRef getKernelBackendAttrName();
 llvm::StringRef getKernelDeviceAttrName();
+
+llvm::StringRef getKernelAllocExpandAttrName();
 } // namespace hc::hk
