@@ -38,7 +38,7 @@ setGPULoaderSearchPaths(const char *paths[], size_t count) {
   RuntimeSearchPaths = temp.release();
 }
 
-static bool TraceFunctions = true;
+static bool TraceFunctions = false;
 
 extern "C" HC_GPU_RUNTIME_LOADER_EXPORT void enableFuncTracing(int val) {
   TraceFunctions = val;

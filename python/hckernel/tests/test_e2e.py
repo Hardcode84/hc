@@ -42,8 +42,22 @@ def get_device(backend):
     assert False, f"Invalid backend: {backend}"
 
 
+_copy_shapes = [
+    (1, 27),
+    (10, 20),
+    (1, 72),
+    (111, 813),
+    (1, 128),
+    (256, 64),
+    (256, 128),
+    (256, 256),
+    (256, 1024),
+]
+
+
 @require_e2e
-def test_copy():
+@pytest.mark.parametrize("shape", _copy_shapes)
+def test_copy(shape):
     backend = get_backend()
 
     W = sym.W
@@ -56,7 +70,7 @@ def test_copy():
         val = group.load(src[x:, y:], shape=group.shape)
         group.store(dst[x:, y:], val)
 
-    a = to_device(torch.arange(200, dtype=torch.int32).reshape(10, 20))
+    a = to_device(torch.arange(shape[0] * shape[1], dtype=torch.int32).reshape(shape))
     b = torch.zeros_like(a)
     copy_kernel(a, b)
     assert_close(b, a)

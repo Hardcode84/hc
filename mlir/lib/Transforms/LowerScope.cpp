@@ -96,9 +96,11 @@ checkShapedDivisible(mlir::Type type, mlir::TypeRange div) {
   return std::nullopt;
 }
 
-static mlir::LogicalResult
-lowerScope(hc::hk::EnvironmentRegionOp region, mlir::TypeRange groupShape,
-           mlir::TypeRange ids, hc::typing::SymbolicTypeBase subgroupSize) {
+static mlir::LogicalResult lowerScope(hc::hk::EnvironmentRegionOp region,
+                                      mlir::TypeRange groupShape,
+                                      mlir::TypeRange ids,
+                                      hc::typing::SymbolicTypeBase subgroupSize,
+                                      bool wgScope) {
   mlir::OpBuilder builder(region.getContext());
 
   auto distributeShapedType = [&](mlir::Type type,
@@ -116,7 +118,7 @@ lowerScope(hc::hk::EnvironmentRegionOp region, mlir::TypeRange groupShape,
       newShape[d] = symbolic.floorDiv(symbolicGr);
     }
 
-    if (subgroupSize && distributeDims.back() != UnsetIdx) {
+    if (wgScope && distributeDims.back() != UnsetIdx) {
       auto i = distributeDims.back();
       auto elem = mlir::cast<hc::typing::SymbolicTypeBase>(newShape[i]);
       newShape[i] = elem * subgroupSize;
@@ -154,6 +156,14 @@ lowerScope(hc::hk::EnvironmentRegionOp region, mlir::TypeRange groupShape,
       assert(i < ids.size());
       assert(d < newIndices.size());
       auto ind = mlir::cast<hc::typing::SymbolicTypeBase>(ids[i]);
+      if (i == distributeDims.size() - 1) {
+        if (wgScope) {
+          ind = ind * subgroupSize;
+        } else {
+          ind = ind % subgroupSize;
+        }
+      }
+
       newIndices[d] = makeSlice(ind);
 
       auto dim = mlir::cast<hc::typing::SymbolicTypeBase>(newShape[d]);
@@ -265,7 +275,7 @@ static mlir::LogicalResult lowerWGScope(hc::hk::EnvironmentRegionOp region) {
   ids.back() = subgroupId;
 
   if (mlir::failed(
-          lowerScope(region, groupShape.getParams(), ids, subgroupSize)))
+          lowerScope(region, groupShape.getParams(), ids, subgroupSize, true)))
     return mlir::failure();
 
   region.setEnvironmentAttr(
@@ -289,7 +299,7 @@ static mlir::LogicalResult lowerSGScope(hc::hk::EnvironmentRegionOp region) {
     return region->emitError("Subgroup size is not defined");
 
   if (mlir::failed(lowerScope(region, subgroupSize, localId.getParams().back(),
-                              nullptr)))
+                              subgroupSize, false)))
     return mlir::failure();
 
   region.setEnvironmentAttr(
@@ -302,7 +312,6 @@ struct LowerWorkgroupScopePass final
     : public hc::impl::LowerWorkgroupScopePassBase<LowerWorkgroupScopePass> {
 
   void runOnOperation() override {
-
     auto visitor = [&](hc::hk::EnvironmentRegionOp region) -> mlir::WalkResult {
       if (!mlir::isa<hc::hk::WorkgroupScopeAttr>(region.getEnvironment()))
         return mlir::WalkResult::advance();
@@ -327,7 +336,6 @@ struct LowerSubgroupScopePass final
     : public hc::impl::LowerSubgroupScopePassBase<LowerSubgroupScopePass> {
 
   void runOnOperation() override {
-
     auto visitor = [&](hc::hk::EnvironmentRegionOp region) -> mlir::WalkResult {
       if (!mlir::isa<hc::hk::SubgroupScopeAttr>(region.getEnvironment()))
         return mlir::WalkResult::advance();
