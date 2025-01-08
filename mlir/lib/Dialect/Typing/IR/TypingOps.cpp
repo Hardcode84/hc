@@ -16,6 +16,8 @@
 
 #include <llvm/ADT/TypeSwitch.h>
 
+MLIR_DEFINE_EXPLICIT_TYPE_ID(hc::typing::SymbolicTypeBase)
+
 namespace {
 struct TypingAsmDialectInterface : public mlir::OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
