@@ -47,6 +47,7 @@ module attributes {kernel.group_id = #typing.type_attr<!seq> : !typing.value, ke
 //   CHECK-DAG: ![[EXPR0:.*]] = !typing<expr (![[SYM5]], ![[SYM6]]) -> s0 floordiv s1>
 //   CHECK-DAG: ![[EXPR1:.*]] = !typing<expr (![[SYM0]], ![[SYM2]]) -> s0 * s1>
 //   CHECK-DAG: ![[EXPR2:.*]] = !typing<expr (![[SYM1]], ![[SYM3]]) -> s0 * s1>
+//   CHECK-DAG: ![[EXPR3:.*]] = !typing<expr (![[SYM5]], ![[SYM6]]) -> (s0 floordiv s1) * s1>
 // CHECK-LABEL: func @test
 //  CHECK-SAME: (%{{.*}}: !hkernel<current_group 2>, %[[ARG1:.*]]: !hkernel<buffer <"W" x "H"> x ![[LIT]]>, %[[ARG2:.*]]: !hkernel<buffer <"W" x "H"> x ![[LIT]]>) {
 //   CHECK-DAG:   %[[V0:.*]] = hkernel.materialize_expr ![[SYM6]]
@@ -60,14 +61,14 @@ module attributes {kernel.group_id = #typing.type_attr<!seq> : !typing.value, ke
 //       CHECK:     %[[V7:.*]] = hkernel.make_slice(%[[V4]]  ![[EXPR2]] :    :   ) -> !hkernel<slice ![[EXPR2]] : none : none>
 //       CHECK:     %[[V8:.*]] = hkernel.subview %[[ARG1]] : !hkernel<buffer <"W" x "H"> x ![[LIT]]>[%[[V6]], %[[V7]]] : !hkernel<slice ![[EXPR1]] : none : none>, !hkernel<slice ![[EXPR2]] : none : none> -> !hkernel<buffer <("W" - "$GROUP_ID0" * "$GROUP_SHAPE0") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1")> x ![[LIT]]>
 //       CHECK:     %[[V9:.*]] = hkernel.make_slice(%[[V3]]  ![[SYM4]] :    :   ) -> !hkernel<slice ![[SYM4]] : none : none>
-//       CHECK:     %[[V10:.*]] = hkernel.make_slice(%[[V2]]  ![[EXPR0]] :    :   ) -> !hkernel<slice ![[EXPR0]] : none : none>
-//       CHECK:     %[[V11:.*]] = hkernel.subview %[[V8]] : !hkernel<buffer <("W" - "$GROUP_ID0" * "$GROUP_SHAPE0") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1")> x ![[LIT]]>[%[[V9]], %[[V10]]] : !hkernel<slice ![[SYM4]] : none : none>, !hkernel<slice ![[EXPR0]] : none : none> -> !hkernel<buffer <(-("$GROUP_ID0" * "$GROUP_SHAPE0") - "$LOCAL_ID0" + "W") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1" - "$LOCAL_ID1" floordiv "$SUBGROUP_SIZE")> x ![[LIT]]>
-//       CHECK:     %[[V12:.*]] = hkernel.load %[[V11]] : !hkernel<buffer <(-("$GROUP_ID0" * "$GROUP_SHAPE0") - "$LOCAL_ID0" + "W") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1" - "$LOCAL_ID1" floordiv "$SUBGROUP_SIZE")> x ![[LIT]]>[%[[V1]], %[[V0]]] : !literal1, !sym6 -> !hkernel<tensor <1 x "$SUBGROUP_SIZE"> x ![[LIT]]>
+//       CHECK:     %[[V10:.*]] = hkernel.make_slice(%[[V2]]  ![[EXPR3]] :    :   ) -> !hkernel<slice ![[EXPR3]] : none : none>
+//       CHECK:     %[[V11:.*]] = hkernel.subview %[[V8]] : !hkernel<buffer <("W" - "$GROUP_ID0" * "$GROUP_SHAPE0") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1")> x ![[LIT]]>[%[[V9]], %[[V10]]] : !hkernel<slice ![[SYM4]] : none : none>, !hkernel<slice ![[EXPR3]] : none : none> -> !hkernel<buffer <(-("$GROUP_ID0" * "$GROUP_SHAPE0") - "$LOCAL_ID0" + "W") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1" - ("$LOCAL_ID1" floordiv "$SUBGROUP_SIZE") * "$SUBGROUP_SIZE")> x ![[LIT]]>
+//       CHECK:     %[[V12:.*]] = hkernel.load %[[V11]] : !hkernel<buffer <(-("$GROUP_ID0" * "$GROUP_SHAPE0") - "$LOCAL_ID0" + "W") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1" - ("$LOCAL_ID1" floordiv "$SUBGROUP_SIZE") * "$SUBGROUP_SIZE")> x ![[LIT]]>[%[[V1]], %[[V0]]] : ![[LIT1]], ![[SYM6]] -> !hkernel<tensor <1 x "$SUBGROUP_SIZE"> x ![[LIT]]>
 //       CHECK:     %[[V13:.*]] = hkernel.subview %[[ARG2]] : !hkernel<buffer <"W" x "H"> x ![[LIT]]>[%[[V6]], %[[V7]]] : !hkernel<slice ![[EXPR1]] : none : none>, !hkernel<slice ![[EXPR2]] : none : none> -> !hkernel<buffer <("W" - "$GROUP_ID0" * "$GROUP_SHAPE0") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1")> x ![[LIT]]>
 //       CHECK:     %[[V14:.*]] = hkernel.make_slice(%[[V3]]  ![[SYM4]] :    :   ) -> !hkernel<slice ![[SYM4]] : none : none>
-//       CHECK:     %[[V15:.*]] = hkernel.make_slice(%[[V2]]  ![[EXPR0]] :    :   ) -> !hkernel<slice ![[EXPR0]] : none : none>
-//       CHECK:     %[[V16:.*]] = hkernel.subview %[[V13]] : !hkernel<buffer <("W" - "$GROUP_ID0" * "$GROUP_SHAPE0") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1")> x ![[LIT]]>[%[[V14]], %[[V15]]] : !hkernel<slice ![[SYM4]] : none : none>, !hkernel<slice ![[EXPR0]] : none : none> -> !hkernel<buffer <(-("$GROUP_ID0" * "$GROUP_SHAPE0") - "$LOCAL_ID0" + "W") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1" - "$LOCAL_ID1" floordiv "$SUBGROUP_SIZE")> x ![[LIT]]>
-//       CHECK:     hkernel.store %[[V16]] : !hkernel<buffer <(-("$GROUP_ID0" * "$GROUP_SHAPE0") - "$LOCAL_ID0" + "W") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1" - "$LOCAL_ID1" floordiv "$SUBGROUP_SIZE")> x ![[LIT]]> = %[[V12]] : !hkernel<tensor <1 x "$SUBGROUP_SIZE"> x ![[LIT]]>
+//       CHECK:     %[[V15:.*]] = hkernel.make_slice(%[[V2]]  ![[EXPR3]] :    :   ) -> !hkernel<slice ![[EXPR3]] : none : none>
+//       CHECK:     %[[V16:.*]] = hkernel.subview %[[V13]] : !hkernel<buffer <("W" - "$GROUP_ID0" * "$GROUP_SHAPE0") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1")> x ![[LIT]]>[%[[V14]], %[[V15]]] : !hkernel<slice ![[SYM4]] : none : none>, !hkernel<slice ![[EXPR3]] : none : none> -> !hkernel<buffer <(-("$GROUP_ID0" * "$GROUP_SHAPE0") - "$LOCAL_ID0" + "W") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1" - ("$LOCAL_ID1" floordiv "$SUBGROUP_SIZE") * "$SUBGROUP_SIZE")> x ![[LIT]]>
+//       CHECK:     hkernel.store %[[V16]] : !hkernel<buffer <(-("$GROUP_ID0" * "$GROUP_SHAPE0") - "$LOCAL_ID0" + "W") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1" - ("$LOCAL_ID1" floordiv "$SUBGROUP_SIZE") * "$SUBGROUP_SIZE")> x ![[LIT]]> = %[[V12]] : !hkernel<tensor <1 x "$SUBGROUP_SIZE"> x ![[LIT]]>
 //       CHECK:   }
 //       CHECK:   return
 //       CHECK: }
