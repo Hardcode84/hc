@@ -36,6 +36,8 @@ public:
 };
 } // namespace hc::typing
 
+MLIR_DECLARE_EXPLICIT_TYPE_ID(hc::typing::SymbolicTypeBase);
+
 #include "hc/Dialect/Typing/IR/TypingOpsDialect.h.inc"
 #include "hc/Dialect/Typing/IR/TypingOpsEnums.h.inc"
 

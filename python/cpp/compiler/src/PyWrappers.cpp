@@ -38,7 +38,7 @@ template <typename T> static bool genAttrIsA(MlirAttribute attr) {
 }
 
 template <typename T> static MlirTypeID genGetTypeID() {
-  return wrap(T::getTypeID());
+  return wrap(::mlir::TypeID::get<T>());
 }
 
 using namespace mlir;
@@ -205,12 +205,25 @@ public:
   }
 };
 
+class PySymbolicType : public PyConcreteType<PySymbolicType> {
+public:
+  static constexpr IsAFunctionTy isaFunction =
+      genTypeIsA<hc::typing::SymbolicTypeBase>;
+  static constexpr GetTypeIDFunctionTy getTypeIdFunction =
+      genGetTypeID<hc::typing::SymbolicTypeBase>;
+  static constexpr const char *pyClassName = "SymbolicType";
+  using PyConcreteType::PyConcreteType;
+
+  static void bindDerived(ClassTy &c) { defExprOperators(c); }
+};
+
 template <typename Op>
-static PyType makeExpr(mlir::python::PyType lhs, mlir::python::PyType rhs) {
+static PySymbolicType makeExpr(mlir::python::PyType lhs,
+                               mlir::python::PyType rhs) {
   auto ulhs = mlir::cast<hc::typing::SymbolicTypeBase>(unwrap(lhs.get()));
   auto urhs = mlir::cast<hc::typing::SymbolicTypeBase>(unwrap(rhs.get()));
   auto res = Op()(ulhs, urhs);
-  return PyType(lhs.getContext(), wrap(res));
+  return PySymbolicType(lhs.getContext(), wrap(res));
 }
 
 struct FloorDiv {
@@ -225,12 +238,12 @@ struct CeilDiv {
 };
 
 template <typename ClassTy> static void defExprOperators(ClassTy &c) {
-  c.def("__add__", &makeExpr<std::plus<void>>, py::arg("rhs"), "mul op");
-  c.def("__sub__", &makeExpr<std::minus<void>>, py::arg("rhs"), "mul op");
+  c.def("__add__", &makeExpr<std::plus<void>>, py::arg("rhs"), "add op");
+  c.def("__sub__", &makeExpr<std::minus<void>>, py::arg("rhs"), "sub op");
   c.def("__mul__", &makeExpr<std::multiplies<void>>, py::arg("rhs"), "mul op");
-  c.def("__mod__", &makeExpr<std::modulus<void>>, py::arg("rhs"), "mul op");
-  c.def("__floordiv__", &makeExpr<FloorDiv>, py::arg("rhs"), "mul op");
-  c.def("__truediv__", &makeExpr<CeilDiv>, py::arg("rhs"), "mul op");
+  c.def("__mod__", &makeExpr<std::modulus<void>>, py::arg("rhs"), "mod op");
+  c.def("__floordiv__", &makeExpr<FloorDiv>, py::arg("rhs"), "floordiv op");
+  c.def("__truediv__", &makeExpr<CeilDiv>, py::arg("rhs"), "ceildiv op");
 }
 
 class PyTypeAttr : public PyConcreteAttribute<PyTypeAttr> {
@@ -263,6 +276,7 @@ static void populateTypingTypes(py::module_ &m) {
   PyLiteralType::bind(m);
   PySymbolType::bind(m);
   PyExprType::bind(m);
+  PySymbolicType::bind(m);
 
   PyTypeAttr::bind(m);
 }
