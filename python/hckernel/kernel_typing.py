@@ -42,27 +42,45 @@ def check_type(a: ValueType, b: ValueType):
 
 
 @func
+def check_is_ident(t: ValueType):
+    check(is_same(get_metatype_name(t), "typing.ident"))
+
+
+@func
+def check_is_symbolic(t: ValueType):
+    check(
+        is_same(get_metatype_name(t), "typing.expr")
+        or is_same(get_metatype_name(t), "typing.literal")
+        or is_same(get_metatype_name(t), "typing.symbol")
+    )
+
+
+@func
 def is_tuple(t: ValueType):
     return is_same(get_type_name(t), "Tuple")
 
 
 @func
 def check_is_tuple(t: ValueType):
+    check_is_ident(t)
     check(is_tuple(t))
 
 
 @func
 def check_is_buffer(t: ValueType):
+    check_is_ident(t)
     check(is_same(get_type_name(t), "Buffer"))
 
 
 @func
 def check_is_tensor(t: ValueType):
+    check_is_ident(t)
     check(is_same(get_type_name(t), "Tensor"))
 
 
 @func
 def check_is_shaped(t: ValueType):
+    check_is_ident(t)
     check(is_same(get_type_name(t), "Buffer") or is_same(get_type_name(t), "Tensor"))
 
 
@@ -282,8 +300,19 @@ def resolver(target: ValueType):
 
 @type_resolver(_registry, ["py_ir.binop"])
 def resolver(lhs: ValueType, rhs: ValueType):
-    # TODO: broadcasting
+    check_is_symbolic(lhs)
+    check_is_symbolic(rhs)
+    op = get_attr("op")
+    if is_same(op, 2):
+        return lhs * rhs
+    check(False)
+    return lhs
+
+
+@type_resolver(_registry, ["py_ir.binop"])
+def resolver(lhs: ValueType, rhs: ValueType):
     check_is_tensor(lhs)
+    # TODO: broadcasting
     check(is_same(lhs, rhs))
     return lhs
 
