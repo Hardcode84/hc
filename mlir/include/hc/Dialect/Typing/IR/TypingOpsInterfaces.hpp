@@ -22,6 +22,7 @@ struct InterpreterState {
   void init(mlir::Operation *rootOp, mlir::Block &block, mlir::TypeRange types,
             llvm::SmallVectorImpl<mlir::Type> &res) {
     state.clear();
+    callstack.clear();
     result = &res;
     args = types;
     iter = block.begin();

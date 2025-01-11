@@ -25,8 +25,14 @@ hc::typing::Interpreter::run(mlir::Operation *rootOp, TypeResolverOp resolver,
   while (true) {
     mlir::Operation &op = state.getNextOp();
     auto res = handleOp(state, op);
-    if (mlir::failed(res))
+    if (mlir::failed(res)) {
+      op.getParentOp()->emitError();
+      for (auto &&[i, call] : llvm::enumerate(llvm::reverse(state.callstack))) {
+        call->emitError("call ") << i;
+        call->getParentOp()->emitError();
+      }
       return resolver->emitError("Type resolver failed");
+    }
 
     switch (*res) {
     case InterpreterResult::MatchFail:
