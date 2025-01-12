@@ -18,6 +18,8 @@ namespace mlir {
 class RewriterBase;
 }
 
+#include "hc/Dialect/Typing/IR/TypingOpsInterfaces.hpp"
+
 #include "hc/Dialect/HKernel/IR/HKernelOpsTypeInterfaces.h.inc"
 
 #include "hc/Dialect/HKernel/IR/HKernelOpsDialect.h.inc"

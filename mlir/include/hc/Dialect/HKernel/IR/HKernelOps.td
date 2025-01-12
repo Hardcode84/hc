@@ -12,6 +12,7 @@ include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/IR/OpBase.td"
 
 include "hc/Dialect/HKernel/IR/HKernelOpsTypeInterfaces.td"
+include "hc/Dialect/Typing/IR/TypingOpsInterfaces.td"
 
 def HKernel_Dialect : Dialect {
   let name = "hkernel";
@@ -162,7 +163,8 @@ def HKernel_MakeSliceOp : HKernel_OpBase<"make_slice", [
 }
 
 def HKernel_MaterializeExprOp : HKernel_OpBase<"materialize_expr", [
-  Pure, ConstantLike
+  Pure, ConstantLike,
+  DeclareOpInterfaceMethods<TypeInferenceInterface>
 ]> {
   let results = (outs AnyType:$result);
 
