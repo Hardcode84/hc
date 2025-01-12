@@ -192,6 +192,11 @@ static void handleArgType(mlir::OpBuilder &builder, mlir::Location loc,
                           SymbolsMapType &symbolsMap) {
   if (auto buffer = mlir::dyn_cast<hc::hk::BufferType>(type))
     return handleBufferType(builder, loc, arg, buffer, symbolsMap);
+
+  if (auto sym = mlir::dyn_cast<hc::typing::SymbolicTypeBase>(type)) {
+    symbolsMap[sym] = arg;
+    return;
+  }
 }
 
 static mlir::Value resolveSymbol(mlir::OpBuilder &builder, mlir::Location loc,
@@ -216,12 +221,16 @@ static mlir::Value resolveSymbol(mlir::OpBuilder &builder, mlir::Location loc,
       return ret;
     }
 
+    mlir::Type indexType = builder.getIndexType();
     if (auto expr = mlir::dyn_cast<hc::typing::ExprType>(folded)) {
       llvm::SmallVector<mlir::OpFoldResult> args;
       for (auto param : expr.getParams()) {
-        auto res = resolveSymbol(builder, loc, param, symbolsMap);
+        mlir::Value res = resolveSymbol(builder, loc, param, symbolsMap);
         if (!res)
           return nullptr;
+
+        if (res.getType() != indexType)
+          res = builder.create<mlir::arith::IndexCastOp>(loc, indexType, res);
 
         args.emplace_back(res);
       }
