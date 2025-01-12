@@ -85,7 +85,7 @@ def Typing_IdentType : Typing_Type<"Ident", "ident", [], "::mlir::Type"> {
     }]>
   ];
 
-  let assemblyFormat = "$name (`:` $paramNames^)? (`->` $params^)?";
+  let assemblyFormat = "$name (`elems` $paramNames^)? (`->` $params^)?";
 
   let extraClassDeclaration = [{
     ::mlir::Type getParam(::mlir::StringAttr name) const;
