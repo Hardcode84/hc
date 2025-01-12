@@ -578,6 +578,17 @@ struct ConvertScalarBinop final
          &createBinOp<mlir::arith::MulFOp>},
     };
 
+    auto convertArg = [&](mlir::Value val) -> mlir::Value {
+      if (auto symbolic =
+              mlir::dyn_cast<hc::typing::SymbolicTypeBase>(val.getType()))
+        val = rewriter.create<hc::hk::MaterializeExprOp>(loc, symbolic);
+
+      if (val.getType() != resType)
+        val = rewriter.create<hc::typing::CastOp>(loc, resType, val);
+
+      return val;
+    };
+
     auto pred = op.getOp();
     for (auto &&[val, intHandler, floatHandler] : handlers) {
       if (val == pred) {
@@ -585,11 +596,8 @@ struct ConvertScalarBinop final
         if (!handler)
           break;
 
-        if (lhs.getType() != resType)
-          lhs = rewriter.create<hc::typing::CastOp>(loc, resType, lhs);
-
-        if (rhs.getType() != resType)
-          rhs = rewriter.create<hc::typing::CastOp>(loc, resType, rhs);
+        lhs = convertArg(lhs);
+        rhs = convertArg(rhs);
 
         mlir::Value res = handler(rewriter, loc, lhs, rhs);
         if (res.getType() != origResType)
