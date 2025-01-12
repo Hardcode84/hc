@@ -365,7 +365,7 @@ typing.type_resolver ["py_ir.getitem"] {
 //       CHECK: ![[SYM1:.*]] = !typing<symbol "Bar">
 //       CHECK: ![[SYM2:.*]] = !typing<symbol "Baz">
 //       CHECK: ![[SEQ:.*]] = !typing<sequence ![[SYM1]], ![[SYM2]]>
-//       CHECK: ![[ID:.*]] = !typing<ident "Foo" : "Elements" -> ![[SEQ]]>
+//       CHECK: ![[ID:.*]] = !typing<ident "Foo" elems "Elements" -> ![[SEQ]]>
 // CHECK-LABEL: py_ir.module {
 //       CHECK:  py_ir.func "func"
 //       CHECK:  ^bb0(%[[ARG:.*]]: ![[ID]]):
