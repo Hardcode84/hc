@@ -144,6 +144,15 @@ mlir::OpFoldResult hc::hk::MaterializeExprOp::fold(FoldAdaptor adaptor) {
   return hc::typing::TypeAttr::get(getType());
 }
 
+mlir::FailureOr<bool> hc::hk::MaterializeExprOp::inferTypes(
+    mlir::TypeRange types, llvm::SmallVectorImpl<mlir::Type> &results) {
+  if (!types.empty())
+    return emitError("Invalid arg count");
+
+  results.emplace_back(getType());
+  return true;
+}
+
 mlir::OpFoldResult hc::hk::TupleExtractOp::fold(FoldAdaptor adaptor) {
   if (auto idx = mlir::getConstantIntValue(adaptor.getIndex())) {
     auto src = getSource();
