@@ -10,11 +10,13 @@ from types import FunctionType
 from typing import Callable
 from collections import namedtuple, OrderedDict
 
-from .kernel_api import *
 from .compiler import mlir_context, Dispatcher
-from .symbol_registry import get_module_for_symbol
+from .convert_expr import convert_sympy_expr
+from .indexing import IndexExpr
+from .kernel_api import *
 from .mlir import ir
 from .mlir import typing as hc_typing
+from .symbol_registry import get_module_for_symbol
 
 FuncDesc = namedtuple(
     "FuncDesc",
@@ -109,7 +111,9 @@ def _get_desc(func, dispatcher_cls, prelink_module, global_attrs, caller_vars=No
             if mod:
                 imported_symbols[name] = mod
 
-            if _is_literal(obj):
+            if isinstance(obj, IndexExpr):
+                literals[name] = convert_sympy_expr(obj)
+            elif _is_literal(obj):
                 literals[name] = obj
 
             if isinstance(obj, dispatcher_cls):

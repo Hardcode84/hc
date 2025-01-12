@@ -80,7 +80,8 @@ getExecutionEngineOpts(Settings &ctxSettings, const py::dict &settings) {
 Context::Context(nanobind::dict settings_)
     : context(createRegistry()),
       executionEngine(getExecutionEngineOpts(settings, settings_)) {
-  context.loadDialect<hc::py_ir::PyIRDialect, hc::typing::TypingDialect>();
+  context.loadDialect<hc::py_ir::PyIRDialect, hc::typing::TypingDialect,
+                      hc::hk::HKernelDialect>();
 
   pushContext(&context);
 }

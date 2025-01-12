@@ -18,8 +18,10 @@
 #include <mlir/Support/LogicalResult.h>
 #include <mlir/Tools/mlir-opt/MlirOptMain.h>
 
+#include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
 #include "hc/Dialect/PyAST/IR/PyASTOps.hpp"
 #include "hc/Dialect/PyIR/IR/PyIROps.hpp"
+#include "hc/Dialect/Typing/IR/TypingOps.hpp"
 #include "hc/PyFront/Import.hpp"
 
 #include "CompilerFront.hpp"
@@ -56,6 +58,16 @@ template <typename T> static std::string toStr(T &&val) {
 static void createLiteral(mlir::OpBuilder &builder, const Literal &lit) {
   auto attr = mlir::cast<mlir::TypedAttr>(lit.attr);
   auto loc = builder.getUnknownLoc();
+
+  // TODO: refac
+  if (auto typeAttr = mlir::dyn_cast<hc::typing::TypeAttr>(attr)) {
+    if (auto sym = mlir::dyn_cast<hc::typing::SymbolicTypeBase>(
+            typeAttr.getTypeVal())) {
+      mlir::Value val = builder.create<hc::hk::MaterializeExprOp>(loc, sym);
+      builder.create<hc::py_ir::StoreVarOp>(loc, lit.name, val);
+      return;
+    }
+  }
   auto op =
       attr.getDialect().materializeConstant(builder, attr, attr.getType(), loc);
 
