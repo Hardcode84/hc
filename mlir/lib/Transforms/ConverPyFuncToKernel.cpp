@@ -527,6 +527,83 @@ private:
   mlir::StringAttr srcName;
 };
 
+static bool isIntegral(mlir::Type type) {
+  return mlir::isa<mlir::IntegerType, mlir::IndexType,
+                   hc::typing::SymbolicTypeBase>(type);
+}
+
+static bool isFloat(mlir::Type type) {
+  return mlir::isa<mlir::FloatType>(type);
+}
+
+template <typename Op>
+static mlir::Value createBinOp(mlir::OpBuilder &builder, mlir::Location loc,
+                               mlir::Value lhs, mlir::Value rhs) {
+  return builder.create<Op>(loc, lhs, rhs);
+}
+
+struct ConvertScalarBinop final
+    : public mlir::OpConversionPattern<hc::py_ir::BinOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::py_ir::BinOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    const mlir::TypeConverter *converter = getTypeConverter();
+    mlir::Type resType = converter->convertType(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    mlir::Type origResType = resType;
+    bool isInt; // else is float
+    if (isIntegral(resType)) {
+      isInt = true;
+      resType = mlir::isa<hc::typing::SymbolicTypeBase>(resType)
+                    ? rewriter.getIndexType()
+                    : resType;
+    } else if (isFloat(resType)) {
+      isInt = false;
+    } else {
+      return rewriter.notifyMatchFailure(op, "Unsupported result type");
+    }
+
+    mlir::Value lhs = adaptor.getLeft();
+    mlir::Value rhs = adaptor.getRight();
+    mlir::Location loc = op.getLoc();
+
+    using Handler = mlir::Value (*)(mlir::OpBuilder &, mlir::Location,
+                                    mlir::Value, mlir::Value);
+    std::tuple<hc::py_ir::BinOpVal, Handler, Handler> handlers[] = {
+        {hc::py_ir::BinOpVal::mul, &createBinOp<mlir::arith::MulIOp>,
+         &createBinOp<mlir::arith::MulFOp>},
+    };
+
+    auto pred = op.getOp();
+    for (auto &&[val, intHandler, floatHandler] : handlers) {
+      if (val == pred) {
+        auto handler = (isInt ? intHandler : floatHandler);
+        if (!handler)
+          break;
+
+        if (lhs.getType() != resType)
+          lhs = rewriter.create<hc::typing::CastOp>(loc, resType, lhs);
+
+        if (rhs.getType() != resType)
+          rhs = rewriter.create<hc::typing::CastOp>(loc, resType, rhs);
+
+        mlir::Value res = handler(rewriter, loc, lhs, rhs);
+        if (res.getType() != origResType)
+          res = rewriter.create<hc::typing::CastOp>(loc, origResType, res);
+
+        rewriter.replaceOp(op, res);
+        return mlir::success();
+      }
+    }
+
+    return rewriter.notifyMatchFailure(op, "N handler");
+  }
+};
+
 struct ConverPyIRToKernelPass final
     : public hc::impl::ConverPyIRToKernelPassBase<ConverPyIRToKernelPass> {
 
@@ -554,11 +631,15 @@ struct ConverPyIRToKernelPass final
 
     hc::populateFuncPatternsAndTypeConversion(patterns, target, converter);
 
-    target.addIllegalOp<hc::py_ir::TuplePackOp, hc::py_ir::TuplePackOp>();
-    target.addLegalDialect<mlir::arith::ArithDialect, hc::hk::HKernelDialect>();
+    target.addIllegalOp<hc::py_ir::TuplePackOp, hc::py_ir::TuplePackOp,
+                        hc::py_ir::BinOp>();
+    target.addLegalDialect<mlir::arith::ArithDialect, hc::typing::TypingDialect,
+                           hc::hk::HKernelDialect>();
 
-    patterns.insert<ConvertTuplePack, ConvertTupleUnpack, ConvertSlice,
-                    ConvertGetItem, ConvertLoad, ConvertStore>(converter, ctx);
+    patterns
+        .insert<ConvertTuplePack, ConvertTupleUnpack, ConvertSlice,
+                ConvertGetItem, ConvertLoad, ConvertStore, ConvertScalarBinop>(
+            converter, ctx);
 
     using ConvertCurrentGroup = ConvertGroupExpr<hc::hk::CurrentGroupType>;
     patterns.insert<ConvertCurrentGroup>("work_offset", converter, ctx);
