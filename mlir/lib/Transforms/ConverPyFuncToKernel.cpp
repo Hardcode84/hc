@@ -612,6 +612,39 @@ struct ConvertScalarBinop final
   }
 };
 
+struct ConvertTupleGetitem final
+    : public mlir::OpConversionPattern<hc::py_ir::GetItemOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::py_ir::GetItemOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::Value src = adaptor.getTarget();
+    auto srcType = mlir::dyn_cast<mlir::TupleType>(src.getType());
+    if (!srcType)
+      return rewriter.notifyMatchFailure(op, "Not a tuple type");
+
+    const mlir::TypeConverter *converter = getTypeConverter();
+    mlir::Type resType = converter->convertType(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+    mlir::Location loc = op.getLoc();
+    mlir::Value index = adaptor.getIndex();
+    if (auto symbolic =
+            mlir::dyn_cast<hc::typing::SymbolicTypeBase>(index.getType()))
+      index = rewriter.create<hc::hk::MaterializeExprOp>(loc, symbolic);
+
+    mlir::Type indexType = rewriter.getIndexType();
+    if (index.getType() != indexType)
+      index = rewriter.create<hc::typing::CastOp>(loc, indexType, index);
+
+    rewriter.replaceOpWithNewOp<hc::hk::TupleExtractOp>(op, resType, src,
+                                                        index);
+    return mlir::success();
+  }
+};
+
 struct ConverPyIRToKernelPass final
     : public hc::impl::ConverPyIRToKernelPassBase<ConverPyIRToKernelPass> {
 
@@ -644,10 +677,9 @@ struct ConverPyIRToKernelPass final
     target.addLegalDialect<mlir::arith::ArithDialect, hc::typing::TypingDialect,
                            hc::hk::HKernelDialect>();
 
-    patterns
-        .insert<ConvertTuplePack, ConvertTupleUnpack, ConvertSlice,
-                ConvertGetItem, ConvertLoad, ConvertStore, ConvertScalarBinop>(
-            converter, ctx);
+    patterns.insert<ConvertTuplePack, ConvertTupleUnpack, ConvertSlice,
+                    ConvertGetItem, ConvertLoad, ConvertStore,
+                    ConvertScalarBinop, ConvertTupleGetitem>(converter, ctx);
 
     using ConvertCurrentGroup = ConvertGroupExpr<hc::hk::CurrentGroupType>;
     patterns.insert<ConvertCurrentGroup>("work_offset", converter, ctx);
