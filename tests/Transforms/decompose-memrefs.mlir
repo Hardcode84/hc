@@ -223,3 +223,35 @@ func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index, %arg3: vecto
   vector.maskedstore %arg0[%arg1, %arg2], %mask, %arg3 : memref<5x7xf32>, vector<2xi1>, vector<2xf32>
   return
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//       CHECK:   gpu.launch
+//       CHECK:   %[[PTR:.*]] = hkernel.ptr_dynamic_shared_mem : !hkernel.ptr<i8, #gpu.address_space<workgroup>>
+//       CHECK:   hkernel.ptr_store %{{.*}} : i8 %[[PTR]] : !hkernel.ptr<i8, #gpu.address_space<workgroup>>[%{{.*}} : index]
+func.func @test(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %shmem: i32) {
+  gpu.launch blocks(%arg6, %arg7, %arg8) in (%arg9 = %arg0, %arg10 = %arg1, %arg11 = %arg2) threads(%arg12, %13, %arg14) in (%arg15 = %arg3, %arg16 = %arg4, %arg17 = %arg5) dynamic_shared_memory_size %shmem {
+    %0 = gpu.dynamic_shared_memory : memref<?xi8, #gpu.address_space<workgroup>>
+    %v = arith.constant 0 : i8
+    %c0 = arith.constant 0 : index
+    memref.store %v, %0[%c0] : memref<?xi8, #gpu.address_space<workgroup>>
+    gpu.terminator
+  }
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:  (%[[ARG0:.*]]: tuple<!hkernel.ptr<i8, #gpu.address_space<workgroup>>, index>, %[[ARG1:.*]]: index, %[[ARG2:.*]]: index, %[[ARG3:.*]]: index, %[[ARG4:.*]]: index)
+//   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
+//       CHECK:  %[[PTR:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<i8, #gpu.address_space<workgroup>>, index>[%[[C0]]] -> !hkernel.ptr<i8, #gpu.address_space<workgroup>>
+//       CHECK:  %[[PTR1:.*]] = hkernel.ptr_add %[[PTR]] : !hkernel.ptr<i8, #gpu.address_space<workgroup>>, %[[ARG1]] : index
+//       CHECK:  %[[CAST:.*]] = hkernel.cast %[[PTR1]] : !hkernel.ptr<i8, #gpu.address_space<workgroup>> to !hkernel.ptr<i32, #gpu.address_space<workgroup>>
+//       CHECK:  %[[RES:.*]] = hkernel.make_tuple %[[CAST]], %[[ARG2]], %[[ARG3]], %[[ARG4]] : !hkernel.ptr<i32, #gpu.address_space<workgroup>>, index, index, index -> tuple<!hkernel.ptr<i32, #gpu.address_space<workgroup>>, index, index, index>
+//       CHECK:  return %[[RES]] : tuple<!hkernel.ptr<i32, #gpu.address_space<workgroup>>, index, index, index>
+func.func @test(%arg0: memref<?xi8, #gpu.address_space<workgroup>>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) -> memref<?x?x1x1x?xi32, #gpu.address_space<workgroup>> {
+  %view = memref.view %arg0[%arg1][%arg2, %arg3, %arg4] : memref<?xi8, #gpu.address_space<workgroup>> to memref<?x?x1x1x?xi32, #gpu.address_space<workgroup>>
+  return %view : memref<?x?x1x1x?xi32, #gpu.address_space<workgroup>>
+}

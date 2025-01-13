@@ -10,8 +10,35 @@
 #include <mlir/Conversion/ConvertToLLVM/ToLLVMInterface.h>
 #include <mlir/Conversion/LLVMCommon/MemRefBuilder.h>
 #include <mlir/Conversion/LLVMCommon/TypeConverter.h>
+#include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Transforms/DialectConversion.h>
+
+#include <llvm/ADT/StringSet.h>
+
+static mlir::FailureOr<unsigned>
+getPtrAddressSpace(const mlir::TypeConverter &converter, mlir::Attribute attr) {
+  if (!attr)
+    return 0;
+
+  // Fake memref type.
+  auto type =
+      mlir::MemRefType::get(1, mlir::IntegerType::get(attr.getContext(), 32),
+                            mlir::MemRefLayoutAttrInterface{}, attr);
+  std::optional<mlir::Attribute> converted =
+      converter.convertTypeAttribute(type, attr);
+  if (!converted)
+    return mlir::failure();
+  if (!(*converted)) // Conversion to default is 0.
+    return 0;
+  if (auto explicitSpace =
+          mlir::dyn_cast_if_present<mlir::IntegerAttr>(*converted)) {
+    if (explicitSpace.getType().isIndex() ||
+        explicitSpace.getType().isSignlessInteger())
+      return explicitSpace.getInt();
+  }
+  return mlir::failure();
+}
 
 namespace {
 struct ConvertGetPyArgOp final
@@ -313,31 +340,103 @@ struct ConvertPtrStore final
     return llvm::success();
   }
 };
-} // namespace
 
-static mlir::FailureOr<unsigned>
-getPtrAddressSpace(mlir::LLVMTypeConverter &converter, mlir::Attribute attr) {
-  if (!attr)
-    return 0;
+static mlir::LLVM::GlobalOp getDynamicSharedMemorySymbol(
+    mlir::OpBuilder &rewriter, mlir::gpu::GPUModuleOp moduleOp,
+    hc::hk::PtrDynamicSharedMemOp op, const mlir::TypeConverter *typeConverter,
+    unsigned alignmentBit) {
+  uint64_t alignmentByte = alignmentBit / 8;
 
-  // Fake memref type.
-  auto type =
-      mlir::MemRefType::get(1, mlir::IntegerType::get(attr.getContext(), 32),
-                            mlir::MemRefLayoutAttrInterface{}, attr);
-  std::optional<mlir::Attribute> converted =
-      converter.convertTypeAttribute(type, attr);
-  if (!converted)
-    return mlir::failure();
-  if (!(*converted)) // Conversion to default is 0.
-    return 0;
-  if (auto explicitSpace =
-          mlir::dyn_cast_if_present<mlir::IntegerAttr>(*converted)) {
-    if (explicitSpace.getType().isIndex() ||
-        explicitSpace.getType().isSignlessInteger())
-      return explicitSpace.getInt();
+  auto ptrType = mlir::cast<hc::hk::PtrType>(op.getType());
+  mlir::FailureOr<unsigned> addressSpace =
+      getPtrAddressSpace(*typeConverter, ptrType.getMemorySpace());
+  if (failed(addressSpace))
+    return nullptr;
+
+  llvm::StringSet<> existingGlobalNames;
+  for (auto globalOp : moduleOp.getBody()->getOps<mlir::LLVM::GlobalOp>()) {
+    existingGlobalNames.insert(globalOp.getSymName());
+    if (auto arrayType =
+            mlir::dyn_cast<mlir::LLVM::LLVMArrayType>(globalOp.getType())) {
+      if (globalOp.getAddrSpace() == addressSpace.value() &&
+          arrayType.getNumElements() == 0 &&
+          globalOp.getAlignment().value_or(0) == alignmentByte) {
+        return globalOp;
+      }
+    }
   }
-  return mlir::failure();
+
+  unsigned uniquingCounter = 0;
+  llvm::SmallString<128> symName = mlir::SymbolTable::generateSymbolName<128>(
+      "__dynamic_shmem_",
+      [&](mlir::StringRef candidate) {
+        return existingGlobalNames.contains(candidate);
+      },
+      uniquingCounter);
+
+  mlir::OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPointToStart(moduleOp.getBody());
+
+  auto zeroSizedArrayType = mlir::LLVM::LLVMArrayType::get(
+      typeConverter->convertType(ptrType.getElementType()), 0);
+
+  return rewriter.create<mlir::LLVM::GlobalOp>(
+      op->getLoc(), zeroSizedArrayType, /*isConstant=*/false,
+      mlir::LLVM::Linkage::Internal, symName, /*value=*/mlir::Attribute(),
+      alignmentByte, addressSpace.value());
 }
+
+struct ConvertDynamicSHmem final
+    : public mlir::OpConversionPattern<hc::hk::PtrDynamicSharedMemOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::PtrDynamicSharedMemOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto moduleOp = op->getParentOfType<mlir::gpu::GPUModuleOp>();
+    if (!moduleOp)
+      return rewriter.notifyMatchFailure(op, "No parent module");
+
+    mlir::LLVM::GlobalOp shmemOp = getDynamicSharedMemorySymbol(
+        rewriter, moduleOp, op, getTypeConverter(), 0);
+    if (!shmemOp)
+      return rewriter.notifyMatchFailure(op, "Failed to create shmem global");
+
+    mlir::Location loc = op.getLoc();
+    auto basePtr = rewriter.create<mlir::LLVM::AddressOfOp>(loc, shmemOp);
+    mlir::Type baseType = basePtr->getResultTypes().front();
+
+    auto elementType =
+        mlir::cast<hc::hk::PtrType>(op.getType()).getElementType();
+    mlir::LLVM::GEPArg gepArgs[] = {0};
+    mlir::Value shmemPtr = rewriter.create<mlir::LLVM::GEPOp>(
+        loc, baseType, elementType, basePtr, gepArgs);
+    rewriter.replaceOp(op, shmemPtr);
+    return mlir::success();
+  }
+};
+
+struct ConvertPtrCast final
+    : public mlir::OpConversionPattern<hc::hk::PtrCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::hk::PtrCastOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto resType = getTypeConverter()->convertType(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Failed to convert result type");
+
+    mlir::Value src = adaptor.getValue();
+    if (resType == src.getType()) {
+      rewriter.replaceOp(op, src);
+      return mlir::success();
+    }
+
+    return mlir::failure();
+  }
+};
+} // namespace
 
 void hc::populatePtrToLLVMTypeConverter(mlir::LLVMTypeConverter &converter) {
   converter.addConversion(
@@ -376,8 +475,9 @@ void hc::populatePtrToLLVMTypeConverter(mlir::LLVMTypeConverter &converter) {
 void hc::populatePtrToLLVMConversionPatterns(
     mlir::LLVMTypeConverter &converter, mlir::RewritePatternSet &patterns) {
   patterns.insert<ConvertGetPyArgOp, ConvertDescriptorCast, ConvertPtrAdd,
-                  ConvertPtrAlloca, ConvertPtrLoad, ConvertPtrStore>(
-      converter, patterns.getContext());
+                  ConvertPtrAlloca, ConvertPtrLoad, ConvertPtrStore,
+                  ConvertDynamicSHmem, ConvertPtrCast>(converter,
+                                                       patterns.getContext());
 }
 
 namespace {

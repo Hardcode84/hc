@@ -245,6 +245,13 @@ def LegalizeLLVMABIPass : Pass<"hc-legalize-llvm-abi-pass", "::mlir::ModuleOp"> 
 
 def ExpandSharedAllocsPass : Pass<"hc-expand-shared-allocs-pass">;
 
+def LegalizeDynamicSharedMemPass : Pass<"hc-legalize-dynamic-shared-mem-pass"> {
+  let dependentDialects = [
+  "::mlir::arith::ArithDialect",
+    "::mlir::gpu::GPUDialect",
+  ];
+}
+
 def SelectPass : Pass<"hc-select-pass"> {
   let options = [
     Option<"name", "name", "std::string", /*default=*/"\"SelectPass\"",

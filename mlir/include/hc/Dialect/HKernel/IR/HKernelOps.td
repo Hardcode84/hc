@@ -5,6 +5,7 @@
 #ifndef HKERNEL_OPS
 #define HKERNEL_OPS
 
+include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferIntRangeInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -410,6 +411,26 @@ def HKernel_PtrAllocaOp : HKernel_OpBase<"ptr_alloca"> {
 
   let assemblyFormat = "attr-dict $size `:` type($size) `,` qualified(type($result))";
 }
+
+def HKernel_PtrDynamicSharedMemOp : HKernel_OpBase<"ptr_dynamic_shared_mem"> {
+  let results = (outs Res<HKernel_PtrType, "",
+                      [MemAlloc<AutomaticAllocationScopeResource, 0, FullEffect>]>:$result);
+
+  let assemblyFormat = "attr-dict `:` qualified(type($result))";
+}
+
+def HKernel_PtrCastOp : HKernel_OpBase<"cast", [
+  Pure,
+  DeclareOpInterfaceMethods<CastOpInterface>
+]> {
+  let arguments = (ins AnyType:$value);
+  let results = (outs AnyType:$result);
+
+  let hasFolder = 1;
+
+  let assemblyFormat = "attr-dict $value `:` type($value) `to` type($result)";
+}
+
 
 def HKernel_PtrAddOp : HKernel_OpBase<"ptr_add", [
   Pure, AllTypesMatch<["base", "result"]>, ViewLikeOpInterface,

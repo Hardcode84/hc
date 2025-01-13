@@ -297,6 +297,10 @@ struct ConvertGpuLaunch final
       sharedMemSize = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmIndexType, rewriter.getI64IntegerAttr(0));
 
+    if (sharedMemSize.getType() != llvmIndexType)
+      sharedMemSize = rewriter.create<mlir::LLVM::ZExtOp>(loc, llvmIndexType,
+                                                          sharedMemSize);
+
     mlir::Value params[] = {
         kernel,       gridSizesPtr, blockSizesPtr, ndimsVal,
         argsArrayPtr, nargs,        sharedMemSize,
