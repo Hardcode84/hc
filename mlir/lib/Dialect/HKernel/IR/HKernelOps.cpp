@@ -551,6 +551,30 @@ void hc::hk::ResolveSliceOp::build(::mlir::OpBuilder &odsBuilder,
         upper, step);
 }
 
+bool hc::hk::PtrCastOp::areCastCompatible(mlir::TypeRange inputs,
+                                          mlir::TypeRange outputs) {
+  (void)inputs;
+  (void)outputs;
+  assert(inputs.size() == 1 && "expected one input");
+  assert(outputs.size() == 1 && "expected one output");
+  return true;
+}
+
+mlir::OpFoldResult hc::hk::PtrCastOp::fold(FoldAdaptor /*adaptor*/) {
+  mlir::Value arg = getValue();
+  mlir::Type dstType = getType();
+  if (arg.getType() == dstType)
+    return arg;
+
+  while (auto parent = arg.getDefiningOp<PtrCastOp>()) {
+    arg = parent.getValue();
+    if (arg.getType() == dstType)
+      return arg;
+  }
+
+  return nullptr;
+}
+
 // TODO: Upstream changes in affine parser
 namespace {
 using namespace mlir;
