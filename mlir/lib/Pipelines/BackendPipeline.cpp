@@ -31,6 +31,7 @@ void hc::populateBackendPipeline(mlir::PassManager &pm) {
   pm.addPass(hc::createCreatePyWrapperPass());
   pm.addPass(hc::createDecomposeMemrefsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLowerAffinePass());
+  pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertSCFToCFPass());
   populateOptPasses(pm);
 
   pm.addPass(mlir::createGpuLauchSinkIndexComputationsPass());
