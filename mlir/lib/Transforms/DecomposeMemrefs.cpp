@@ -12,6 +12,7 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Arith/Utils/Utils.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/Utils/IndexingUtils.h>
 #include <mlir/Dialect/Vector/IR/VectorOps.h>
@@ -548,6 +549,48 @@ struct ConvertDescCast final
   }
 };
 
+struct ConvertDynamicShmem final
+    : mlir::OpConversionPattern<mlir::gpu::DynamicSharedMemoryOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::gpu::DynamicSharedMemoryOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto dstType =
+        getTypeConverter()->convertType<mlir::TupleType>(op.getType());
+    if (!dstType)
+      return rewriter.notifyMatchFailure(op, "Failed to convert dest type");
+
+    mlir::Value shmemSize;
+    if (dstType.size() == 1) {
+      // Nothing
+    } else if (dstType.size() == 2) {
+      auto parent = op->getParentOfType<mlir::gpu::LaunchOp>();
+      if (!parent || !parent.getDynamicSharedMemorySize())
+        return rewriter.notifyMatchFailure(op, "cannot get shared mem size");
+
+      shmemSize = parent.getDynamicSharedMemorySize();
+    } else {
+      return rewriter.notifyMatchFailure(op, "Invalid dst type");
+    }
+
+    mlir::Location loc = op.getLoc();
+    mlir::Value ptr =
+        rewriter.create<hc::hk::PtrDynamicSharedMemOp>(loc, dstType.getType(0));
+    llvm::SmallVector<mlir::Value, 2> args = {ptr};
+    if (dstType.size() == 2) {
+      mlir::Type sizeType = dstType.getType(1);
+      if (shmemSize.getType() != sizeType)
+        shmemSize =
+            rewriter.create<mlir::arith::IndexCastOp>(loc, sizeType, shmemSize);
+
+      args.emplace_back(shmemSize);
+    }
+    rewriter.replaceOpWithNewOp<hc::hk::MakeTupleOp>(op, dstType, args);
+    return mlir::success();
+  }
+};
+
 struct DecomposeMemrefsPass final
     : public hc::impl::DecomposeMemrefsPassBase<DecomposeMemrefsPass> {
 
@@ -577,11 +620,10 @@ struct DecomposeMemrefsPass final
 
     hc::populateFuncPatternsAndTypeConversion(patterns, target, converter);
 
-    patterns
-        .insert<ConvertDim, ConvertAlloca, ConvertSubview, ConvertLoad,
-                ConvertStore, ConvertVecLoad, ConvertVecStore,
-                ConvertMaskedVecLoad, ConvertMaskedVecStore, ConvertDescCast>(
-            converter, ctx);
+    patterns.insert<ConvertDim, ConvertAlloca, ConvertSubview, ConvertLoad,
+                    ConvertStore, ConvertVecLoad, ConvertVecStore,
+                    ConvertMaskedVecLoad, ConvertMaskedVecStore,
+                    ConvertDescCast, ConvertDynamicShmem>(converter, ctx);
 
     target.markUnknownOpDynamicallyLegal(
         [&](mlir::Operation *op) -> bool { return converter.isLegal(op); });

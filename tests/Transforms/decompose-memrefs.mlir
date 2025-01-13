@@ -223,3 +223,20 @@ func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index, %arg3: vecto
   vector.maskedstore %arg0[%arg1, %arg2], %mask, %arg3 : memref<5x7xf32>, vector<2xi1>, vector<2xf32>
   return
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//       CHECK:   gpu.launch
+//       CHECK:   %[[PTR:.*]] = hkernel.ptr_dynamic_shared_mem : !hkernel.ptr<i8, #gpu.address_space<workgroup>>
+//       CHECK:   hkernel.ptr_store %{{.*}} : i8 %[[PTR]] : !hkernel.ptr<i8, #gpu.address_space<workgroup>>[%{{.*}} : index]
+func.func @test(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %shmem: i32) {
+  gpu.launch blocks(%arg6, %arg7, %arg8) in (%arg9 = %arg0, %arg10 = %arg1, %arg11 = %arg2) threads(%arg12, %13, %arg14) in (%arg15 = %arg3, %arg16 = %arg4, %arg17 = %arg5) dynamic_shared_memory_size %shmem {
+    %0 = gpu.dynamic_shared_memory : memref<?xi8, #gpu.address_space<workgroup>>
+    %v = arith.constant 0 : i8
+    %c0 = arith.constant 0 : index
+    memref.store %v, %0[%c0] : memref<?xi8, #gpu.address_space<workgroup>>
+    gpu.terminator
+  }
+  return
+}

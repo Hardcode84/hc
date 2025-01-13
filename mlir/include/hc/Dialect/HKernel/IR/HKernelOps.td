@@ -411,6 +411,13 @@ def HKernel_PtrAllocaOp : HKernel_OpBase<"ptr_alloca"> {
   let assemblyFormat = "attr-dict $size `:` type($size) `,` qualified(type($result))";
 }
 
+def HKernel_PtrDynamicSharedMemOp : HKernel_OpBase<"ptr_dynamic_shared_mem"> {
+  let results = (outs Res<HKernel_PtrType, "",
+                      [MemAlloc<AutomaticAllocationScopeResource, 0, FullEffect>]>:$result);
+
+  let assemblyFormat = "attr-dict `:` qualified(type($result))";
+}
+
 def HKernel_PtrAddOp : HKernel_OpBase<"ptr_add", [
   Pure, AllTypesMatch<["base", "result"]>, ViewLikeOpInterface,
 ]> {
