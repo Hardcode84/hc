@@ -279,6 +279,43 @@ struct ConvertSubview final
   }
 };
 
+struct ConvertView final : mlir::OpConversionPattern<mlir::memref::ViewOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::ViewOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::Value src = adaptor.getSource();
+    auto srcType = mlir::dyn_cast<mlir::TupleType>(src.getType());
+    if (!srcType || srcType.size() == 0 ||
+        !mlir::isa<hc::hk::PtrType>(srcType.getType(0)))
+      return rewriter.notifyMatchFailure(op, "Invalid source type");
+
+    auto resType =
+        getTypeConverter()->convertType<mlir::TupleType>(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Unable to convert result type");
+
+    auto sizes = adaptor.getSizes();
+    if (sizes.size() != (resType.size() - 1))
+      return rewriter.notifyMatchFailure(op, "Invalid sizes");
+
+    mlir::Location loc = op.getLoc();
+    mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    src = rewriter.create<hc::hk::TupleExtractOp>(loc, srcType.getType(0), src,
+                                                  zero);
+
+    src = rewriter.create<hc::hk::PtrAddOp>(loc, src.getType(), src,
+                                            adaptor.getByteShift());
+
+    llvm::SmallVector<mlir::Value> args;
+    args.emplace_back(src);
+    llvm::append_range(args, sizes);
+    rewriter.replaceOpWithNewOp<hc::hk::MakeTupleOp>(op, resType, args);
+    return mlir::success();
+  }
+};
+
 struct ConvertLoad final : mlir::OpConversionPattern<mlir::memref::LoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -620,8 +657,8 @@ struct DecomposeMemrefsPass final
 
     hc::populateFuncPatternsAndTypeConversion(patterns, target, converter);
 
-    patterns.insert<ConvertDim, ConvertAlloca, ConvertSubview, ConvertLoad,
-                    ConvertStore, ConvertVecLoad, ConvertVecStore,
+    patterns.insert<ConvertDim, ConvertAlloca, ConvertSubview, ConvertView,
+                    ConvertLoad, ConvertStore, ConvertVecLoad, ConvertVecStore,
                     ConvertMaskedVecLoad, ConvertMaskedVecStore,
                     ConvertDescCast, ConvertDynamicShmem>(converter, ctx);
 
