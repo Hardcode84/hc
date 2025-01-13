@@ -36,6 +36,10 @@ void convertPyArrayImpl(void *obj, int rank, void *ret) {
   }
 }
 
+void convertPyInt64(void *obj, int64_t *ret) {
+  *ret = py::cast<int64_t>(py::handle(static_cast<PyObject *>(obj)));
+}
+
 extern "C" void setGPULoaderSearchPaths(const char *paths[], size_t count);
 
 void setRuntimeSearchPathsImpl(void *obj) {

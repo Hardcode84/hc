@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <cstdint>
+
 void convertPyArrayImpl(void *obj, int rank, void *ret);
+void convertPyInt64(void *obj, int64_t *ret);
 
 void setRuntimeSearchPathsImpl(void *obj);
