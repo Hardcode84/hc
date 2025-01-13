@@ -57,6 +57,19 @@ hcgpuConvertPyArray(hc::ExceptionDesc *errorDesc, void *obj, int rank,
   }
 }
 
+extern "C" HC_PYTHON_RUNTIME_EXPORT int
+hcgpuConvertPyInt64(hc::ExceptionDesc *errorDesc, void *obj,
+                    int64_t *ret) noexcept {
+  LOG_FUNC();
+  try {
+    convertPyInt64(obj, ret);
+    return 0;
+  } catch (const std::exception &e) {
+    errorDesc->message = e.what();
+    return 1;
+  }
+}
+
 extern "C" HC_PYTHON_RUNTIME_EXPORT void *
 hcgpuGetKernel(void **handle, const char *deviceDesc, const void *data,
                size_t dataSize, const char *kenrnelName) noexcept {

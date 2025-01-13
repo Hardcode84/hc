@@ -107,6 +107,15 @@ struct ConvertGetPyArgOp final
       convertRes =
           rewriter.create<mlir::LLVM::CallOp>(loc, convertArgFunc, convertArgs)
               .getResult();
+    } else if (auto intType = mlir::dyn_cast<mlir::IntegerType>(origType)) {
+      std::string funcName =
+          ("hcgpuConvertPyInt" + llvm::Twine(intType.getWidth())).str();
+      auto convertArgFunc =
+          getFunction(funcName, i32Type, {ptrType, ptrType, ptrType});
+      mlir::Value convertArgs[] = {adaptor.getErrorContext(), arg, resPtr};
+      convertRes =
+          rewriter.create<mlir::LLVM::CallOp>(loc, convertArgFunc, convertArgs)
+              .getResult();
     } else {
       return rewriter.notifyMatchFailure(op, "Unsupported return type");
     }
