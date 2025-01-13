@@ -248,9 +248,10 @@ func.func @test(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %arg4: i
 //   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
 //       CHECK:  %[[PTR:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<i8, #gpu.address_space<workgroup>>, index>[%[[C0]]] -> !hkernel.ptr<i8, #gpu.address_space<workgroup>>
 //       CHECK:  %[[PTR1:.*]] = hkernel.ptr_add %[[PTR]] : !hkernel.ptr<i8, #gpu.address_space<workgroup>>, %[[ARG1]] : index
-//       CHECK:  %[[RES:.*]] = hkernel.make_tuple %[[PTR1:.*]], %[[ARG2]], %[[ARG3]], %[[ARG4]] : !hkernel.ptr<i8, #gpu.address_space<workgroup>>, index, index, index -> tuple<!hkernel.ptr<i8, #gpu.address_space<workgroup>>, index, index, index>
-//       CHECK:  return %[[RES]] : tuple<!hkernel.ptr<i8, #gpu.address_space<workgroup>>, index, index, index>
-func.func @test(%arg0: memref<?xi8, #gpu.address_space<workgroup>>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) -> memref<?x?x1x1x?xi8, #gpu.address_space<workgroup>> {
-  %view = memref.view %arg0[%arg1][%arg2, %arg3, %arg4] : memref<?xi8, #gpu.address_space<workgroup>> to memref<?x?x1x1x?xi8, #gpu.address_space<workgroup>>
-  return %view : memref<?x?x1x1x?xi8, #gpu.address_space<workgroup>>
+//       CHECK:  %[[CAST:.*]] = hkernel.cast %[[PTR1]] : !hkernel.ptr<i8, #gpu.address_space<workgroup>> to !hkernel.ptr<i32, #gpu.address_space<workgroup>>
+//       CHECK:  %[[RES:.*]] = hkernel.make_tuple %[[CAST]], %[[ARG2]], %[[ARG3]], %[[ARG4]] : !hkernel.ptr<i32, #gpu.address_space<workgroup>>, index, index, index -> tuple<!hkernel.ptr<i32, #gpu.address_space<workgroup>>, index, index, index>
+//       CHECK:  return %[[RES]] : tuple<!hkernel.ptr<i32, #gpu.address_space<workgroup>>, index, index, index>
+func.func @test(%arg0: memref<?xi8, #gpu.address_space<workgroup>>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) -> memref<?x?x1x1x?xi32, #gpu.address_space<workgroup>> {
+  %view = memref.view %arg0[%arg1][%arg2, %arg3, %arg4] : memref<?xi8, #gpu.address_space<workgroup>> to memref<?x?x1x1x?xi32, #gpu.address_space<workgroup>>
+  return %view : memref<?x?x1x1x?xi32, #gpu.address_space<workgroup>>
 }

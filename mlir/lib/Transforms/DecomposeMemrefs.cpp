@@ -297,7 +297,7 @@ struct ConvertView final : mlir::OpConversionPattern<mlir::memref::ViewOp> {
       return rewriter.notifyMatchFailure(op, "Unable to convert result type");
 
     auto sizes = adaptor.getSizes();
-    if (sizes.size() != (resType.size() - 1))
+    if ((sizes.size() + 1) != resType.size())
       return rewriter.notifyMatchFailure(op, "Invalid sizes");
 
     mlir::Location loc = op.getLoc();
@@ -307,6 +307,9 @@ struct ConvertView final : mlir::OpConversionPattern<mlir::memref::ViewOp> {
 
     src = rewriter.create<hc::hk::PtrAddOp>(loc, src.getType(), src,
                                             adaptor.getByteShift());
+
+    if (src.getType() != resType.getType(0))
+      src = rewriter.create<hc::hk::PtrCastOp>(loc, resType.getType(0), src);
 
     llvm::SmallVector<mlir::Value> args;
     args.emplace_back(src);
