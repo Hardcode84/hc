@@ -127,7 +127,7 @@ static mlir::LogicalResult lowerScope(hc::hk::EnvironmentRegionOp region,
   };
 
   mlir::IRMapping mapping;
-  auto getShaped = [&](mlir::Value val,
+  auto getShaped = [&](mlir::Value val, mlir::TypeRange distShape,
                        mlir::ArrayRef<unsigned> distributeDims) -> mlir::Value {
     if (auto res = mapping.lookupOrNull(val))
       return res;
@@ -156,13 +156,11 @@ static mlir::LogicalResult lowerScope(hc::hk::EnvironmentRegionOp region,
       assert(i < ids.size());
       assert(d < newIndices.size());
       auto ind = mlir::cast<hc::typing::SymbolicTypeBase>(ids[i]);
-      if (i == distributeDims.size() - 1) {
-        if (wgScope) {
-          ind = ind * subgroupSize;
-        } else {
-          ind = ind % subgroupSize;
-        }
-      }
+      if (i == (distributeDims.size() - 1) && !wgScope)
+        ind = ind % subgroupSize;
+
+      auto newDim = mlir::cast<hc::typing::SymbolicTypeBase>(distShape[d]);
+      ind = ind * newDim;
 
       newIndices[d] = makeSlice(ind);
 
@@ -206,7 +204,8 @@ static mlir::LogicalResult lowerScope(hc::hk::EnvironmentRegionOp region,
       auto newResType = distributeShapedType(load.getType(), *div);
 
       builder.setInsertionPoint(op);
-      getShaped(load.getSource(), *div); // Populate mapper
+      getShaped(load.getSource(), newResType.getShape(),
+                *div); // Populate mapper
 
       mapping.map(load.getShape(), genShapeArray(newResType));
       auto newOp = builder.clone(*op, mapping);
@@ -229,7 +228,8 @@ static mlir::LogicalResult lowerScope(hc::hk::EnvironmentRegionOp region,
         return mlir::WalkResult::advance();
 
       builder.setInsertionPoint(op);
-      getShaped(store.getTarget(), *div); // Populate mapper
+      getShaped(store.getTarget(), newSrcType.getShape(),
+                *div); // Populate mapper
       builder.clone(*op, mapping);
       store->erase();
       return mlir::WalkResult::advance();
