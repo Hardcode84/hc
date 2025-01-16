@@ -69,13 +69,11 @@ static mlir::LogicalResult
 materializeStrides(mlir::OpBuilder &builder, mlir::Location loc,
                    mlir::MemRefType type, mlir::Value srcPacked,
                    llvm::SmallVectorImpl<mlir::OpFoldResult> &ret) {
-  auto tupleType = mlir::dyn_cast<mlir::TupleType>(srcPacked.getType());
-  int currentIndex = 1; // 0th is ptr
-  auto getNextVal = [&]() -> mlir::OpFoldResult {
+  auto tupleType = mlir::cast<mlir::TupleType>(srcPacked.getType());
+  auto getNextVal = [&](int64_t currentIndex) -> mlir::OpFoldResult {
     mlir::Value idx =
         builder.create<mlir::arith::ConstantIndexOp>(loc, currentIndex);
     auto elemType = tupleType.getType(currentIndex);
-    ++currentIndex;
     return builder.create<hc::hk::TupleExtractOp>(loc, elemType, srcPacked, idx)
         .getResult();
   };
@@ -84,24 +82,31 @@ materializeStrides(mlir::OpBuilder &builder, mlir::Location loc,
     return builder.getIndexAttr(val);
   };
 
+  int currentIndex = 1; // 0th is ptr
   auto getDim = [&](int64_t val) -> mlir::OpFoldResult {
     if (mlir::ShapedType::isDynamic(val)) {
-      return getNextVal();
+      return getNextVal(currentIndex++);
     } else {
       return createConst(val);
     }
   };
 
   if (type.getLayout().isIdentity()) {
+    llvm::SmallVector<mlir::OpFoldResult> dims;
+    for (auto s : type.getShape())
+      dims.emplace_back(getDim(s));
+
     mlir::Value stride =
         mlir::getValueOrCreateConstantIndexOp(builder, loc, createConst(1));
     ret.emplace_back(stride);
-    for (auto s : llvm::reverse(type.getShape().drop_front())) {
+    auto count = dims.size();
+    for (auto i : llvm::seq<size_t>(1, count)) {
       mlir::Value dimVal =
-          mlir::getValueOrCreateConstantIndexOp(builder, loc, getDim(s));
+          mlir::getValueOrCreateConstantIndexOp(builder, loc, dims[count - i]);
       stride = builder.create<mlir::arith::MulIOp>(loc, stride, dimVal);
       ret.emplace_back(stride);
     }
+
     std::reverse(ret.end() - type.getRank(), ret.end()); // inplace
   } else {
     llvm::SmallVector<int64_t> strides;
@@ -109,9 +114,8 @@ materializeStrides(mlir::OpBuilder &builder, mlir::Location loc,
       return mlir::failure();
 
     currentIndex += type.getNumDynamicDims();
-    for (auto s : strides) {
+    for (auto s : strides)
       ret.emplace_back(getDim(s));
-    }
   }
   return mlir::success();
 }
