@@ -23,6 +23,7 @@ static void populateOptPasses(mlir::OpPassManager &pm) {
       "OptPass", [](mlir::OpPassManager &p) {
         p.addPass(mlir::createCanonicalizerPass());
         p.addPass(mlir::createCSEPass());
+        p.addPass(mlir::createLoopInvariantCodeMotionPass());
       }));
 }
 
@@ -31,8 +32,8 @@ void hc::populateBackendPipeline(mlir::PassManager &pm) {
   pm.addPass(hc::createCreatePyWrapperPass());
   pm.addPass(hc::createDecomposeMemrefsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLowerAffinePass());
+  populateOptPasses(pm.nest<mlir::func::FuncOp>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertSCFToCFPass());
-  populateOptPasses(pm);
 
   pm.addPass(mlir::createGpuLauchSinkIndexComputationsPass());
   pm.addPass(mlir::createGpuKernelOutliningPass());

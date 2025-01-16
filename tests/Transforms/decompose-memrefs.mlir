@@ -105,8 +105,8 @@ func.func @test(%arg0: memref<5x7xf32>, %arg1: index, %arg2: index) -> memref<2x
 // CHECK-LABEL: func @test
 //  CHECK-SAME:  (%[[ARG0:.*]]: tuple<!hkernel.ptr<f32>, index, index>, %[[ARG1:.*]]: index, %[[ARG2:.*]]: index)
 //   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
-//   CHECK-DAG:  %[[C1:.*]] = arith.constant 1 : index
-//       CHECK:  %[[SIZE:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>, index, index>[%[[C1]]] -> index
+//   CHECK-DAG:  %[[C2:.*]] = arith.constant 2 : index
+//       CHECK:  %[[SIZE:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>, index, index>[%[[C2]]] -> index
 //       CHECK:  %[[OFFSET:.*]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[SIZE]], %[[ARG2]]]
 //       CHECK:  %[[PTR:.*]] = hkernel.tuple_extract %[[ARG0]] : tuple<!hkernel.ptr<f32>, index, index>[%[[C0]]] -> !hkernel.ptr<f32>
 //       CHECK:  %[[PTR2:.*]] = hkernel.ptr_add %[[PTR]] : !hkernel.ptr<f32>, %[[OFFSET]] : index
