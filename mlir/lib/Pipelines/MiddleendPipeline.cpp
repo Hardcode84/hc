@@ -20,6 +20,7 @@ static void populateOptPasses(mlir::PassManager &pm) {
         p.addPass(mlir::arith::createIntRangeOptimizationsPass());
         p.addPass(mlir::createCanonicalizerPass());
         p.addPass(mlir::createCSEPass());
+        p.addPass(mlir::createLoopInvariantCodeMotionPass());
       }));
 }
 
