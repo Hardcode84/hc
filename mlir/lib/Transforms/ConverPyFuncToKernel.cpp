@@ -137,6 +137,7 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
 
   auto bufferStr = getStr("Buffer");
   auto tensorStr = getStr("Tensor");
+  auto vectorStr = getStr("Vector");
   auto dimsStr = getStr("dims");
   auto dtypeStr = getStr("dtype");
   auto nameStr = getStr("name");
@@ -188,6 +189,22 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
           return std::nullopt;
 
         return hc::hk::TensorType::get(type.getContext(), dims.getParams(),
+                                       *dtype);
+      });
+  converter.addConversion(
+      [=](hc::typing::IdentType type) -> std::optional<mlir::Type> {
+        if (type.getName() != vectorStr)
+          return std::nullopt;
+
+        auto dims = type.getParam<hc::typing::SequenceType>(dimsStr);
+        if (!dims)
+          return std::nullopt;
+
+        auto dtype = getDtype(type);
+        if (!dtype)
+          return std::nullopt;
+
+        return hc::hk::VectorType::get(type.getContext(), dims.getParams(),
                                        *dtype);
       });
 
