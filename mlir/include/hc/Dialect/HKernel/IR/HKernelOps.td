@@ -77,13 +77,9 @@ def HKernel_SliceType : HKernel_Type<"Slice", "slice", [], "::mlir::Type"> {
   let assemblyFormat = "$lower `:` $upper `:` $step";
 }
 
-def HKernel_BufferType : HKernel_Type<"Buffer", "buffer", [
+class HKernel_ShapedType<string name, string mnemonic> : HKernel_Type<name, mnemonic, [
   SymbolicallyShapedTypeInterface
 ], "::mlir::Type"> {
-  let summary = "TBD";
-  let description = [{
-    TBD
-  }];
   let parameters = (ins
     ArrayRefParameter<"::mlir::Type">:$shape,
     "::mlir::Type":$elementType
@@ -98,26 +94,10 @@ def HKernel_BufferType : HKernel_Type<"Buffer", "buffer", [
   }];
 }
 
-def HKernel_TensorType : HKernel_Type<"Tensor", "tensor", [
-  SymbolicallyShapedTypeInterface
-], "::mlir::Type"> {
-  let summary = "TBD";
-  let description = [{
-    TBD
-  }];
-  let parameters = (ins
-    ArrayRefParameter<"::mlir::Type">:$shape,
-    "::mlir::Type":$elementType
-  );
 
-  let assemblyFormat = "custom<SymbolicShape>($shape) `x` $elementType";
-
-  let extraClassDeclaration = [{
-    ::hc::hk::SymbolicallyShapedType cloneWith(
-      std::optional<llvm::ArrayRef<mlir::Type>> shape,
-      mlir::Type elementType) const;
-  }];
-}
+def HKernel_BufferType : HKernel_ShapedType<"Buffer", "buffer">;
+def HKernel_TensorType : HKernel_ShapedType<"Tensor", "tensor">;
+def HKernel_VectorType : HKernel_ShapedType<"Vector", "vector">;
 
 def HKernel_MakeTupleOp : HKernel_OpBase<"make_tuple", [Pure]> {
   let arguments = (ins Variadic<AnyType>:$args);

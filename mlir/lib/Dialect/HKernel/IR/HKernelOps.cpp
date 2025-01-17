@@ -129,6 +129,13 @@ hc::hk::TensorType::cloneWith(std::optional<llvm::ArrayRef<mlir::Type>> shape,
                          elementType ? elementType : getElementType());
 }
 
+hc::hk::SymbolicallyShapedType
+hc::hk::VectorType::cloneWith(std::optional<llvm::ArrayRef<mlir::Type>> shape,
+                              mlir::Type elementType) const {
+  return VectorType::get(getContext(), shape ? *shape : getShape(),
+                         elementType ? elementType : getElementType());
+}
+
 void hc::hk::MakeSliceOp::build(::mlir::OpBuilder &odsBuilder,
                                 ::mlir::OperationState &odsState,
                                 mlir::Value lower, mlir::Value upper,
@@ -154,25 +161,26 @@ mlir::FailureOr<bool> hc::hk::MaterializeExprOp::inferTypes(
 }
 
 mlir::OpFoldResult hc::hk::TupleExtractOp::fold(FoldAdaptor adaptor) {
-  if (auto idx = mlir::getConstantIntValue(adaptor.getIndex())) {
-    auto src = getSource();
-    auto def = src.getDefiningOp<MakeTupleOp>();
-    if (!def)
-      return nullptr;
+  auto idx = mlir::getConstantIntValue(adaptor.getIndex());
+  if (!idx)
+    return nullptr;
 
-    mlir::ValueRange args = def.getArgs();
+  auto src = getSource();
+  auto def = src.getDefiningOp<MakeTupleOp>();
+  if (!def)
+    return nullptr;
 
-    auto i = *idx;
-    auto tupleType = mlir::cast<mlir::TupleType>(src.getType());
-    assert(args.getTypes() == tupleType.getTypes());
-    if (i < 0 || static_cast<size_t>(i) >= tupleType.size() ||
-        tupleType.getType(i) != getType())
-      return nullptr;
+  mlir::ValueRange args = def.getArgs();
 
-    return args[i];
-  }
+  auto i = *idx;
+  auto tupleType = mlir::dyn_cast<mlir::TupleType>(src.getType());
+  if (!tupleType || args.getTypes() != tupleType.getTypes())
+    return nullptr;
+  if (i < 0 || static_cast<size_t>(i) >= tupleType.size() ||
+      tupleType.getType(i) != getType())
+    return nullptr;
 
-  return nullptr;
+  return args[i];
 }
 
 namespace {

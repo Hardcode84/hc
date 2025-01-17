@@ -33,6 +33,7 @@ CurrentGroup2 = typing.IdentType.get("hckernel.kernel_api.CurrentGroup2")
 CurrentGroup3 = typing.IdentType.get("hckernel.kernel_api.CurrentGroup3")
 
 GroupLoad = typing.IdentType.get("hckernel.kernel_api.CurrentGroup.load")
+GroupVLoad = typing.IdentType.get("hckernel.kernel_api.CurrentGroup.vload")
 GroupStore = typing.IdentType.get("hckernel.kernel_api.CurrentGroup.store")
 
 
@@ -79,9 +80,19 @@ def check_is_tensor(t: ValueType):
 
 
 @func
+def check_is_vector(t: ValueType):
+    check_is_ident(t)
+    check(is_same(get_type_name(t), "Vector"))
+
+
+@func
 def check_is_shaped(t: ValueType):
     check_is_ident(t)
-    check(is_same(get_type_name(t), "Buffer") or is_same(get_type_name(t), "Tensor"))
+    check(
+        is_same(get_type_name(t), "Buffer")
+        or is_same(get_type_name(t), "Tensor")
+        or is_same(get_type_name(t), "Vector")
+    )
 
 
 @func
@@ -323,6 +334,12 @@ def resolver(target: ValueType):
     return GroupLoad
 
 
+@type_resolver(_registry, ["py_ir.getattr", "vload"])
+def resolver(target: ValueType):
+    check_is_current_group(target)
+    return GroupVLoad
+
+
 @type_resolver(_registry, ["py_ir.call"])
 def resolver(func: ValueType):
     check_type(func, GroupLoad)
@@ -336,6 +353,21 @@ def resolver(func: ValueType):
     check_is_tuple(shape)
     elements = get_type_param(shape, "elements")
     return make_type("Tensor", dims=elements, dtype=get_type_param(buffer, "dtype"))
+
+
+@type_resolver(_registry, ["py_ir.call"])
+def resolver(func: ValueType):
+    check_type(func, GroupVLoad)
+    buffer = get_named_arg("array")
+    if is_same(buffer, NoneTyp):
+        buffer = get_arg(1)
+
+    shape = get_named_arg("shape")
+    if is_same(shape, NoneTyp):
+        shape = get_arg(2)
+    check_is_tuple(shape)
+    elements = get_type_param(shape, "elements")
+    return make_type("Vector", dims=elements, dtype=get_type_param(buffer, "dtype"))
 
 
 @type_resolver(_registry, ["py_ir.getattr", "store"])
