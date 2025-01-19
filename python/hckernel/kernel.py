@@ -167,6 +167,7 @@ def kernel(
             prelink_module=_get_typing_module,
             global_attrs=attrs,
             caller_vars=caller_vars,
+            literal_args=literals,
         )
 
     return _kernel_impl

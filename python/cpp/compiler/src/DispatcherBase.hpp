@@ -63,7 +63,7 @@ private:
   llvm::SmallDenseMap<const void *, FuncT> funcsCache;
   llvm::SmallVector<void *> compilerModules;
 
-  void populateArgsHandlers(nanobind::handle args);
+  void populateArgsHandlers(nanobind::handle args, nanobind::handle literals);
   mlir::Attribute processArgs(const nanobind::args &args,
                               const nanobind::kwargs &kwargs,
                               llvm::SmallVectorImpl<PyObject *> &retArgs) const;
