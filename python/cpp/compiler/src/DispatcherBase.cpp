@@ -241,7 +241,7 @@ mlir::Operation *DispatcherBase::runFrontend() {
 
     mod = std::move(newMod);
 
-    populateArgsHandlers(desc.attr("args"));
+    populateArgsHandlers(desc.attr("args"), desc.attr("literal_args"));
     this->funcName = std::move(funcName);
   }
   return mod.get();
@@ -305,13 +305,6 @@ static void updateRetMap(llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret,
                 toStr(oldVal) + " and " + toStr(val));
 }
 
-// static bool issubclass(py::handle cls, py::handle parent) {
-//   const auto result = PyObject_IsSubclass(cls.ptr(), parent.ptr());
-//   if (result == -1)
-//     throw py::python_error();
-//   return result != 0;
-// }
-
 template <unsigned Width, bool Signed>
 static mlir::Type getIntType(mlir::MLIRContext *ctx) {
   return mlir::IntegerType::get(ctx, Width,
@@ -362,31 +355,58 @@ struct DispatcherBase::ArgsHandlerBuilder {
     }
   }
 
-  HandlerT getArgHandler(py::handle arg) {
+  HandlerT getArgHandler(py::handle arg,
+                         const llvm::SmallDenseSet<PyObject *> &literals) {
     auto getSym = [&](py::handle a) -> mlir::Type {
       return hc::typing::SymbolType::get(&ctx, toString(a.attr("name")));
     };
 
     if (py::isinstance(arg, symbolType)) {
       auto sym = getSym(arg);
-      return [sym](mlir::MLIRContext &ctx, py::handle obj,
-                   llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret) {
-        if (py::isinstance<py::int_>(obj)) {
-          updateRetMap(ret, sym, mlir::IntegerType::get(&ctx, 64));
-        } else if (py::isinstance<py::float_>(obj)) {
-          updateRetMap(ret, sym, mlir::Float64Type::get(&ctx));
-        } else {
-          reportError(llvm::Twine("Unsupported type: ") +
-                      toString(py::str(obj)));
-        }
-      };
+      if (literals.contains(arg.ptr())) {
+        return [sym](mlir::MLIRContext &ctx, py::handle obj,
+                     llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret) {
+          mlir::Type type;
+          if (py::isinstance<py::int_>(obj)) {
+            auto val = static_cast<int64_t>(py::int_(obj));
+            auto intType = mlir::IntegerType::get(&ctx, 64);
+            type = hc::typing::LiteralType::get(
+                mlir::IntegerAttr::get(intType, val));
+          } else if (py::isinstance<py::float_>(obj)) {
+            auto val = static_cast<double>(py::float_(obj));
+            auto floatType = mlir::Float64Type::get(&ctx);
+            type = hc::typing::LiteralType::get(
+                mlir::FloatAttr::get(floatType, val));
+          } else {
+            reportError(llvm::Twine("Unsupported type: ") +
+                        toString(py::str(obj)));
+          }
+          updateRetMap(ret, sym, type);
+        };
+      } else {
+        return [sym](mlir::MLIRContext &ctx, py::handle obj,
+                     llvm::SmallMapVector<mlir::Type, mlir::Type, 8> &ret) {
+          mlir::Type type;
+          if (py::isinstance<py::int_>(obj)) {
+            type = mlir::IntegerType::get(&ctx, 64);
+
+          } else if (py::isinstance<py::float_>(obj)) {
+            type = mlir::Float64Type::get(&ctx);
+
+          } else {
+            reportError(llvm::Twine("Unsupported type: ") +
+                        toString(py::str(obj)));
+          }
+          updateRetMap(ret, sym, type);
+        };
+      }
     }
     if (py::isinstance<py::tuple>(arg)) {
       auto count = py::len(arg);
       llvm::SmallVector<HandlerT, 0> handlers;
       handlers.reserve(count);
       for (auto elem : arg)
-        handlers.emplace_back(getArgHandler(elem));
+        handlers.emplace_back(getArgHandler(elem.ptr(), literals));
 
       return [handlersCopy = std::move(handlers)](
                  mlir::MLIRContext &ctx, py::handle obj,
@@ -502,13 +522,19 @@ private:
   }
 };
 
-void DispatcherBase::populateArgsHandlers(py::handle args) {
+void DispatcherBase::populateArgsHandlers(py::handle args,
+                                          py::handle literals) {
   auto &ctx = context.context;
   assert(argsHandlers.empty());
   argsHandlers.reserve(py::len(args));
+
+  llvm::SmallDenseSet<PyObject *> lits;
+  for (auto l : literals)
+    lits.insert(l.ptr());
+
   for (auto [name, elem] : py::cast<py::dict>(args)) {
     auto nameAttr = mlir::StringAttr::get(&ctx, toString(name));
-    auto handler = argsHandlerBuilder->getArgHandler(elem);
+    auto handler = argsHandlerBuilder->getArgHandler(elem, lits);
     argsHandlers.emplace_back(ArgDesc{nameAttr.getValue(), std::move(handler)});
   }
 }

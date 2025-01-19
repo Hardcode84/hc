@@ -29,6 +29,7 @@ def _verify_kernel_params(work_shape, group_shape, subgroup_size, literals, tuna
         or isinstance(subgroup_size, int)
         or subgroup_size in literals
     ), "Subgroup size must be const or literal"
+    assert isinstance(literals, Iterable), f"literals must iterable, got {literals}"
 
 
 class TunableParam:

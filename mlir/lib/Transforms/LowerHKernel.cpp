@@ -229,6 +229,21 @@ static mlir::Value resolveSymbol(mlir::OpBuilder &builder, mlir::Location loc,
         if (!res)
           return nullptr;
 
+        if (auto literal =
+                mlir::dyn_cast<hc::typing::LiteralType>(res.getType())) {
+          auto attr = literal.getValue();
+          auto di = builder.getContext()
+                        ->getLoadedDialect<mlir::arith::ArithDialect>();
+          auto c = di->materializeConstant(builder, attr, attr.getType(), loc);
+          if (!c || c->getNumResults() != 1)
+            return nullptr;
+
+          res = c->getResult(0);
+        }
+
+        if (!res.getType().isIntOrIndex())
+          return nullptr;
+
         if (res.getType() != indexType)
           res = builder.create<mlir::arith::IndexCastOp>(loc, indexType, res);
 

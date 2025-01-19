@@ -404,9 +404,10 @@ struct ConvertGetItem final
   }
 };
 
-static bool checkIsIdent(mlir::Type type, mlir::StringAttr name) {
+static bool checkIsIdent(mlir::Type type,
+                         llvm::ArrayRef<mlir::StringAttr> names) {
   auto ident = mlir::dyn_cast<hc::typing::IdentType>(type);
-  return ident && ident.getName() == name;
+  return ident && llvm::is_contained(names, ident.getName());
 }
 
 static llvm::SmallVector<mlir::Value>
@@ -463,15 +464,17 @@ struct ConvertLoad final : public mlir::OpConversionPattern<hc::py_ir::CallOp> {
               mlir::MLIRContext *context, mlir::PatternBenefit benefit = 1)
       : mlir::OpConversionPattern<hc::py_ir::CallOp>(typeConverter, context,
                                                      benefit),
-        funcName(mlir::StringAttr::get(
+        loadName(mlir::StringAttr::get(
             context, "hckernel.kernel_api.CurrentGroup.load")),
+        vloadName(mlir::StringAttr::get(
+            context, "hckernel.kernel_api.CurrentGroup.vload")),
         arrayName(mlir::StringAttr::get(context, "array")),
         shapeName(mlir::StringAttr::get(context, "shape")) {}
 
   mlir::LogicalResult
   matchAndRewrite(hc::py_ir::CallOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    if (!checkIsIdent(adaptor.getFunc().getType(), funcName))
+    if (!checkIsIdent(adaptor.getFunc().getType(), {loadName, vloadName}))
       return rewriter.notifyMatchFailure(op, "Invalid func type");
 
     const mlir::TypeConverter *converter = getTypeConverter();
@@ -495,7 +498,8 @@ struct ConvertLoad final : public mlir::OpConversionPattern<hc::py_ir::CallOp> {
   }
 
 private:
-  mlir::StringAttr funcName;
+  mlir::StringAttr loadName;
+  mlir::StringAttr vloadName;
   mlir::StringAttr arrayName;
   mlir::StringAttr shapeName;
 };
