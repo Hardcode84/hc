@@ -136,7 +136,7 @@ func.func @test(%arg: !hkernel.memref_descriptor<memref<?xf32>>) -> (!hkernel.pt
 //       CHECK:  %[[OFF:.*]] = llvm.extractvalue %[[ARG]][2] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
 //       CHECK:  %[[PTR2:.*]] = llvm.getelementptr inbounds %[[PTR]][%[[OFF]]] : (!llvm.ptr, i64) -> !llvm.ptr, i8
 //       CHECK:  %[[SIZE:.*]] = llvm.extractvalue %arg0[3, 0] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-//       CHECK:  %[[R1:.*]] = llvm.mlir.undef : !llvm.struct<(ptr, i64)>
+//       CHECK:  %[[R1:.*]] = llvm.mlir.poison : !llvm.struct<(ptr, i64)>
 //       CHECK:  %[[R2:.*]] = llvm.insertvalue %[[PTR2]], %[[R1]][0] : !llvm.struct<(ptr, i64)>
 //       CHECK:  %[[R3:.*]] = llvm.insertvalue %[[SIZE]], %[[R2]][1] : !llvm.struct<(ptr, i64)>
 //       CHECK:  llvm.return %[[R3]] : !llvm.struct<(ptr, i64)>

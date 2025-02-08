@@ -185,7 +185,7 @@ struct ConvertDescriptorCast final
     if (!memrefType.getLayout().isIdentity()) {
       int64_t offset; // unused
       llvm::SmallVector<int64_t> strides;
-      if (mlir::failed(mlir::getStridesAndOffset(memrefType, strides, offset)))
+      if (mlir::failed(memrefType.getStridesAndOffset(strides, offset)))
         return rewriter.notifyMatchFailure(op, "Failed to get strides");
 
       for (auto &&[i, s] : llvm::enumerate(strides)) {

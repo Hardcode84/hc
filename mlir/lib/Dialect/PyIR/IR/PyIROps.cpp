@@ -278,7 +278,8 @@ public:
     mlir::TypeRange resTypes = fn.getFunctionType().getResults();
     mlir::Location loc = op.getLoc();
     mlir::Value newRes = rewriter.create<hc::py_ir::StaticCallOp>(
-        loc, resTypes, def.getValueAttr(), op.getArgs(), op.getArgsNames());
+        loc, resTypes, def.getValueAttr(), op.getArgs(), op.getArgsNames(),
+        nullptr, nullptr);
 
     mlir::Type newType = newRes.getType();
     if (newType != op.getType())

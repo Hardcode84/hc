@@ -62,7 +62,7 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
 static mlir::LogicalResult getStrides(mlir::MemRefType type,
                                       llvm::SmallVectorImpl<int64_t> &strides) {
   int64_t offset; // unused
-  return mlir::getStridesAndOffset(type, strides, offset);
+  return type.getStridesAndOffset(strides, offset);
 }
 
 static mlir::LogicalResult

@@ -254,6 +254,8 @@ def PyIR_PyStaticFuncOp : PyIR_OpBase<"static_func", [
   let arguments = (ins
       SymbolNameAttr:$sym_name,
       OptionalAttr<StrAttr>:$sym_visibility,
+      OptionalAttr<DictArrayAttr>:$arg_attrs,
+      OptionalAttr<DictArrayAttr>:$res_attrs,
       TypeAttrOf<FunctionType>:$function_type,
       ArrayAttr:$arg_names,
       Variadic<AnyType>:$annotations);
@@ -333,7 +335,9 @@ def PyIR_StaticCallOp : PyIR_OpBase<"static_call", [
   let arguments = (ins
     FlatSymbolRefAttr:$callee,
     Variadic<AnyType>:$args,
-    ArrayAttr:$args_names);
+    ArrayAttr:$args_names,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs);
 
   let results = (outs AnyType:$result);
 
