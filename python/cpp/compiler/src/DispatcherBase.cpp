@@ -316,11 +316,11 @@ template <unsigned Width>
 static mlir::Type getFloatType(mlir::MLIRContext *ctx) {
   switch (Width) {
   case 16:
-    return mlir::FloatType::getF16(ctx);
+    return mlir::Float16Type::get(ctx);
   case 32:
-    return mlir::FloatType::getF32(ctx);
+    return mlir::Float32Type::get(ctx);
   case 64:
-    return mlir::FloatType::getF64(ctx);
+    return mlir::Float64Type::get(ctx);
   }
   llvm_unreachable("Invalid float width");
 }
