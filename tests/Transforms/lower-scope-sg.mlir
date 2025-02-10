@@ -45,5 +45,7 @@ module attributes {kernel.group_id = #typing.type_attr<!seq> : !typing.value, ke
 // CHECK-LABEL: func @test
 //   CHECK-DAG: %[[V0:.*]] = hkernel.materialize_expr ![[LIT1]]
 //       CHECK:   hkernel.env_region #hkernel.workitem_scope
-//       CHECK:     %[[R:.*]] = hkernel.load %{{.*}} : !hkernel<buffer <(-("$GROUP_ID0" * "$GROUP_SHAPE0") - "$LOCAL_ID0" + "W") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1" - "$LOCAL_ID1" floordiv "$SUBGROUP_SIZE" - "$LOCAL_ID1" mod "$SUBGROUP_SIZE")> x ![[LIT0]]>[%[[V0]], %[[V0]]] : ![[LIT1]], ![[LIT1]] -> !hkernel<tensor <1 x 1> x ![[LIT0]]>
-//       CHECK:     hkernel.store %{{.*}} : !hkernel<buffer <(-("$GROUP_ID0" * "$GROUP_SHAPE0") - "$LOCAL_ID0" + "W") x ("H" - "$GROUP_ID1" * "$GROUP_SHAPE1" - "$LOCAL_ID1" floordiv "$SUBGROUP_SIZE" - "$LOCAL_ID1" mod "$SUBGROUP_SIZE")> x ![[LIT0]]> = %[[R]] : !hkernel<tensor <1 x 1> x ![[LIT0]]>
+//       CHECK:     hkernel.subview
+//       CHECK:     %[[R:.*]] = hkernel.load %{{.*}} : !hkernel<buffer <("W" - "$GROUP_ID0" * "$GROUP_SHAPE0" - "$LOCAL_ID0") x (-("$GROUP_ID1" * "$GROUP_SHAPE1") - "$LOCAL_ID1" mod "$SUBGROUP_SIZE" - "$LOCAL_ID1" floordiv "$SUBGROUP_SIZE" + "H")> x ![[LIT0]]>[%[[V0]], %[[V0]]] : ![[LIT1]], ![[LIT1]] -> !hkernel<tensor <1 x 1> x ![[LIT0]]>
+//       CHECK:     hkernel.subview
+//       CHECK:     hkernel.store %{{.*}} : !hkernel<buffer <("W" - "$GROUP_ID0" * "$GROUP_SHAPE0" - "$LOCAL_ID0") x (-("$GROUP_ID1" * "$GROUP_SHAPE1") - "$LOCAL_ID1" mod "$SUBGROUP_SIZE" - "$LOCAL_ID1" floordiv "$SUBGROUP_SIZE" + "H")> x ![[LIT0]]> = %[[R]] : !hkernel<tensor <1 x 1> x ![[LIT0]]>

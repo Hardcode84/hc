@@ -1095,6 +1095,8 @@ simplifyExpr(llvm::ArrayRef<mlir::Type> params, mlir::AffineExpr expr) {
   bool changed;
   do {
     changed = false;
+    expr = mlir::simplifyAffineExpr(expr, 0, retParams.size());
+
     if (expandLiterals(retParams, expr))
       changed = true;
 
@@ -1109,7 +1111,7 @@ simplifyExpr(llvm::ArrayRef<mlir::Type> params, mlir::AffineExpr expr) {
   } while (changed);
 
   sortParams(retParams, expr);
-  return {retParams, mlir::simplifyAffineExpr(expr, 0, retParams.size())};
+  return {retParams, expr};
 }
 
 static mlir::ParseResult

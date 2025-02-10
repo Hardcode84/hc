@@ -109,6 +109,18 @@ struct ConverPyFuncToKernelFuncPass final
   }
 };
 
+static llvm::SmallVector<mlir::Type> simplifyTypes(mlir::TypeRange types) {
+  llvm::SmallVector<mlir::Type> ret(types.size());
+  for (auto &&[i, t] : llvm::enumerate(types)) {
+    if (auto sym = mlir::dyn_cast<hc::typing::SymbolicTypeBase>(t)) {
+      ret[i] = hc::typing::SymbolicTypeBase::foldExpr(sym);
+    } else {
+      ret[i] = t;
+    }
+  }
+  return ret;
+}
+
 static void populateTypeConverter(mlir::MLIRContext *ctx,
                                   mlir::TypeConverter &converter) {
   // Convert unknown types to itself
@@ -172,8 +184,8 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
         if (!dtype)
           return std::nullopt;
 
-        return hc::hk::BufferType::get(type.getContext(), dims.getParams(),
-                                       *dtype);
+        return hc::hk::BufferType::get(type.getContext(),
+                                       simplifyTypes(dims.getParams()), *dtype);
       });
   converter.addConversion(
       [=](hc::typing::IdentType type) -> std::optional<mlir::Type> {
@@ -188,8 +200,8 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
         if (!dtype)
           return std::nullopt;
 
-        return hc::hk::TensorType::get(type.getContext(), dims.getParams(),
-                                       *dtype);
+        return hc::hk::TensorType::get(type.getContext(),
+                                       simplifyTypes(dims.getParams()), *dtype);
       });
   converter.addConversion(
       [=](hc::typing::IdentType type) -> std::optional<mlir::Type> {
@@ -204,8 +216,8 @@ static void populateTypeConverter(mlir::MLIRContext *ctx,
         if (!dtype)
           return std::nullopt;
 
-        return hc::hk::VectorType::get(type.getContext(), dims.getParams(),
-                                       *dtype);
+        return hc::hk::VectorType::get(type.getContext(),
+                                       simplifyTypes(dims.getParams()), *dtype);
       });
 
   auto tupleStr = getStr("Tuple");
