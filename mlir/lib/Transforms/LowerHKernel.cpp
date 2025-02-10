@@ -50,10 +50,13 @@ static std::optional<int64_t> getSymbolicLiteral(mlir::Type type) {
   return attr.getInt();
 }
 
-static mlir::SmallVector<int64_t> convertShape(mlir::TypeRange symbolic) {
+static mlir::SmallVector<int64_t> convertShape(mlir::TypeRange symbolic,
+                                               mlir::TypeConverter &converter) {
   llvm::SmallVector<int64_t> shape(symbolic.size());
   for (auto &&[i, s] : llvm::enumerate(symbolic)) {
     if (auto lit = getSymbolicLiteral(s)) {
+      shape[i] = *lit;
+    } else if (auto lit = getSymbolicLiteral(converter.convertType(s))) {
       shape[i] = *lit;
     } else {
       shape[i] = mlir::ShapedType::kDynamic;
@@ -95,7 +98,8 @@ static void populateTypeConverter(mlir::TypeConverter &converter) {
 
     mlir::TypeRange shape = type.getShape();
     auto layout = getStridedLayout(type.getContext(), shape.size());
-    return mlir::MemRefType::get(convertShape(shape), elemType, layout);
+    return mlir::MemRefType::get(convertShape(shape, converter), elemType,
+                                 layout);
   });
 
   converter.addConversion([&](hc::hk::TensorType type) -> mlir::Type {
@@ -108,11 +112,27 @@ static void populateTypeConverter(mlir::TypeConverter &converter) {
     mlir::TypeRange shape = type.getShape();
     auto layout = getStridedLayout(type.getContext(), shape.size());
     auto addrSpace = getWGAddrSpace(type.getContext());
-    auto convertedShape = convertShape(shape);
+    auto convertedShape = convertShape(shape, converter);
     auto dataType =
         mlir::MemRefType::get(convertedShape, elemType, layout, addrSpace);
     auto maskType =
         mlir::MemRefType::get(convertedShape, maskElemType, layout, addrSpace);
+    return mlir::TupleType::get(type.getContext(), {dataType, maskType});
+  });
+
+  converter.addConversion([&](hc::hk::VectorType type) -> mlir::Type {
+    auto elemType = convertElemType(converter, type.getElementType());
+    if (!elemType)
+      return nullptr;
+
+    mlir::TypeRange shape = type.getShape();
+    auto convertedShape = convertShape(shape, converter);
+    if (mlir::ShapedType::isDynamicShape(convertedShape))
+      return nullptr;
+
+    auto maskElemType = mlir::IntegerType::get(type.getContext(), 1);
+    auto dataType = mlir::VectorType::get(convertedShape, elemType);
+    auto maskType = mlir::VectorType::get(convertedShape, maskElemType);
     return mlir::TupleType::get(type.getContext(), {dataType, maskType});
   });
 
@@ -523,6 +543,7 @@ struct ResolveArgsPass final
             builder.getUnknownLoc(), 64);
       }
 
+      mlir::Type indexType = builder.getIndexType();
       auto replaceMaterialize =
           [&](hc::hk::MaterializeExprOp mat) -> mlir::WalkResult {
         auto type = mat.getType();
@@ -533,6 +554,9 @@ struct ResolveArgsPass final
           mat.emitError("Failed to materialize expr");
           return mlir::WalkResult::interrupt();
         }
+        if (expr.getType() != indexType)
+          expr = builder.create<mlir::arith::IndexCastOp>(loc, indexType, expr);
+
         expr = doCast(builder, loc, expr, type)->getResult(0);
         builder.replaceAllUsesWith(mat, expr);
         builder.eraseOp(mat);
@@ -978,55 +1002,87 @@ struct ConvertLoad final : public mlir::OpConversionPattern<hc::hk::LoadOp> {
     if (unpackedSrc.empty())
       return rewriter.notifyMatchFailure(op, "Failed to unpack src");
 
-    auto alloc = createAlloc(rewriter, loc, newResultType, dstShape);
-    if (alloc.size() != 2)
-      return rewriter.notifyMatchFailure(op, "Failed to create alloc");
+    if (mlir::isa<hc::hk::TensorType>(origResultType)) {
+      auto alloc = createAlloc(rewriter, loc, newResultType, dstShape);
+      if (alloc.size() != 2)
+        return rewriter.notifyMatchFailure(op, "Failed to create alloc");
 
-    mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
-    mlir::Value one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
-    auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
-                           mlir::ValueRange indices, mlir::ValueRange) {
-      mlir::Value cond;
-      for (auto &&[srcDim, index] : llvm::zip_equal(srcShape, indices)) {
-        mlir::Value lt = builder.create<mlir::arith::CmpIOp>(
-            loc, mlir::arith::CmpIPredicate::slt, index, srcDim);
-        if (!cond) {
-          cond = lt;
-        } else {
-          cond = builder.create<mlir::arith::AndIOp>(loc, cond, lt);
+      mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+      mlir::Value one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+      auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
+                             mlir::ValueRange indices, mlir::ValueRange) {
+        mlir::Value cond;
+        for (auto &&[srcDim, index] : llvm::zip_equal(srcShape, indices)) {
+          mlir::Value lt = builder.create<mlir::arith::CmpIOp>(
+              loc, mlir::arith::CmpIPredicate::slt, index, srcDim);
+          if (!cond) {
+            cond = lt;
+          } else {
+            cond = builder.create<mlir::arith::AndIOp>(loc, cond, lt);
+          }
         }
-      }
-      auto maskType = mlir::VectorType::get(1, builder.getI1Type());
+        auto maskType = mlir::VectorType::get(1, builder.getI1Type());
+        mlir::Value mask =
+            builder.create<mlir::vector::SplatOp>(loc, maskType, cond);
+        if (unpackedSrc.size() >= 2) {
+          mlir::Value f = builder.create<mlir::arith::ConstantIntOp>(
+              loc, /*value*/ 0, /*width*/ 1);
+          mlir::Value passthru =
+              builder.create<mlir::vector::SplatOp>(loc, maskType, f);
+          mask = builder.create<mlir::vector::MaskedLoadOp>(
+              loc, maskType, unpackedSrc[1], indices, mask, passthru);
+        }
+
+        auto src = unpackedSrc.front();
+        auto vecType = mlir::VectorType::get(1, src.getType().getElementType());
+        mlir::Value passthru = builder.create<mlir::ub::PoisonOp>(loc, vecType);
+        mlir::Value res = builder.create<mlir::vector::MaskedLoadOp>(
+            loc, vecType, src, indices, mask, passthru);
+        builder.create<mlir::vector::StoreOp>(loc, res, alloc[0], indices);
+        builder.create<mlir::vector::StoreOp>(loc, mask, alloc[1], indices);
+      };
+      llvm::SmallVector<mlir::Value> lowerBounds(rank, zero);
+      llvm::SmallVector<mlir::Value> steps(rank, one);
+      rewriter.create<mlir::scf::ParallelOp>(loc, lowerBounds, dstShape, steps,
+                                             std::nullopt, bodyBuilder);
+
+      auto res = packTuple(rewriter, loc, alloc, newResultType);
+      if (!res)
+        return rewriter.notifyMatchFailure(op, "Failed to pack result");
+
+      rewriter.replaceOp(op, res);
+      return mlir::success();
+    }
+    if (mlir::isa<hc::hk::VectorType>(origResultType)) {
+      auto resTupleType = mlir::dyn_cast<mlir::TupleType>(newResultType);
+      if (!resTupleType || resTupleType.size() != 2 ||
+          !mlir::isa<mlir::VectorType>(resTupleType.getType(0)) ||
+          !mlir::isa<mlir::VectorType>(resTupleType.getType(1)))
+        return rewriter.notifyMatchFailure(op, "Invalid result type");
+
+      auto resType = mlir::cast<mlir::VectorType>(resTupleType.getType(0));
+      auto maskType = mlir::cast<mlir::VectorType>(resTupleType.getType(1));
       mlir::Value mask =
-          builder.create<mlir::vector::SplatOp>(loc, maskType, cond);
-      if (unpackedSrc.size() >= 2) {
-        mlir::Value f = builder.create<mlir::arith::ConstantIntOp>(
-            loc, /*value*/ 0, /*width*/ 1);
-        mlir::Value passthru =
-            builder.create<mlir::vector::SplatOp>(loc, maskType, f);
-        mask = builder.create<mlir::vector::MaskedLoadOp>(
-            loc, maskType, unpackedSrc[1], indices, mask, passthru);
-      }
+          rewriter.create<mlir::vector::CreateMaskOp>(loc, maskType, srcShape);
 
-      auto src = unpackedSrc.front();
-      auto vecType = mlir::VectorType::get(1, src.getType().getElementType());
-      mlir::Value passthru = builder.create<mlir::ub::PoisonOp>(loc, vecType);
-      mlir::Value res = builder.create<mlir::vector::MaskedLoadOp>(
-          loc, vecType, src, indices, mask, passthru);
-      builder.create<mlir::vector::StoreOp>(loc, res, alloc[0], indices);
-      builder.create<mlir::vector::StoreOp>(loc, mask, alloc[1], indices);
-    };
-    llvm::SmallVector<mlir::Value> lowerBounds(rank, zero);
-    llvm::SmallVector<mlir::Value> steps(rank, one);
-    rewriter.create<mlir::scf::ParallelOp>(loc, lowerBounds, dstShape, steps,
-                                           std::nullopt, bodyBuilder);
+      mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+      llvm::SmallVector<mlir::Value> indices(resType.getRank(), zero);
+      if (unpackedSrc.size() >= 2)
+        mask = rewriter.create<mlir::vector::MaskedLoadOp>(
+            loc, maskType, unpackedSrc[1], indices, mask, mask);
 
-    auto res = packTuple(rewriter, loc, alloc, newResultType);
-    if (!res)
-      return rewriter.notifyMatchFailure(op, "Failed to pack result");
+      mlir::Value passthru = rewriter.create<mlir::ub::PoisonOp>(loc, resType);
+      mlir::Value result = rewriter.create<mlir::vector::MaskedLoadOp>(
+          loc, resType, unpackedSrc[0], indices, mask, passthru);
+      auto res = packTuple(rewriter, loc, {result, mask}, newResultType);
+      if (!res)
+        return rewriter.notifyMatchFailure(op, "Failed to pack result");
 
-    rewriter.replaceOp(op, res);
-    return mlir::success();
+      rewriter.replaceOp(op, res);
+      return mlir::success();
+    }
+
+    return rewriter.notifyMatchFailure(op, "Invalid ret type");
   }
 };
 
@@ -1081,39 +1137,65 @@ struct ConvertStore final : public mlir::OpConversionPattern<hc::hk::StoreOp> {
       srcShape.emplace_back(dim);
     }
 
-    mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
-    mlir::Value one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
-    auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
-                           mlir::ValueRange indices, mlir::ValueRange) {
-      auto maskType = mlir::VectorType::get(1, builder.getI1Type());
-      mlir::Value mask;
-      if (unpackedSrc.size() > 1) {
-        mask = builder.create<mlir::vector::LoadOp>(loc, maskType,
-                                                    unpackedSrc[1], indices);
-      } else {
-        mask = builder.create<mlir::arith::ConstantIntOp>(loc, 1, 1);
-        mask = builder.create<mlir::vector::SplatOp>(loc, maskType, mask);
-      }
+    if (mlir::isa<hc::hk::TensorType>(origSrcType)) {
+      mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+      mlir::Value one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+      auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
+                             mlir::ValueRange indices, mlir::ValueRange) {
+        auto maskType = mlir::VectorType::get(1, builder.getI1Type());
+        mlir::Value mask;
+        if (unpackedSrc.size() > 1) {
+          mask = builder.create<mlir::vector::LoadOp>(loc, maskType,
+                                                      unpackedSrc[1], indices);
+        } else {
+          mask = builder.create<mlir::arith::ConstantIntOp>(loc, 1, 1);
+          mask = builder.create<mlir::vector::SplatOp>(loc, maskType, mask);
+        }
 
-      auto src = unpackedSrc.front();
-      auto vecType = mlir::VectorType::get(1, src.getType().getElementType());
-      mlir::Value val =
-          builder.create<mlir::vector::LoadOp>(loc, vecType, src, indices);
+        auto src = unpackedSrc.front();
+        auto vecType = mlir::VectorType::get(1, src.getType().getElementType());
+        mlir::Value val =
+            builder.create<mlir::vector::LoadOp>(loc, vecType, src, indices);
+
+        auto dst = unpackedDst.front();
+        builder.create<mlir::vector::MaskedStoreOp>(loc, dst, indices, mask,
+                                                    val);
+        if (unpackedDst.size() > 1)
+          builder.create<mlir::vector::MaskedStoreOp>(loc, unpackedDst[1],
+                                                      indices, mask, mask);
+      };
+
+      auto rank = srcShape.size();
+      llvm::SmallVector<mlir::Value> lowerBounds(rank, zero);
+      llvm::SmallVector<mlir::Value> steps(rank, one);
+      rewriter.create<mlir::scf::ParallelOp>(loc, lowerBounds, srcShape, steps,
+                                             std::nullopt, bodyBuilder);
+      rewriter.eraseOp(op);
+      return mlir::success();
+    }
+    if (mlir::isa<hc::hk::VectorType>(origSrcType)) {
+      if (unpackedSrc.size() != 2 ||
+          !mlir::isa<mlir::VectorType>(unpackedSrc[0].getType()) ||
+          !mlir::isa<mlir::VectorType>(unpackedSrc[1].getType()))
+        return rewriter.notifyMatchFailure(op, "Invalid source type");
+
+      mlir::Value value = unpackedSrc[0];
+      mlir::Value mask = unpackedSrc[1];
+
+      mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+      llvm::SmallVector<mlir::Value> indices(srcShape.size(), zero);
 
       auto dst = unpackedDst.front();
-      builder.create<mlir::vector::MaskedStoreOp>(loc, dst, indices, mask, val);
+      rewriter.create<mlir::vector::MaskedStoreOp>(loc, dst, indices, mask,
+                                                   value);
       if (unpackedDst.size() > 1)
-        builder.create<mlir::vector::MaskedStoreOp>(loc, unpackedDst[1],
-                                                    indices, mask, mask);
-    };
+        rewriter.create<mlir::vector::MaskedStoreOp>(loc, unpackedDst[1],
+                                                     indices, mask, mask);
 
-    auto rank = srcShape.size();
-    llvm::SmallVector<mlir::Value> lowerBounds(rank, zero);
-    llvm::SmallVector<mlir::Value> steps(rank, one);
-    rewriter.create<mlir::scf::ParallelOp>(loc, lowerBounds, srcShape, steps,
-                                           std::nullopt, bodyBuilder);
-    rewriter.eraseOp(op);
-    return mlir::success();
+      rewriter.eraseOp(op);
+      return mlir::success();
+    }
+    return rewriter.notifyMatchFailure(op, "Invalid src type");
   }
 };
 
@@ -1198,6 +1280,7 @@ struct LowerHKernelOpsPass final
         [&](mlir::func::ReturnOp op) {
           return converter.isLegal(op.getOperandTypes());
         });
+    target.addLegalOp<mlir::UnrealizedConversionCastOp>();
     target.addLegalOp<hc::hk::MaterializeExprOp>();
     target.addLegalDialect<mlir::ub::UBDialect, mlir::arith::ArithDialect,
                            mlir::memref::MemRefDialect,
