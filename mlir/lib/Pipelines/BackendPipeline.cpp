@@ -33,7 +33,7 @@ void hc::populateBackendPipeline(mlir::PassManager &pm) {
   pm.addPass(hc::createDecomposeMemrefsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLowerAffinePass());
   populateOptPasses(pm.nest<mlir::func::FuncOp>());
-  pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertSCFToCFPass());
+  pm.addNestedPass<mlir::func::FuncOp>(mlir::createSCFToControlFlowPass());
 
   pm.addPass(mlir::createGpuLauchSinkIndexComputationsPass());
   pm.addPass(mlir::createGpuKernelOutliningPass());
