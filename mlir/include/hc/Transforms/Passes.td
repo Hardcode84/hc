@@ -265,6 +265,9 @@ def SelectPass : Pass<"hc-select-pass"> {
   ];
 }
 
+def LegalizeVectorOpsPass : Pass<"hc-legalize-vector-ops-pass"> {
+}
+
 // TODO: Fix upstream
 def ConvertGpuOpsToNVVMOps : Pass<"hc-convert-gpu-to-nvvm", "::mlir::gpu::GPUModuleOp"> {
   let summary = "Generate NVVM operations for gpu operations";

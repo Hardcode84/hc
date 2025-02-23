@@ -103,3 +103,34 @@ def test_copy_unroll(shape, unroll):
     b = torch.zeros_like(a)
     copy_kernel(a, b, unroll)
     assert_close(b, a)
+
+
+@require_e2e
+@pytest.mark.parametrize("shape", _copy_shapes)
+@pytest.mark.parametrize("unroll", [1, 2, 4])
+def test_copy_vec(shape, unroll):
+    backend = get_backend()
+
+    W = sym.W
+    H = sym.H
+    DT = typename.DT
+    V = sym.V
+    H1 = sympy.ceiling(H / V)
+
+    @kernel(
+        work_shape=(W, H1),
+        backend=backend,
+        device=get_device(backend),
+        literals=[V],
+    )
+    def copy_kernel(
+        group: CurrentGroup, src: Buffer[W, H, DT], dst: Buffer[W, H, DT], v: V
+    ):
+        x, y = group.work_offset
+        val = group.vload(src[x:, y * V :], shape=(group.shape[0], group.shape[1] * V))
+        group.store(dst[x:, y * V :], val)
+
+    a = to_device(torch.arange(shape[0] * shape[1], dtype=torch.int32).reshape(shape))
+    b = torch.zeros_like(a)
+    copy_kernel(a, b, unroll)
+    assert_close(b, a)

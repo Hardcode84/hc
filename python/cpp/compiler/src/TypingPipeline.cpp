@@ -240,7 +240,7 @@ public:
     if (!funcType)
       return mlir::failure();
 
-    llvm::StringRef funcName = funcType.getName().getValue();
+    llvm::StringRef funcName = funcType.getName();
     if (!funcName.consume_front("hckernel.typing."))
       return mlir::failure();
 
