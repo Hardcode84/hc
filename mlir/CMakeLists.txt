@@ -61,6 +61,7 @@ set(SOURCES_LIST
     lib/Transforms/GpuToROCDL.cpp
     lib/Transforms/LegalizeBoolMemrefs.cpp
     lib/Transforms/LegalizeLLVMABI.cpp
+    lib/Transforms/LegalizeVectorOps.cpp
     lib/Transforms/LowerHKernel.cpp
     lib/Transforms/LowerScope.cpp
     lib/Transforms/ModuleLinker.cpp

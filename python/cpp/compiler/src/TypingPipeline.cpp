@@ -88,7 +88,7 @@ static mlir::LogicalResult convertCall(mlir::PatternRewriter &builder,
   auto none = builder.getNoneType();
   auto vt = hc::typing::ValueType::get(builder.getContext());
   using fptr =
-      mlir::Operation *(*)(mlir::OpBuilder &builder, mlir::Location loc,
+      mlir::Operation *(*)(mlir::OpBuilder & builder, mlir::Location loc,
                            mlir::ValueRange args, mlir::Type resType,
                            mlir::TypeRange expectedArgTypes);
 
@@ -282,7 +282,7 @@ public:
       return mlir::failure();
 
     using fptr =
-        mlir::Value (*)(mlir::OpBuilder &builder, mlir::Location loc,
+        mlir::Value (*)(mlir::OpBuilder & builder, mlir::Location loc,
                         mlir::Value lhs, mlir::Value rhs, mlir::Type dstType);
     using Op = hc::py_ir::BinOpVal;
     namespace arith = mlir::arith;
@@ -330,7 +330,7 @@ public:
       return mlir::failure();
 
     using fptr =
-        mlir::Value (*)(mlir::OpBuilder &builder, mlir::Location loc,
+        mlir::Value (*)(mlir::OpBuilder & builder, mlir::Location loc,
                         mlir::Value lhs, mlir::Value rhs, mlir::Type dstType);
     using Op = hc::py_ir::BinOpVal;
     namespace ty = hc::typing;
@@ -388,7 +388,7 @@ public:
     mlir::Type resType = rewriter.getIndexType();
 
     using fptr =
-        mlir::Value (*)(mlir::OpBuilder &builder, mlir::Location loc,
+        mlir::Value (*)(mlir::OpBuilder & builder, mlir::Location loc,
                         mlir::Value lhs, mlir::Value rhs, mlir::Type dstType);
     using Op = hc::py_ir::CmpOpVal;
     using pred = mlir::arith::CmpIPredicate;
