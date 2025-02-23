@@ -32,6 +32,7 @@ void hc::populateBackendPipeline(mlir::PassManager &pm) {
   pm.addPass(hc::createCreatePyWrapperPass());
   pm.addPass(hc::createDecomposeMemrefsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLowerAffinePass());
+  pm.addNestedPass<mlir::func::FuncOp>(hc::createLegalizeVectorOpsPass());
   populateOptPasses(pm.nest<mlir::func::FuncOp>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createSCFToControlFlowPass());
 
