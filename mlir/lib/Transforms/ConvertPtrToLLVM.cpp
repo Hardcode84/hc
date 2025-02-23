@@ -6,6 +6,7 @@
 #include "hc/Transforms/ConvertPtrToLLVM.hpp"
 
 #include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
+#include "hc/Dialect/Typing/IR/TypingOps.hpp"
 
 #include <mlir/Conversion/ConvertToLLVM/ToLLVMInterface.h>
 #include <mlir/Conversion/LLVMCommon/MemRefBuilder.h>
@@ -107,7 +108,7 @@ struct ConvertGetPyArgOp final
       convertRes =
           rewriter.create<mlir::LLVM::CallOp>(loc, convertArgFunc, convertArgs)
               .getResult();
-    } else if (auto intType = mlir::dyn_cast<mlir::IntegerType>(origType)) {
+    } else if (auto intType = mlir::dyn_cast<mlir::IntegerType>(resType)) {
       std::string funcName =
           ("hcgpuConvertPyInt" + llvm::Twine(intType.getWidth())).str();
       auto convertArgFunc =
@@ -486,6 +487,10 @@ void hc::populatePtrToLLVMTypeConverter(mlir::LLVMTypeConverter &converter) {
       [ptrType](hc::hk::PyArgsType) -> std::optional<mlir::Type> {
         return ptrType;
       });
+
+  converter.addConversion([&converter](hc::typing::SymbolicTypeBase type) {
+    return converter.convertType(mlir::IndexType::get(type.getContext()));
+  });
 }
 
 void hc::populatePtrToLLVMConversionPatterns(
