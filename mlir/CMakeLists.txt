@@ -57,8 +57,6 @@ set(SOURCES_LIST
     lib/Transforms/ExpandSharedAllocs.cpp
     lib/Transforms/ExpandTuple.cpp
     lib/Transforms/GpuToGpuRuntime.cpp
-    lib/Transforms/GpuToNVVM.cpp
-    lib/Transforms/GpuToROCDL.cpp
     lib/Transforms/LegalizeBoolMemrefs.cpp
     lib/Transforms/LegalizeLLVMABI.cpp
     lib/Transforms/LegalizeVectorOps.cpp

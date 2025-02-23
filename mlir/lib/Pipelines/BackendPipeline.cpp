@@ -8,6 +8,8 @@
 #include "hc/Dialect/HKernel/IR/HKernelOps.hpp"
 
 #include <mlir/Conversion/AffineToStandard/AffineToStandard.h>
+#include <mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h>
+#include <mlir/Conversion/GPUToROCDL/GPUToROCDLPass.h>
 #include <mlir/Conversion/Passes.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
@@ -45,14 +47,14 @@ void hc::populateBackendPipeline(mlir::PassManager &pm) {
       {"rocm",
        [](mlir::OpPassManager &pm) {
          auto &gpuPm = pm.nest<mlir::gpu::GPUModuleOp>();
-         gpuPm.addPass(hc::createConvertGpuOpsToROCDLOps());
+         gpuPm.addPass(mlir::createLowerGpuOpsToROCDLOpsPass());
          populateOptPasses(gpuPm);
 
          pm.addPass(mlir::createGpuROCDLAttachTarget());
        }},
       {"nvvm", [](mlir::OpPassManager &pm) {
          auto &gpuPm = pm.nest<mlir::gpu::GPUModuleOp>();
-         gpuPm.addPass(hc::createConvertGpuOpsToNVVMOps());
+         gpuPm.addPass(mlir::createConvertGpuOpsToNVVMOps());
          populateOptPasses(gpuPm);
 
          pm.addPass(mlir::createGpuNVVMAttachTarget());
