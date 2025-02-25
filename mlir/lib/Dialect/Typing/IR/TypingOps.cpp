@@ -575,10 +575,11 @@ InterpreterValue hc::typing::getVal(const InterpreterState &state,
 static const constexpr int PackShift = 2;
 
 std::optional<int64_t> hc::typing::getInt(InterpreterValue val) {
-  if (val.is<void *>())
-    return reinterpret_cast<intptr_t>(val.get<void *>()) >> PackShift;
+  if (mlir::isa<void *>(val))
+    return reinterpret_cast<intptr_t>(mlir::cast<void *>(val)) >> PackShift;
 
-  auto lit = mlir::dyn_cast<hc::typing::LiteralType>(val.get<mlir::Type>());
+  auto lit =
+      mlir::dyn_cast<hc::typing::LiteralType>(mlir::cast<mlir::Type>(val));
   if (!lit)
     return std::nullopt;
 
