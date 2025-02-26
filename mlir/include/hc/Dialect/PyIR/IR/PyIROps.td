@@ -363,7 +363,7 @@ def PyIR_StaticCallOp : PyIR_OpBase<"static_call", [
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(::mlir::CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", callee.get<::mlir::SymbolRefAttr>());
+      (*this)->setAttr("callee", ::mlir::cast<::mlir::SymbolRefAttr>(callee));
     }
   }];
 
